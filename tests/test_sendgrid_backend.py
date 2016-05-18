@@ -432,7 +432,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         data = self.get_api_call_data()
         smtpapi = self.get_smtpapi()
         self.assertEqual(data['toname'], [' ', 'Bob'])
-        self.assertEqual(data['to'], ['alice@example.com', 'Bob <bob@example.com>'])
+        self.assertEqual(data['to'], ['alice@example.com', 'bob@example.com'])
         self.assertEqual(smtpapi['to'], ['alice@example.com', 'Bob <bob@example.com>'])
         self.assertEqual(smtpapi['sub'], {
             ':name': ["Alice", "Bob"],
