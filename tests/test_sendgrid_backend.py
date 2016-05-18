@@ -431,8 +431,8 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
 
         data = self.get_api_call_data()
         smtpapi = self.get_smtpapi()
-        self.assertNotIn('to', data)  # recipients should be moved to smtpapi-to with merge_data
-        self.assertNotIn('toname', data)
+        self.assertEqual(data['toname'], ['', 'Bob'])
+        self.assertEqual(data['to'], ['alice@example.com', 'Bob <bob@example.com>'])
         self.assertEqual(smtpapi['to'], ['alice@example.com', 'Bob <bob@example.com>'])
         self.assertEqual(smtpapi['sub'], {
             ':name': ["Alice", "Bob"],
