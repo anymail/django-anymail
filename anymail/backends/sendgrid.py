@@ -100,6 +100,7 @@ class SendGridPayload(RequestsPayload):
             self.set_recipients('to', self.to_list)
         else:
             # Merge-friendly smtpapi 'to' field
+            self.set_recipients('to', self.to_list)
             self.smtpapi['to'] = [email.address for email in self.to_list]
             self.all_recipients += self.to_list
 
