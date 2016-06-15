@@ -172,7 +172,7 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
 
     def test_unicode_attachment_correctly_decoded(self):
         # Slight modification from the Django unicode docs:
-        # http://django.readthedocs.org/en/latest/ref/unicode.html#email
+        # https://django.readthedocs.io/en/latest/ref/unicode.html#email
         self.message.attach("Une pièce jointe.html", '<p>\u2019</p>', mimetype='text/html')
         self.message.send()
         data = self.get_api_call_json()
