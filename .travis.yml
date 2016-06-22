@@ -2,18 +2,24 @@ sudo: false
 language: python
 matrix:
   include:
-    # Django 1.8: "Python 2.7 or above"
+    # Anymail supports the same python versions as Django, excluding Python 3.2, but adding pypy.
+    # https://docs.djangoproject.com/en/dev/faq/install/#what-python-version-can-i-use-with-django
+    # Django 1.8: Python 2.7, 3.2 (until the end of 2016), 3.3, 3.4, 3.5
     - { env: DJANGO=django==1.8, python: 2.7 }
+    - { env: DJANGO=django==1.8, python: 3.3 }
     - { env: DJANGO=django==1.8, python: 3.4 }
+    - { env: DJANGO=django==1.8, python: 3.5 }
     - { env: DJANGO=django==1.8, python: pypy }
-    # Django 1.9: "Python 2.7, 3.4, or 3.5"
+    # Django 1.9: Python 2.7, 3.4, 3.5
     - { env: DJANGO=django==1.9, python: 2.7 }
     - { env: DJANGO=django==1.9, python: 3.4 }
     - { env: DJANGO=django==1.9, python: 3.5 }
     - { env: DJANGO=django==1.9, python: pypy }
-    # Django 1.10 (prerelease)
+    # Django 1.10 (prerelease): Python 2.7, 3.4, 3.5
     - { env: DJANGO="--pre django", python: 2.7 }
+    - { env: DJANGO="--pre django", python: 3.4 }
     - { env: DJANGO="--pre django", python: 3.5 }
+    - { env: DJANGO="--pre django", python: pypy }
 cache:
   directories:
     - $HOME/.cache/pip
