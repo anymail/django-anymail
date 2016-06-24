@@ -30,7 +30,7 @@ setup(
     keywords="django, email, email backend, ESP, transactional mail, mailgun, mandrill, postmark, sendgrid",
     author="Mike Edmunds <medmunds@gmail.com>",
     author_email="medmunds@gmail.com",
-    url="https://github.com/anymail/anymail/",
+    url="https://github.com/anymail/django-anymail",
     license="BSD License",
     packages=["anymail"],
     zip_safe=False,
