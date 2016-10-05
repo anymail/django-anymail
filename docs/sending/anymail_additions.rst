@@ -287,11 +287,11 @@ ESP send status
                 subject="Re: The apocalypse")
             message.send()
 
-            message.anymail_status.recipient["you@example.com"].status
+            message.anymail_status.recipients["you@example.com"].status
             # 'sent'
-            message.anymail_status.recipient["me@example.com"].status
+            message.anymail_status.recipients["me@example.com"].status
             # 'queued'
-            message.anymail_status.recipient["me@example.com"].message_id
+            message.anymail_status.recipients["me@example.com"].message_id
             # '886313e1-3b8a-5372-9b90-0c9aee199e5d'
 
         Will be an empty dict if the send call failed.
