@@ -10,6 +10,14 @@ from ..exceptions import AnymailWebhookValidationFailure
 from ..signals import tracking, AnymailTrackingEvent, EventType, RejectReason
 from ..utils import get_anymail_setting, combine
 
+# Use safer comparison method if available
+# https://docs.python.org/2/library/hmac.html#hmac.compare_digest
+if hasattr(hmac, "compare_digest"):
+    compare_digest = hmac.compare_digest
+else:
+    def compare_digest(s1, s2):
+        return s1 == s2
+
 
 class MailgunBaseWebhookView(AnymailBaseWebhookView):
     """Base view class for Mailgun webhooks"""
@@ -34,7 +42,7 @@ class MailgunBaseWebhookView(AnymailBaseWebhookView):
             raise AnymailWebhookValidationFailure("Mailgun webhook called without required security fields")
         expected_signature = hmac.new(key=self.api_key, msg='{}{}'.format(timestamp, token).encode('ascii'),
                                       digestmod=hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(signature, expected_signature):
+        if not compare_digest(signature, expected_signature):
             raise AnymailWebhookValidationFailure("Mailgun webhook called with incorrect signature")
 
     def parse_events(self, request):
