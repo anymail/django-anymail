@@ -4,6 +4,7 @@ from datetime import datetime
 import hashlib
 import hmac
 from base64 import b64encode
+from django.utils.crypto import constant_time_compare
 from django.utils.timezone import utc
 
 from .base import AnymailBaseWebhookView
@@ -44,7 +45,7 @@ class MandrillSignatureMixin(object):
 
         expected_signature = b64encode(hmac.new(key=self.webhook_key, msg=signed_data.encode('utf-8'),
                                                 digestmod=hashlib.sha1).digest())
-        if not hmac.compare_digest(signature, expected_signature):
+        if not constant_time_compare(signature, expected_signature):
             raise AnymailWebhookValidationFailure("Mandrill webhook called with incorrect signature")
 
 
