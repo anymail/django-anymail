@@ -3,6 +3,7 @@
 from datetime import datetime, date
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
+import os
 
 import requests
 import six
@@ -16,13 +17,6 @@ from sparkpost.exceptions import SparkPostAPIException
 from anymail.exceptions import (AnymailAPIError, AnymailUnsupportedFeature, AnymailRecipientsRefused,
                                 AnymailConfigurationError)
 from anymail.message import attach_inline_image_file
-
-try:
-    # noinspection PyUnresolvedReferences
-    from test.support import EnvironmentVarGuard  # python3
-except ImportError:
-    # noinspection PyUnresolvedReferences
-    from test.test_support import EnvironmentVarGuard  # python2
 
 from .utils import AnymailTestMixin, decode_att, SAMPLE_IMAGE_FILENAME, sample_image_path, sample_image_content
 
@@ -579,8 +573,9 @@ class SparkPostBackendImproperlyConfiguredTests(SimpleTestCase, AnymailTestMixin
 
     def test_api_key_in_env(self):
         """SparkPost package allows API key in env var; make sure Anymail works with that"""
-        with EnvironmentVarGuard() as env:
-            env['SPARKPOST_API_KEY'] = 'key_from_environment'
+        with patch.dict(
+                os.environ,
+                {'SPARKPOST_API_KEY': 'key_from_environment'}):
             conn = mail.get_connection()
             # Poke into implementation details to verify:
             self.assertIsNone(conn.api_key)  # Anymail prop
