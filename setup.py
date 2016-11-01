@@ -47,7 +47,7 @@ setup(
     },
     include_package_data=True,
     test_suite="runtests.runtests",
-    tests_require=["mock"],
+    tests_require=["mock", "sparkpost"],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Programming Language :: Python",
