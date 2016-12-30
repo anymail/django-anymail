@@ -9,6 +9,7 @@ import six
 from django.conf import settings
 from django.core.mail.message import sanitize_address, DEFAULT_ATTACHMENT_MIME_TYPE
 from django.utils.encoding import force_text
+from django.utils.functional import Promise
 from django.utils.timezone import utc
 
 from .exceptions import AnymailConfigurationError, AnymailInvalidAddress
@@ -162,6 +163,9 @@ class Attachment(object):
         else:
             (self.name, self.content, self.mimetype) = attachment
 
+        self.name = force_non_lazy(self.name)
+        self.content = force_non_lazy(self.content)
+
         # Guess missing mimetype from filename, borrowed from
         # django.core.mail.EmailMessage._create_attachment()
         if self.mimetype is None and self.name is not None:
@@ -289,3 +293,37 @@ def rfc2822date(dt):
     # but treats naive datetimes as local rather than "UTC with no information ..."
     timeval = timestamp(dt)
     return formatdate(timeval, usegmt=True)
+
+
+def is_lazy(obj):
+    """Return True if obj is a Django lazy object."""
+    # See django.utils.functional.lazy. (This appears to be preferred
+    # to checking for `not isinstance(obj, six.text_type)`.)
+    return isinstance(obj, Promise)
+
+
+def force_non_lazy(obj):
+    """If obj is a Django lazy object, return it coerced to text; otherwise return it unchanged.
+
+    (Similar to django.utils.encoding.force_text, but doesn't alter non-text objects.)
+    """
+    if is_lazy(obj):
+        return six.text_type(obj)
+
+    return obj
+
+
+def force_non_lazy_list(obj):
+    """Return a (shallow) copy of sequence obj, with all values forced non-lazy."""
+    try:
+        return [force_non_lazy(item) for item in obj]
+    except (AttributeError, TypeError):
+        return force_non_lazy(obj)
+
+
+def force_non_lazy_dict(obj):
+    """Return a (deep) copy of dict obj, with all values forced non-lazy."""
+    try:
+        return {key: force_non_lazy_dict(value) for key, value in obj.items()}
+    except (AttributeError, TypeError):
+        return force_non_lazy(obj)

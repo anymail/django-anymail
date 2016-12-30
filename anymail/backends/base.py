@@ -7,7 +7,8 @@ from django.utils.timezone import is_naive, get_current_timezone, make_aware, ut
 from ..exceptions import AnymailCancelSend, AnymailError, AnymailUnsupportedFeature, AnymailRecipientsRefused
 from ..message import AnymailStatus
 from ..signals import pre_send, post_send
-from ..utils import Attachment, ParsedEmail, UNSET, combine, last, get_anymail_setting
+from ..utils import (Attachment, ParsedEmail, UNSET, combine, last, get_anymail_setting,
+                     force_non_lazy, force_non_lazy_list, force_non_lazy_dict)
 
 
 class AnymailBaseBackend(BaseEmailBackend):
@@ -195,31 +196,43 @@ class AnymailBaseBackend(BaseEmailBackend):
 
 
 class BasePayload(object):
-    # attr, combiner, converter
+    # Listing of EmailMessage/EmailMultiAlternatives attributes
+    # to process into Payload. Each item is in the form:
+    #   (attr, combiner, converter)
+    #   attr: the property name
+    #   combiner: optional function(default_value, value) -> value
+    #     to combine settings defaults with the EmailMessage property value
+    #     (usually `combine` to merge, or `last` for message value to override default;
+    #     use `None` if settings defaults aren't supported)
+    #   converter: optional function(value) -> value transformation
+    #     (can be a callable or the string name of a Payload method, or `None`)
+    #     The converter must force any Django lazy translation strings to text.
+    # The Payload's `set_<attr>` method will be called with
+    # the combined/converted results for each attr.
     base_message_attrs = (
         # Standard EmailMessage/EmailMultiAlternatives props
         ('from_email', last, 'parsed_email'),
         ('to', combine, 'parsed_emails'),
         ('cc', combine, 'parsed_emails'),
         ('bcc', combine, 'parsed_emails'),
-        ('subject', last, None),
+        ('subject', last, force_non_lazy),
         ('reply_to', combine, 'parsed_emails'),
-        ('extra_headers', combine, None),
-        ('body', last, None),  # special handling below checks message.content_subtype
-        ('alternatives', combine, None),
+        ('extra_headers', combine, force_non_lazy_dict),
+        ('body', last, force_non_lazy),  # special handling below checks message.content_subtype
+        ('alternatives', combine, 'prepped_alternatives'),
         ('attachments', combine, 'prepped_attachments'),
     )
     anymail_message_attrs = (
         # Anymail expando-props
-        ('metadata', combine, None),
+        ('metadata', combine, force_non_lazy_dict),
         ('send_at', last, 'aware_datetime'),
-        ('tags', combine, None),
+        ('tags', combine, force_non_lazy_list),
         ('track_clicks', last, None),
         ('track_opens', last, None),
-        ('template_id', last, None),
-        ('merge_data', combine, None),
-        ('merge_global_data', combine, None),
-        ('esp_extra', combine, None),
+        ('template_id', last, force_non_lazy),
+        ('merge_data', combine, force_non_lazy_dict),
+        ('merge_global_data', combine, force_non_lazy_dict),
+        ('esp_extra', combine, force_non_lazy_dict),
     )
     esp_message_attrs = ()  # subclasses can override
 
@@ -261,15 +274,21 @@ class BasePayload(object):
     #
 
     def parsed_email(self, address):
-        return ParsedEmail(address, self.message.encoding)
+        return ParsedEmail(address, self.message.encoding)  # (handles lazy address)
 
     def parsed_emails(self, addresses):
         encoding = self.message.encoding
-        return [ParsedEmail(address, encoding) for address in addresses]
+        return [ParsedEmail(address, encoding)  # (handles lazy address)
+                for address in addresses]
+
+    def prepped_alternatives(self, alternatives):
+        return [(force_non_lazy(content), mimetype)
+                for (content, mimetype) in alternatives]
 
     def prepped_attachments(self, attachments):
         str_encoding = self.message.encoding or settings.DEFAULT_CHARSET
-        return [Attachment(attachment, str_encoding) for attachment in attachments]
+        return [Attachment(attachment, str_encoding)  # (handles lazy content, filename)
+                for attachment in attachments]
 
     def aware_datetime(self, value):
         """Converts a date or datetime or timestamp to an aware datetime.

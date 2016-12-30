@@ -1,10 +1,14 @@
 from datetime import datetime
+from email.mime.text import MIMEText
 
+import six
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import get_connection, send_mail
 from django.test import SimpleTestCase
 from django.test.utils import override_settings
+from django.utils.functional import Promise
 from django.utils.timezone import utc
+from django.utils.translation import ugettext_lazy
 
 from anymail.exceptions import AnymailConfigurationError, AnymailUnsupportedFeature
 from anymail.message import AnymailMessage
@@ -212,3 +216,80 @@ class SendDefaultsTests(TestBackendTestCase):
         self.assertEqual(params['template_id'], 'global-template')  # global-defaults only
         self.assertEqual(params['espextra'], 'espsetting')
         self.assertNotIn('globalextra', params)  # entire esp_extra is overriden by esp-send-defaults
+
+
+class LazyStringsTest(TestBackendTestCase):
+    """
+    Tests ugettext_lazy strings forced real before passing to ESP transport.
+
+    Docs notwithstanding, Django lazy strings *don't* work anywhere regular
+    strings would. In particular, they aren't instances of unicode/str.
+    There are some cases (e.g., urllib.urlencode, requests' _encode_params)
+    where this can cause encoding errors or just very wrong results.
+
+    Since Anymail sits on the border between Django app code and non-Django
+    ESP code (e.g., requests), it's responsible for converting lazy text
+    to actual strings.
+    """
+
+    def assertNotLazy(self, s, msg=None):
+        self.assertNotIsInstance(s, Promise,
+                                 msg=msg or "String %r is lazy" % six.text_type(s))
+
+    def test_lazy_from(self):
+        # This sometimes ends up lazy when settings.DEFAULT_FROM_EMAIL is meant to be localized
+        self.message.from_email = ugettext_lazy(u'"Global Sales" <sales@example.com>')
+        self.message.send()
+        params = self.get_send_params()
+        self.assertNotLazy(params['from'].address)
+
+    def test_lazy_subject(self):
+        self.message.subject = ugettext_lazy("subject")
+        self.message.send()
+        params = self.get_send_params()
+        self.assertNotLazy(params['subject'])
+
+    def test_lazy_body(self):
+        self.message.body = ugettext_lazy("text body")
+        self.message.attach_alternative(ugettext_lazy("html body"), "text/html")
+        self.message.send()
+        params = self.get_send_params()
+        self.assertNotLazy(params['text_body'])
+        self.assertNotLazy(params['html_body'])
+
+    def test_lazy_headers(self):
+        self.message.extra_headers['X-Test'] = ugettext_lazy("Test Header")
+        self.message.send()
+        params = self.get_send_params()
+        self.assertNotLazy(params['extra_headers']['X-Test'])
+
+    def test_lazy_attachments(self):
+        self.message.attach(ugettext_lazy("test.csv"), ugettext_lazy("test,csv,data"), "text/csv")
+        self.message.attach(MIMEText(ugettext_lazy("contact info")))
+        self.message.send()
+        params = self.get_send_params()
+        self.assertNotLazy(params['attachments'][0].name)
+        self.assertNotLazy(params['attachments'][0].content)
+        self.assertNotLazy(params['attachments'][1].content)
+
+    def test_lazy_tags(self):
+        self.message.tags = [ugettext_lazy("Shipping"), ugettext_lazy("Sales")]
+        self.message.send()
+        params = self.get_send_params()
+        self.assertNotLazy(params['tags'][0])
+        self.assertNotLazy(params['tags'][1])
+
+    def test_lazy_metadata(self):
+        self.message.metadata = {'order_type': ugettext_lazy("Subscription")}
+        self.message.send()
+        params = self.get_send_params()
+        self.assertNotLazy(params['metadata']['order_type'])
+
+    def test_lazy_merge_data(self):
+        self.message.merge_data = {
+            'to@example.com': {'duration': ugettext_lazy("One Month")}}
+        self.message.merge_global_data = {'order_type': ugettext_lazy("Subscription")}
+        self.message.send()
+        params = self.get_send_params()
+        self.assertNotLazy(params['merge_data']['to@example.com']['duration'])
+        self.assertNotLazy(params['merge_global_data']['order_type'])
