@@ -52,17 +52,56 @@ class MailjetPayload(RequestsPayload):
         self.headers = {
             'Content-Type': 'application/json',
         }
+        # Late binding of recipients and their variables
+        self.recipients = {}
+        self.merge_data = None
         super(MailjetPayload, self).__init__(*args, **kwargs)
 
     def get_api_endpoint(self):
         return "messages/send"
 
     def serialize_data(self):
+        self._finish_recipients()
         return self.serialize_json(self.data)
 
     #
     # Payload construction
     #
+
+    def _finish_recipients(self):
+        # NOTE do not set both To and Recipients, it behaves specially: each
+        # recipient receives a separate mail but the To address receives one
+        # listing all recipients.
+        if "cc" in self.recipients or "bcc" in self.recipients:
+            self._finish_recipients_single()
+        else:
+            self._finish_recipients_with_vars()
+
+    def _finish_recipients_with_vars(self):
+        """Send bulk mail with different variables for each mail."""
+        assert not "Cc" in self.data and not "Bcc" in self.data
+        recipients = []
+        merge_data = self.merge_data or {}
+        for email in self.recipients["to"]:
+            recipient = {
+                "Email": email.email,
+                "Name": email.name,
+                "Vars": merge_data.get(email.email)
+            }
+            # Strip out empty Name and Vars
+            recipient = {k: v for k, v in recipient.items() if v}
+            recipients.append(recipient)
+        self.data["Recipients"] = recipients
+
+    def _finish_recipients_single(self):
+        """Send a single mail with some To, Cc and Bcc headers."""
+        assert not "Recipients" in self.data
+        if self.merge_data:
+            # When Cc and Bcc headers are given, then merge data cannot be set.
+            raise NotImplementedError("Cannot set merge data with bcc/cc")
+        for recipient_type, emails in self.recipients.items():
+            header = ", ".join(str(email) for email in emails)
+            self.data[recipient_type.capitalize()] = header
 
     def init_payload(self):
         self.data = {
@@ -75,7 +114,8 @@ class MailjetPayload(RequestsPayload):
 
     def add_recipient(self, recipient_type, email):
         assert recipient_type in ["to", "cc", "bcc"]
-        self.data.setdefault(recipient_type.capitalize(), []).append(str(email))
+        # Will be handled later in serialize_data
+        self.recipients.setdefault(recipient_type, []).append(email)
 
     def set_subject(self, subject):
         self.data["Subject"] = subject
@@ -123,3 +163,10 @@ class MailjetPayload(RequestsPayload):
     def set_template_id(self, template_id):
         self.data["Mj-TemplateID"] = template_id
         self.data["Mj-TemplateLanguage"] = True
+
+    def set_merge_data(self, merge_data):
+        # Will be handled later in serialize_data
+        self.merge_data = merge_data
+
+    def set_merge_global_data(self, merge_global_data):
+        self.data["Vars"] = merge_global_data
