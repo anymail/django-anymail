@@ -16,6 +16,7 @@ class EmailBackend(AnymailRequestsBackend):
         """Init options from Django settings"""
         esp_name = self.esp_name
         self.api_key = get_anymail_setting('api_key', esp_name=esp_name, kwargs=kwargs, allow_bare=True)
+        self.secret_key = get_anymail_setting('secret_key', esp_name=esp_name, kwargs=kwargs, allow_bare=True)
         api_url = get_anymail_setting('api_url', esp_name=esp_name, kwargs=kwargs,
                                       default="https://api.mailjet.com/v3")
         if not api_url.endswith("/"):
@@ -47,18 +48,20 @@ class EmailBackend(AnymailRequestsBackend):
 
 class MailjetPayload(RequestsPayload):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, message, defaults, backend, *args, **kwargs):
         self.esp_extra = {}  # late-bound in serialize_data
-        self.headers = {
+        auth = (backend.api_key, backend.secret_key)
+        http_headers = {
             'Content-Type': 'application/json',
         }
         # Late binding of recipients and their variables
         self.recipients = {}
         self.merge_data = None
-        super(MailjetPayload, self).__init__(*args, **kwargs)
+        super(MailjetPayload, self).__init__(message, defaults, backend,
+                auth=auth, headers=http_headers, *args, **kwargs)
 
     def get_api_endpoint(self):
-        return "messages/send"
+        return "send"
 
     def serialize_data(self):
         self._finish_recipients()
