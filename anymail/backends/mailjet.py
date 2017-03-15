@@ -75,14 +75,13 @@ class MailjetPayload(RequestsPayload):
 
     def add_recipient(self, recipient_type, email):
         assert recipient_type in ["to", "cc", "bcc"]
-        if email.name:
-            address = "{} <{}>".format(email.name, email.email)
-        else:
-            address = "<{}>".format(email.email)
-        self.data.setdefault[recipient_type.capitalize(), []].append(address)
+        self.data.setdefault(recipient_type.capitalize(), []).append(str(email))
 
     def set_subject(self, subject):
         self.data["Subject"] = subject
+
+    def set_reply_to(self, emails):
+        self.data["Reply-To"] = ", ".join([str(email) for email in emails])
 
     def set_extra_headers(self, headers):
         self.data.setdefault("Headers", {}).update(headers)
@@ -114,11 +113,13 @@ class MailjetPayload(RequestsPayload):
         self.data["Mj-EventPayLoad"] = ','.join(tags)
 
     def set_track_clicks(self, track_clicks):
-        self.data["Mj-trackclick"] = track_clicks
+        # 1 disables tracking, 2 enables tracking
+        self.data["Mj-trackclick"] = 2 if track_clicks else 1
 
     def set_track_opens(self, track_opens):
-        self.data["Mj-trackopen"] = track_opens
+        # 1 disables tracking, 2 enables tracking
+        self.data["Mj-trackopen"] = 2 if track_opens else 1
 
     def set_template_id(self, template_id):
         self.data["Mj-TemplateID"] = template_id
-        self.data["MJ-TemplateLanguage"] = True
+        self.data["Mj-TemplateLanguage"] = True
