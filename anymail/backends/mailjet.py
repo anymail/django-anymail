@@ -36,7 +36,7 @@ class EmailBackend(AnymailRequestsBackend):
                     status = 'unknown'
 
                 for item in parsed_response[key]:
-                    message_id = item.get('MessageID_id', None)
+                    message_id = item.get('MessageID', None)
                     email = item['Email']
                     recipient_status[email] = AnymailRecipientStatus(message_id=message_id, status=status)
         except (KeyError, TypeError):
