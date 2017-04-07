@@ -1,6 +1,6 @@
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus, ANYMAIL_STATUSES
-from ..utils import get_anymail_setting
+from ..utils import get_anymail_setting, ParsedEmail
 
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 
@@ -65,6 +65,7 @@ class MailjetPayload(RequestsPayload):
 
     def serialize_data(self):
         self._finish_recipients()
+        self._populate_sender_from_template()
         return self.serialize_json(self.data)
 
     #
@@ -79,6 +80,23 @@ class MailjetPayload(RequestsPayload):
             self._finish_recipients_single()
         else:
             self._finish_recipients_with_vars()
+
+    def _populate_sender_from_template(self):
+        # If no From address was given, use the address from the template.
+        # Unfortunately, API 3.0 requires the From address to be given, so let's
+        # query it when needed. This will supposedly be fixed in 3.1 with a
+        # public beta in May 2017.
+        template_id = self.data.get("Mj-TemplateID")
+        if template_id and not self.data.get("FromEmail"):
+            response = self.backend.session.get(
+                "%sREST/template/%s/detailcontent" % (self.backend.api_url, template_id),
+                auth=self.auth
+            )
+            self.backend.raise_for_status(response, None, self.message)
+            json_response = self.backend.deserialize_json_response(response, None, self.message)
+            # Populate email address header from template.
+            email = ParsedEmail(json_response["Data"][0]["Headers"]["From"], None)
+            self.set_from_email(email)
 
     def _finish_recipients_with_vars(self):
         """Send bulk mail with different variables for each mail."""
