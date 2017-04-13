@@ -171,6 +171,12 @@ class Attachment(object):
         if isinstance(attachment, MIMEBase):
             self.name = attachment.get_filename()
             self.content = attachment.get_payload(decode=True)
+            if self.content is None:
+                if hasattr(attachment, 'as_bytes'):
+                    self.content = attachment.as_bytes()
+                else:
+                    # Python 2.7 fallback
+                    self.content = attachment.as_string().encode(self.encoding)
             self.mimetype = attachment.get_content_type()
 
             if get_content_disposition(attachment) == 'inline':

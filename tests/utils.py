@@ -52,6 +52,9 @@ def sample_image_content(filename=SAMPLE_IMAGE_FILENAME):
         return f.read()
 
 
+SAMPLE_FORWARDED_EMAIL = b'Received: by luna.mailgun.net with SMTP mgrt 8734663311733; Fri, 03 May 2013\n 18:26:27 +0000\nContent-Type: multipart/alternative; boundary="eb663d73ae0a4d6c9153cc0aec8b7520"\nMime-Version: 1.0\nSubject: Test email\nFrom: Someone <someone@example.com>\nTo: someoneelse@example.com\nReply-To: reply.to@example.com\nMessage-Id: <20130503182626.18666.16540@example.com>\nList-Unsubscribe: <mailto:u+na6tmy3ege4tgnldmyytqojqmfsdembyme3tmy3cha4wcndbgaydqyrgoi6wszdpovrhi5dinfzw63tfmv4gs43uomstimdhnvqws3bomnxw2jtuhusteqjgmq6tm@example.com>\nX-Mailgun-Sid: WyIwNzI5MCIsICJhbGljZUBleGFtcGxlLmNvbSIsICI2Il0=\nX-Mailgun-Variables: {"my_var_1": "Mailgun Variable #1", "my-var-2": "awesome"}\nDate: Fri, 03 May 2013 18:26:27 +0000\nSender: someone@example.com\n\n--eb663d73ae0a4d6c9153cc0aec8b7520\nMime-Version: 1.0\nContent-Type: text/plain; charset="ascii"\nContent-Transfer-Encoding: 7bit\n\nHi Bob, This is a message. Thanks!\n\n--eb663d73ae0a4d6c9153cc0aec8b7520\nMime-Version: 1.0\nContent-Type: text/html; charset="ascii"\nContent-Transfer-Encoding: 7bit\n\n<html>\n                            <body>Hi Bob, This is a message. Thanks!\n                            <br>\n</body></html>\n--eb663d73ae0a4d6c9153cc0aec8b7520--\n'
+
+
 # noinspection PyUnresolvedReferences
 class AnymailTestMixin:
     """Helpful additional methods for Anymail tests"""
