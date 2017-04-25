@@ -95,7 +95,12 @@ class MailjetPayload(RequestsPayload):
             self.backend.raise_for_status(response, None, self.message)
             json_response = self.backend.deserialize_json_response(response, None, self.message)
             # Populate email address header from template.
-            email = ParsedEmail(json_response["Data"][0]["Headers"]["From"], None)
+            headers = json_response["Data"][0]["Headers"]
+            if "From" in headers:
+                address = headers["From"]
+            else:
+                address = "%s <%s>" % (headers["SenderName"], headers["SenderEmail"])
+            email = ParsedEmail(address, None)
             self.set_from_email(email)
 
     def _finish_recipients_with_vars(self):
