@@ -423,6 +423,34 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         with self.assertRaises(AnymailRequestsAPIError) as cm:
             self.message.send()
 
+    def test_template_unexpected_response(self):
+        # Missing headers (not sure if possible though).
+        template_response_content = b'''{
+            "Count": 1,
+            "Data": [{
+                "Text-part": "text body",
+                "Html-part": "html body",
+                "MJMLContent": "",
+                "Headers": {
+                }
+            }],
+            "Total": 1
+        }'''
+        self.set_template_response(raw=template_response_content)
+        self.message.template_id = '1234561'
+        self.message.from_email = None
+        with self.assertRaisesMessage(AnymailRequestsAPIError, "template API") as cm:
+            self.message.send()
+
+    def test_template_unexpected_response(self):
+        """Test scenario when MJ service returns no JSON for some reason."""
+        template_response_content = b'''total garbage'''
+        self.set_template_response(raw=template_response_content)
+        self.message.template_id = '1234562'
+        self.message.from_email = None
+        with self.assertRaisesMessage(AnymailRequestsAPIError, "Invalid JSON") as cm:
+            self.message.send()
+
     def test_merge_data(self):
         self.message.to = ['alice@example.com']
         self.message.template_id = '1234567'

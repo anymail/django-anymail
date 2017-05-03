@@ -95,11 +95,15 @@ class MailjetPayload(RequestsPayload):
             self.backend.raise_for_status(response, None, self.message)
             json_response = self.backend.deserialize_json_response(response, None, self.message)
             # Populate email address header from template.
-            headers = json_response["Data"][0]["Headers"]
-            if "From" in headers:
-                address = headers["From"]
-            else:
-                address = "%s <%s>" % (headers["SenderName"], headers["SenderEmail"])
+            try:
+                headers = json_response["Data"][0]["Headers"]
+                if "From" in headers:
+                    address = headers["From"]
+                else:
+                    address = "%s <%s>" % (headers["SenderName"], headers["SenderEmail"])
+            except KeyError:
+                raise AnymailRequestsAPIError("Invalid Mailjet template API response",
+                        email_message=self.message, response=response, backend=self.backend)
             email = ParsedEmail(address, None)
             self.set_from_email(email)
 
