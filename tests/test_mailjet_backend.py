@@ -13,7 +13,8 @@ from django.test import SimpleTestCase
 from django.test.utils import override_settings
 
 from anymail.exceptions import (AnymailAPIError, AnymailSerializationError,
-                                AnymailUnsupportedFeature, AnymailRecipientsRefused)
+                                AnymailUnsupportedFeature,
+                                AnymailRequestsAPIError)
 from anymail.message import attach_inline_image_file
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase, SessionSharingTestCasesMixin
@@ -33,10 +34,36 @@ class MailjetBackendMockAPITestCase(RequestsBackendMockAPITestCase):
         }]
     }"""
 
+    DEFAULT_TEMPLATE_RESPONSE = b"""{
+        "Count": 1,
+        "Data": [{
+            "Text-part": "text body",
+            "Html-part": "html body",
+            "MJMLContent": "",
+            "Headers": {
+                "Subject": "Hello World!",
+                "SenderName": "Friendly Tester",
+                "SenderEmail": "some@example.com",
+                "ReplyEmail": ""
+            }
+        }],
+        "Total": 1
+    }"""
+
     def setUp(self):
         super(MailjetBackendMockAPITestCase, self).setUp()
         # Simple message useful for many tests
         self.message = mail.EmailMultiAlternatives('Subject', 'Text Body', 'from@example.com', ['to@example.com'])
+
+    def set_template_response(self, status_code=200, raw=None):
+        """Sets an expectation for a template and populate its response."""
+        if raw is None:
+            raw = self.DEFAULT_TEMPLATE_RESPONSE
+        template_response = RequestsBackendMockAPITestCase.MockResponse(status_code, raw)
+        self.mock_request.side_effect = [
+            template_response,
+            self.mock_request.return_value
+        ]
 
 
 class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
@@ -350,6 +377,51 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         data = self.get_api_call_json()
         self.assertEqual(data['Mj-TemplateID'], '1234567')
         self.assertEqual(data['Vars'], {'name': "Alice", 'group': "Developers"})
+
+    def test_template_populate_from(self):
+        self.set_template_response()
+        self.message.template_id = '1234567'
+        self.message.from_email = None
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data['Mj-TemplateID'], '1234567')
+        self.assertEqual(data['FromEmail'], 'some@example.com')
+
+    def test_template_populate_from(self):
+        template_response_content = b'''{
+            "Count": 1,
+            "Data": [{
+                "Text-part": "text body",
+                "Html-part": "html body",
+                "MJMLContent": "",
+                "Headers": {
+                    "Subject": "Hello World!!",
+                    "From": "Friendly Tester <noreply@example.com>",
+                    "Reply-To": ""
+                }
+            }],
+            "Total": 1
+        }'''
+        self.set_template_response(raw=template_response_content)
+        self.message.template_id = '1234568'
+        self.message.from_email = None
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data['Mj-TemplateID'], '1234568')
+        self.assertEqual(data['FromName'], 'Friendly Tester')
+        self.assertEqual(data['FromEmail'], 'noreply@example.com')
+
+    def test_template_not_found(self):
+        template_response_content = b'''{
+            "ErrorInfo": "",
+            "ErrorMessage": "Object not found",
+            "StatusCode": 404
+        }'''
+        self.set_template_response(status_code=404, raw=template_response_content)
+        self.message.template_id = '1234560'
+        self.message.from_email = None
+        with self.assertRaises(AnymailRequestsAPIError) as cm:
+            self.message.send()
 
     def test_merge_data(self):
         self.message.to = ['alice@example.com']
