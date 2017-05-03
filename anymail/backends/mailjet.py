@@ -200,3 +200,6 @@ class MailjetPayload(RequestsPayload):
 
     def set_merge_global_data(self, merge_global_data):
         self.data["Vars"] = merge_global_data
+
+    def set_esp_extra(self, extra):
+        self.data.update(extra)
