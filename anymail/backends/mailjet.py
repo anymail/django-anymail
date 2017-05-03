@@ -147,7 +147,11 @@ class MailjetPayload(RequestsPayload):
         self.data["Subject"] = subject
 
     def set_reply_to(self, emails):
-        self.data["Reply-To"] = ", ".join([str(email) for email in emails])
+        headers = self.data.setdefault("Headers", {})
+        if emails:
+            headers["Reply-To"] = ", ".join([str(email) for email in emails])
+        elif "Reply-To" in headers:
+            del headers["Reply-To"]
 
     def set_extra_headers(self, headers):
         self.data.setdefault("Headers", {}).update(headers)
