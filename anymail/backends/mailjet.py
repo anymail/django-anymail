@@ -179,8 +179,15 @@ class MailjetPayload(RequestsPayload):
             "content": attachment.b64content
         })
 
+    def set_metadata(self, metadata):
+        self.data["Mj-EventPayLoad"] = metadata
+
     def set_tags(self, tags):
-        self.data["Mj-EventPayLoad"] = ','.join(tags)
+        if len(tags) > 0:
+            self.data["Tag"] = tags[0]
+            self.data["Mj-CustomID"] = tags[0]
+            if len(tags) > 1:
+                self.unsupported_feature('multiple tags (%r)' % tags)
 
     def set_track_clicks(self, track_clicks):
         # 1 disables tracking, 2 enables tracking
