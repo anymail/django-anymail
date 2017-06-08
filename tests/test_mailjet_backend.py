@@ -60,10 +60,10 @@ class MailjetBackendMockAPITestCase(RequestsBackendMockAPITestCase):
         if raw is None:
             raw = self.DEFAULT_TEMPLATE_RESPONSE
         template_response = RequestsBackendMockAPITestCase.MockResponse(status_code, raw)
-        self.mock_request.side_effect = [
+        self.mock_request.side_effect = iter([
             template_response,
             self.mock_request.return_value
-        ]
+        ])
 
 
 class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
