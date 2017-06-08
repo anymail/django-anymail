@@ -378,13 +378,14 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.assertEqual(data['Mj-TemplateID'], '1234567')
         self.assertEqual(data['Vars'], {'name': "Alice", 'group': "Developers"})
 
-    def test_template_populate_from(self):
+    def test_template_populate_from_sender(self):
         self.set_template_response()
         self.message.template_id = '1234567'
         self.message.from_email = None
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(data['Mj-TemplateID'], '1234567')
+        self.assertEqual(data['FromName'], 'Friendly Tester')
         self.assertEqual(data['FromEmail'], 'some@example.com')
 
     def test_template_populate_from(self):

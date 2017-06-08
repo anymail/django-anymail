@@ -1,6 +1,6 @@
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus, ANYMAIL_STATUSES
-from ..utils import get_anymail_setting, ParsedEmail
+from ..utils import get_anymail_setting, ParsedEmail, parse_address_list
 
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 
@@ -98,14 +98,14 @@ class MailjetPayload(RequestsPayload):
             try:
                 headers = json_response["Data"][0]["Headers"]
                 if "From" in headers:
-                    address = headers["From"]
+                    parsed = parse_address_list([headers["From"]])[0]
                 else:
-                    address = "%s <%s>" % (headers["SenderName"], headers["SenderEmail"])
+                    name_addr = (headers["SenderName"], headers["SenderEmail"])
+                    parsed = ParsedEmail(name_addr)
             except KeyError:
                 raise AnymailRequestsAPIError("Invalid Mailjet template API response",
                         email_message=self.message, response=response, backend=self.backend)
-            email = ParsedEmail(address, None)
-            self.set_from_email(email)
+            self.set_from_email(parsed)
 
     def _finish_recipients_with_vars(self):
         """Send bulk mail with different variables for each mail."""
