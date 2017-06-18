@@ -58,7 +58,7 @@ class MailjetPayload(RequestsPayload):
         self.recipients = {}
         self.merge_data = None
         super(MailjetPayload, self).__init__(message, defaults, backend,
-                auth=auth, headers=http_headers, *args, **kwargs)
+                                             auth=auth, headers=http_headers, *args, **kwargs)
 
     def get_api_endpoint(self):
         return "send"
@@ -104,12 +104,12 @@ class MailjetPayload(RequestsPayload):
                     parsed = ParsedEmail(name_addr)
             except KeyError:
                 raise AnymailRequestsAPIError("Invalid Mailjet template API response",
-                        email_message=self.message, response=response, backend=self.backend)
+                                              email_message=self.message, response=response, backend=self.backend)
             self.set_from_email(parsed)
 
     def _finish_recipients_with_vars(self):
         """Send bulk mail with different variables for each mail."""
-        assert not "Cc" in self.data and not "Bcc" in self.data
+        assert "Cc" not in self.data and "Bcc" not in self.data
         recipients = []
         merge_data = self.merge_data or {}
         for email in self.recipients["to"]:
@@ -125,7 +125,7 @@ class MailjetPayload(RequestsPayload):
 
     def _finish_recipients_single(self):
         """Send a single mail with some To, Cc and Bcc headers."""
-        assert not "Recipients" in self.data
+        assert "Recipients" not in self.data
         if self.merge_data:
             # When Cc and Bcc headers are given, then merge data cannot be set.
             raise NotImplementedError("Cannot set merge data with bcc/cc")

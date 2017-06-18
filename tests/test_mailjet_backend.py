@@ -421,7 +421,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.set_template_response(status_code=404, raw=template_response_content)
         self.message.template_id = '1234560'
         self.message.from_email = None
-        with self.assertRaises(AnymailRequestsAPIError) as cm:
+        with self.assertRaises(AnymailRequestsAPIError):
             self.message.send()
 
     def test_template_unexpected_response(self):
@@ -440,7 +440,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.set_template_response(raw=template_response_content)
         self.message.template_id = '1234561'
         self.message.from_email = None
-        with self.assertRaisesMessage(AnymailRequestsAPIError, "template API") as cm:
+        with self.assertRaisesMessage(AnymailRequestsAPIError, "template API"):
             self.message.send()
 
     def test_template_invalid_response(self):
@@ -449,7 +449,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.set_template_response(raw=template_response_content)
         self.message.template_id = '1234562'
         self.message.from_email = None
-        with self.assertRaisesMessage(AnymailRequestsAPIError, "Invalid JSON") as cm:
+        with self.assertRaisesMessage(AnymailRequestsAPIError, "Invalid JSON"):
             self.message.send()
 
     def test_merge_data(self):
