@@ -443,7 +443,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailRequestsAPIError, "template API") as cm:
             self.message.send()
 
-    def test_template_unexpected_response(self):
+    def test_template_invalid_response(self):
         """Test scenario when MJ service returns no JSON for some reason."""
         template_response_content = b'''total garbage'''
         self.set_template_response(raw=template_response_content)
