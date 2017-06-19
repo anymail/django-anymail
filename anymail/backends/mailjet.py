@@ -27,7 +27,17 @@ class EmailBackend(AnymailRequestsBackend):
         return MailjetPayload(message, defaults, self)
 
     def parse_recipient_status(self, response, payload, message):
+        # Mailjet's (v3.0) transactional send API is not covered in their reference docs.
+        # The response appears to be either:
+        #   {status: [{"Email": ..., "MessageID": ...}, ...], status: ...}
+        #   (where status is something like "Sent", or ...?)
+        # or if the entire call has failed:
+        #   {"ErrorCode": nnn, "Message": ...}
         parsed_response = self.deserialize_json_response(response, payload, message)
+        if "ErrorCode" in parsed_response:
+            raise AnymailRequestsAPIError(email_message=message, payload=payload, response=response,
+                                          backend=self)
+
         recipient_status = {}
         try:
             for key in parsed_response:
