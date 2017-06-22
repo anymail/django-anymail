@@ -25,7 +25,8 @@ class RequestsBackendMockAPITestCase(SimpleTestCase, AnymailTestMixin):
             super(RequestsBackendMockAPITestCase.MockResponse, self).__init__()
             self.status_code = status_code
             self.encoding = encoding
-            self.raw = six.BytesIO(raw)
+            # six.BytesIO(None) returns b'None' in PY2 (rather than b'')
+            self.raw = six.BytesIO(raw) if raw is not None else six.BytesIO()
 
     def setUp(self):
         super(RequestsBackendMockAPITestCase, self).setUp()

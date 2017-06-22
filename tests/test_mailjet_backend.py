@@ -323,6 +323,15 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         with self.assertRaises(AnymailAPIError):
             self.message.send()
 
+    def test_invalid_api_key(self):
+        """Anymail should add a helpful message for an invalid API key"""
+        # Mailjet just returns a 401 error -- without additional explanation --
+        # for invalid keys. We want to provide users something more helpful
+        # than just "Mailjet API response 401:
+        self.set_mock_response(status_code=401, raw=None)
+        with self.assertRaisesMessage(AnymailAPIError, "Invalid Mailjet API key or secret"):
+            self.message.send()
+
 
 class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
     """Test backend support for Anymail added features"""

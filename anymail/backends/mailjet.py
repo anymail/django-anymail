@@ -26,6 +26,14 @@ class EmailBackend(AnymailRequestsBackend):
     def build_message_payload(self, message, defaults):
         return MailjetPayload(message, defaults, self)
 
+    def raise_for_status(self, response, payload, message):
+        # Improve Mailjet's (lack of) error message for bad API key
+        if response.status_code == 401 and not response.content:
+            raise AnymailRequestsAPIError(
+                "Invalid Mailjet API key or secret",
+                email_message=message, payload=payload, response=response, backend=self)
+        super(EmailBackend, self).raise_for_status(response, payload, message)
+
     def parse_recipient_status(self, response, payload, message):
         # Mailjet's (v3.0) transactional send API is not covered in their reference docs.
         # The response appears to be either:
