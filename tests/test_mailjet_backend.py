@@ -507,11 +507,9 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         sent = msg.send()
         self.assertEqual(sent, 1)
         self.assertEqual(msg.anymail_status.status, {'sent'})
-        # TODO is it desired to have a numeric message ID as opposed to string?
-        self.assertEqual(msg.anymail_status.message_id, 12345678901234500)
+        self.assertEqual(msg.anymail_status.message_id, "12345678901234500")
         self.assertEqual(msg.anymail_status.recipients['to1@example.com'].status, 'sent')
-        self.assertEqual(msg.anymail_status.recipients['to1@example.com'].message_id,
-                         12345678901234500)
+        self.assertEqual(msg.anymail_status.recipients['to1@example.com'].message_id, "12345678901234500")
         self.assertEqual(msg.anymail_status.esp_response.content, response_content)
 
     # noinspection PyUnresolvedReferences

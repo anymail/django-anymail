@@ -29,8 +29,8 @@ class EmailBackend(AnymailRequestsBackend):
     def parse_recipient_status(self, response, payload, message):
         # Mailjet's (v3.0) transactional send API is not covered in their reference docs.
         # The response appears to be either:
-        #   {status: [{"Email": ..., "MessageID": ...}, ...], status: ...}
-        #   (where status is something like "Sent", or ...?)
+        #   {"Sent": [{"Email": ..., "MessageID": ...}, ...]}
+        #   where only successful recipients are included
         # or if the entire call has failed:
         #   {"ErrorCode": nnn, "Message": ...}
         parsed_response = self.deserialize_json_response(response, payload, message)
@@ -46,13 +46,14 @@ class EmailBackend(AnymailRequestsBackend):
                     status = 'unknown'
 
                 for item in parsed_response[key]:
-                    message_id = item.get('MessageID', None)
+                    message_id = str(item['MessageID'])
                     email = item['Email']
                     recipient_status[email] = AnymailRecipientStatus(message_id=message_id, status=status)
         except (KeyError, TypeError):
             raise AnymailRequestsAPIError("Invalid Mailjet API response format",
                                           email_message=message, payload=payload, response=response,
                                           backend=self)
+        # TODO: this may be missing status for any unsuccessful (invalid/blocked) recipient email addresses
         return recipient_status
 
 
