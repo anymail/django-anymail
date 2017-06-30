@@ -544,6 +544,37 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.assertEqual(msg.anymail_status.esp_response.content, response_content)
 
     # noinspection PyUnresolvedReferences
+    def test_status_includes_all_recipients(self):
+        """The status should include an entry for each recipient"""
+        # Note that Mailjet's response only communicates "Sent" status; not failed addresses.
+        # (This is an example response from before the workaround for commas in display-names...)
+        response_content = b"""{
+            "Sent": [{
+                "Email": "to1@example.com",
+                "MessageID": 12345678901234500
+            }, {
+                "Email": "\\"Recipient",
+                "MessageID": 12345678901234501
+            }, {
+                "Email": "Also",
+                "MessageID": 12345678901234502
+            }]
+        }"""
+        self.set_mock_response(raw=response_content)
+        msg = mail.EmailMessage('Subject', 'Message', 'from@example.com',
+                                ['to1@example.com', '"Recipient, Also" <to2@example.com>'],)
+        sent = msg.send()
+        self.assertEqual(sent, 1)
+        self.assertEqual(msg.anymail_status.status, {'sent', 'unknown'})
+        self.assertEqual(msg.anymail_status.recipients['to1@example.com'].status, 'sent')
+        self.assertEqual(msg.anymail_status.recipients['to1@example.com'].message_id, "12345678901234500")
+        self.assertEqual(msg.anymail_status.recipients['to2@example.com'].status, 'unknown')  # because, whoops
+        self.assertEqual(msg.anymail_status.recipients['to2@example.com'].message_id, None)
+        self.assertEqual(msg.anymail_status.message_id,
+                         {"12345678901234500", "12345678901234501", "12345678901234502", None})
+        self.assertEqual(msg.anymail_status.esp_response.content, response_content)
+
+    # noinspection PyUnresolvedReferences
     def test_send_failed_anymail_status(self):
         """ If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=500)

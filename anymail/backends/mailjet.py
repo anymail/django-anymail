@@ -61,7 +61,13 @@ class EmailBackend(AnymailRequestsBackend):
             raise AnymailRequestsAPIError("Invalid Mailjet API response format",
                                           email_message=message, payload=payload, response=response,
                                           backend=self)
-        # TODO: this may be missing status for any unsuccessful (invalid/blocked) recipient email addresses
+        # Make sure we ended up with a status for every original recipient
+        # (Mailjet only communicates "Sent")
+        for recipients in payload.recipients.values():
+            for email in recipients:
+                if email.email not in recipient_status:
+                    recipient_status[email.email] = AnymailRecipientStatus(message_id=None, status='unknown')
+
         return recipient_status
 
 
