@@ -207,9 +207,12 @@ class MailjetPayload(RequestsPayload):
         self.data["Mj-EventPayLoad"] = self.serialize_json(metadata)
 
     def set_tags(self, tags):
+        # The choices here are CustomID or Campaign, and Campaign seems closer
+        # to how "tags" are handled by other ESPs -- e.g., you can view dashboard
+        # statistics across all messages with the same Campaign.
         if len(tags) > 0:
             self.data["Tag"] = tags[0]
-            self.data["Mj-CustomID"] = tags[0]
+            self.data["Mj-campaign"] = tags[0]
             if len(tags) > 1:
                 self.unsupported_feature('multiple tags (%r)' % tags)
 

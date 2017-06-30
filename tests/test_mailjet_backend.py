@@ -353,7 +353,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.message.tags = ["receipt"]
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(data['Mj-CustomID'], "receipt")
+        self.assertEqual(data['Mj-campaign'], "receipt")
 
         self.message.tags = ["receipt", "repeat-user"]
         with self.assertRaisesMessage(AnymailUnsupportedFeature, 'multiple tags'):
@@ -484,7 +484,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         """
         self.message.send()
         data = self.get_api_call_json()
-        self.assertNotIn('Mj-CustomID', data)
+        self.assertNotIn('Mj-campaign', data)
         self.assertNotIn('Mj-EventPayLoad', data)
         self.assertNotIn('Mj-TemplateID', data)
         self.assertNotIn('Vars', data)
