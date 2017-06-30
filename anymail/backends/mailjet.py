@@ -149,8 +149,15 @@ class MailjetPayload(RequestsPayload):
             # When Cc and Bcc headers are given, then merge data cannot be set.
             raise NotImplementedError("Cannot set merge data with bcc/cc")
         for recipient_type, emails in self.recipients.items():
-            header = ", ".join(str(email) for email in emails)
-            self.data[recipient_type.capitalize()] = header
+            # Workaround Mailjet 3.0 bug parsing display-name with commas
+            # (see test_comma_in_display_name in test_mailjet_backend for details)
+            formatted_emails = [
+                email.address if "," not in email.name
+                # else name has a comma, so force it into MIME encoded-word utf-8 syntax:
+                else ParsedEmail((email.name.encode('utf-8'), email.email)).formataddr('utf-8')
+                for email in emails
+            ]
+            self.data[recipient_type.capitalize()] = ", ".join(formatted_emails)
 
     def init_payload(self):
         self.data = {
@@ -161,10 +168,11 @@ class MailjetPayload(RequestsPayload):
         if email.name:
             self.data["FromName"] = email.name
 
-    def add_recipient(self, recipient_type, email):
+    def set_recipients(self, recipient_type, emails):
         assert recipient_type in ["to", "cc", "bcc"]
         # Will be handled later in serialize_data
-        self.recipients.setdefault(recipient_type, []).append(email)
+        if emails:
+            self.recipients[recipient_type] = emails
 
     def set_subject(self, subject):
         self.data["Subject"] = subject

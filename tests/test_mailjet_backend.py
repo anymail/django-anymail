@@ -99,6 +99,29 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         self.assertEqual(data['Cc'], 'Carbon Copy <cc1@example.com>, cc2@example.com')
         self.assertEqual(data['Bcc'], 'Blind Copy <bcc1@example.com>, bcc2@example.com')
 
+    def test_comma_in_display_name(self):
+        # note there are two paths: with cc/bcc, and without
+        msg = mail.EmailMessage(
+            'Subject', 'Message', '"Example, Inc." <from@example.com>',
+            ['"Recipient, Ltd." <to@example.com>'])
+        msg.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data['FromName'], 'Example, Inc.')
+        self.assertEqual(data['FromEmail'], 'from@example.com')
+        self.assertEqual(data['Recipients'][0]["Email"], "to@example.com")
+        self.assertEqual(data['Recipients'][0]["Name"], "Recipient, Ltd.")  # separate Name field works fine
+
+        # Mailjet 3.0 API doesn't properly parse RFC-2822 quoted display-names from To/Cc/Bcc:
+        # `To: "Recipient, Ltd." <to@example.com>` tries to send messages to `"Recipient`
+        # and to `Ltd.` (neither of which are actual email addresses).
+        # As a workaround, force MIME "encoded-word" utf-8 encoding, which gets past Mailjet's broken parsing.
+        # (This shouldn't be necessary in Mailjet 3.1, where Name becomes a separate json field for Cc/Bcc.)
+        msg.cc = ['cc@example.com']
+        msg.send()
+        data = self.get_api_call_json()
+        # self.assertEqual(data['To'], '"Recipient, Ltd." <to@example.com>')  # this doesn't work
+        self.assertEqual(data['To'], '=?utf-8?q?Recipient=2C_Ltd=2E?= <to@example.com>')  # workaround
+
     def test_email_message(self):
         email = mail.EmailMessage(
             'Subject', 'Body goes here', 'from@example.com',
