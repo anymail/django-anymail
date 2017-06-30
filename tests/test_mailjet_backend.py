@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import unittest
-
 from base64 import b64encode
 from decimal import Decimal
 from email.mime.base import MIMEBase
@@ -351,7 +349,7 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         # Mailjet just returns a 401 error -- without additional explanation --
         # for invalid keys. We want to provide users something more helpful
         # than just "Mailjet API response 401:
-        self.set_mock_response(status_code=401, raw=None)
+        self.set_mock_response(status_code=401, reason="Unauthorized", raw=None)
         with self.assertRaisesMessage(AnymailAPIError, "Invalid Mailjet API key or secret"):
             self.message.send()
 
@@ -401,7 +399,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.assertEqual(data['Mj-trackclick'], 1)
 
     def test_template(self):
-        # TODO is it desired to force a string template ID?
+        # template_id can be str or int (but must be numeric ID -- not the template's name)
         self.message.template_id = '1234567'
         self.message.merge_global_data = {'name': "Alice", 'group': "Developers"}
         self.message.send()
@@ -579,11 +577,13 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.assertIn("Don't know how to send this data to Mailjet", str(err))  # our added context
         self.assertRegex(str(err), r"Decimal.*is not JSON serializable")  # original message
 
-    @unittest.skip("Not implemented yet")
     def test_merge_data_null_values(self):
-        # TODO check that this triggers an error
-        # See also https://dev.mailjet.com/guides/#send-api-errors for more
+        # Mailjet doesn't accept None (null) as a merge value;
+        # returns "HTTP/1.1 500 Cannot convert data from Null value"
         self.message.merge_global_data = {'Some': None}
+        self.set_mock_response(status_code=500, reason="Cannot convert data from Null value", raw=None)
+        with self.assertRaisesMessage(AnymailAPIError, "Cannot convert data from Null value"):
+            self.message.send()
 
 
 class MailjetBackendSessionSharingTestCase(SessionSharingTestCasesMixin, MailjetBackendMockAPITestCase):
