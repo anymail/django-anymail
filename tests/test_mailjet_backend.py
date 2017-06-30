@@ -337,13 +337,12 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
     """Test backend support for Anymail added features"""
 
     def test_metadata(self):
-        # TODO check that a non-string is actually allowed, the documentation
-        # suggests that JSON is OK, but only has a string example, see
+        # Mailjet expects the payload to be a single string
         # https://dev.mailjet.com/guides/#tagging-email-messages
         self.message.metadata = {'user_id': "12345", 'items': 6}
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(data['Mj-EventPayLoad'], {'user_id': "12345", 'items': 6})
+        self.assertJSONEqual(data['Mj-EventPayLoad'], {"user_id": "12345", "items": 6})
 
     def test_send_at(self):
         self.message.send_at = 1651820889  # 2022-05-06 07:08:09 UTC

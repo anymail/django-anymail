@@ -203,7 +203,8 @@ class MailjetPayload(RequestsPayload):
         })
 
     def set_metadata(self, metadata):
-        self.data["Mj-EventPayLoad"] = metadata
+        # Mailjet expects a single string payload
+        self.data["Mj-EventPayLoad"] = self.serialize_json(metadata)
 
     def set_tags(self, tags):
         if len(tags) > 0:
