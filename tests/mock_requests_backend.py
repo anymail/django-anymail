@@ -21,10 +21,11 @@ class RequestsBackendMockAPITestCase(SimpleTestCase, AnymailTestMixin):
 
     class MockResponse(requests.Response):
         """requests.request return value mock sufficient for testing"""
-        def __init__(self, status_code=200, raw=b"RESPONSE", encoding='utf-8'):
+        def __init__(self, status_code=200, raw=b"RESPONSE", encoding='utf-8', reason=None):
             super(RequestsBackendMockAPITestCase.MockResponse, self).__init__()
             self.status_code = status_code
             self.encoding = encoding
+            self.reason = reason or ("OK" if 200 <= status_code < 300 else "ERROR")
             # six.BytesIO(None) returns b'None' in PY2 (rather than b'')
             self.raw = six.BytesIO(raw) if raw is not None else six.BytesIO()
 
@@ -35,10 +36,10 @@ class RequestsBackendMockAPITestCase(SimpleTestCase, AnymailTestMixin):
         self.addCleanup(self.patch_request.stop)
         self.set_mock_response()
 
-    def set_mock_response(self, status_code=DEFAULT_STATUS_CODE, raw=UNSET, encoding='utf-8'):
+    def set_mock_response(self, status_code=DEFAULT_STATUS_CODE, raw=UNSET, encoding='utf-8', reason=None):
         if raw is UNSET:
             raw = self.DEFAULT_RAW_RESPONSE
-        mock_response = self.MockResponse(status_code, raw, encoding)
+        mock_response = self.MockResponse(status_code, raw=raw, encoding=encoding, reason=reason)
         self.mock_request.return_value = mock_response
         return mock_response
 

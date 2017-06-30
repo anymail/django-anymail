@@ -1,6 +1,7 @@
 import json
 from traceback import format_exception_only
 
+import six
 from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
 from requests import HTTPError
 
@@ -65,7 +66,16 @@ class AnymailError(Exception):
         """Return a formatted string of self.status_code and response, or None"""
         if self.status_code is None:
             return None
-        description = "%s API response %d:" % (self.esp_name or "ESP", self.status_code)
+
+        # Decode response.reason to text -- borrowed from requests.Response.raise_for_status:
+        reason = self.response.reason
+        if isinstance(reason, six.binary_type):
+            try:
+                reason = reason.decode('utf-8')
+            except UnicodeDecodeError:
+                reason = reason.decode('iso-8859-1')
+
+        description = "%s API response %d: %s" % (self.esp_name or "ESP", self.status_code, reason)
         try:
             json_response = self.response.json()
             description += "\n" + json.dumps(json_response, indent=2)
