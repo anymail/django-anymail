@@ -117,7 +117,12 @@ class MailjetPayload(RequestsPayload):
             try:
                 headers = json_response["Data"][0]["Headers"]
                 if "From" in headers:
-                    parsed = parse_address_list([headers["From"]])[0]
+                    # Workaround Mailjet returning malformed From header
+                    # if there's a comma in the template's From display-name:
+                    from_email = headers["From"].replace(",", "||COMMA||")
+                    parsed = parse_address_list([from_email])[0]
+                    if parsed.name:
+                        parsed.name = parsed.name.replace("||COMMA||", ",")
                 else:
                     name_addr = (headers["SenderName"], headers["SenderEmail"])
                     parsed = ParsedEmail(name_addr)

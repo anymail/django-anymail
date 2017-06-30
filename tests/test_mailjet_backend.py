@@ -420,6 +420,8 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.assertEqual(data['FromEmail'], 'some@example.com')
 
     def test_template_populate_from(self):
+        # Note: Mailjet fails to properly quote the From field's display-name
+        # if the template sender name contains commas (as shown here):
         template_response_content = b'''{
             "Count": 1,
             "Data": [{
@@ -428,7 +430,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
                 "MJMLContent": "",
                 "Headers": {
                     "Subject": "Hello World!!",
-                    "From": "Friendly Tester <noreply@example.com>",
+                    "From": "Widgets, Inc. <noreply@example.com>",
                     "Reply-To": ""
                 }
             }],
@@ -440,7 +442,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(data['Mj-TemplateID'], '1234568')
-        self.assertEqual(data['FromName'], 'Friendly Tester')
+        self.assertEqual(data['FromName'], 'Widgets, Inc.')
         self.assertEqual(data['FromEmail'], 'noreply@example.com')
 
     def test_template_not_found(self):
