@@ -41,7 +41,10 @@ class EmailBackend(AnymailBaseBackend):
                 raise response
         except AttributeError:
             # Default is to return 'sent' for each recipient
-            status = AnymailRecipientStatus(message_id=1, status='sent')
+            status = AnymailRecipientStatus(
+                message_id=message.message()['Message-ID'],
+                status='sent'
+            )
             response = {
                 'recipient_status': {email: status for email in payload.recipient_emails}
             }

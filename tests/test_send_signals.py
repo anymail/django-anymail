@@ -59,20 +59,23 @@ class TestPostSendSignal(TestBackendTestCase):
 
     def test_post_send(self):
         """Post-send receiver called for each message, after sending"""
+        message_id = 'asdf'
+
         @receiver(post_send, weak=False)
         def handle_post_send(sender, message, status, esp_name, **kwargs):
             self.assertEqual(self.get_send_count(), 1)  # already sent
             self.assertEqual(sender, TestEmailBackend)
             self.assertEqual(message, self.message)
             self.assertEqual(status.status, {'sent'})
-            self.assertEqual(status.message_id, 1)  # TestEmailBackend default message_id
+            self.assertEqual(status.message_id, message_id)
             self.assertEqual(status.recipients['to@example.com'].status, 'sent')
-            self.assertEqual(status.recipients['to@example.com'].message_id, 1)
+            self.assertEqual(status.recipients['to@example.com'].message_id, message_id)
             self.assertEqual(esp_name, "Test")  # the TestEmailBackend's ESP is named "Test"
             self.receiver_called = True
         self.addCleanup(post_send.disconnect, receiver=handle_post_send)
 
         self.receiver_called = False
+        self.message.extra_headers['Message-ID'] = message_id
         self.message.send()
         self.assertTrue(self.receiver_called)
 
