@@ -1,3 +1,4 @@
+import uuid
 from django.core.mail.backends.console import EmailBackend as DjangoConsoleBackend
 
 from ..exceptions import AnymailError
@@ -11,6 +12,10 @@ class EmailBackend(AnymailTestBackend, DjangoConsoleBackend):
     """
 
     esp_name = "Console"
+
+    def get_esp_message_id(self, message):
+        # Generate a guaranteed-unique ID for the message
+        return str(uuid.uuid4())
 
     def send_messages(self, email_messages):
         if not email_messages:

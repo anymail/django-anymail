@@ -27,6 +27,11 @@ class EmailBackend(AnymailBaseBackend):
         if not hasattr(mail, 'outbox'):
             mail.outbox = []  # see django.core.mail.backends.locmem
 
+    def get_esp_message_id(self, message):
+        # Get a unique ID for the message.  The message must have been added to
+        # the outbox first.
+        return mail.outbox.index(message)
+
     def build_message_payload(self, message, defaults):
         return TestPayload(backend=self, message=message, defaults=defaults)
 
@@ -42,7 +47,7 @@ class EmailBackend(AnymailBaseBackend):
         except AttributeError:
             # Default is to return 'sent' for each recipient
             status = AnymailRecipientStatus(
-                message_id=message.message()['Message-ID'],
+                message_id=self.get_esp_message_id(message),
                 status='sent'
             )
             response = {
