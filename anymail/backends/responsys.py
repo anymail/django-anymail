@@ -19,8 +19,7 @@ class EmailBackend(AnymailRequestsBackend):
         username = get_anymail_setting('username', esp_name=esp_name, kwargs=kwargs, default=None, allow_bare=True)
         password = get_anymail_setting('password', esp_name=esp_name, kwargs=kwargs, default=None, allow_bare=True)
 
-        api_url = get_anymail_setting('api_url', esp_name=esp_name, kwargs=kwargs,
-                                        default='/rest/api/v1.3/campaigns/')
+        api_url = get_anymail_setting('api_url', esp_name=esp_name, kwargs=kwargs, default='/rest/api/v1.3/campaigns/')
 
         login_url = get_anymail_setting('login_url', esp_name=esp_name, kwargs=kwargs,
                                         default='http://login2.responsys.net/rest/api/v1.3/auth/token')
@@ -46,14 +45,15 @@ class EmailBackend(AnymailRequestsBackend):
         return ResponsysPayload(message, defaults, self)
 
     def parse_recipient_status(self, response, payload, message):
-        recipientsDict = dict()
+        recipients_dict = dict()
         parsed_response = self.deserialize_json_response(response, payload, message)
 
         for r in parsed_response:
             status = 'sent' if r['success'] else 'failed'
-            recipientsDict[r['recipientId']] = AnymailRecipientStatus(status=status,  message_id=None)
+            recipients_dict[r['recipientId']] = AnymailRecipientStatus(status=status,  message_id=None)
 
-        return recipientsDict
+        return recipients_dict
+
 
 class ResponsysPayload(RequestsPayload):
 
@@ -63,8 +63,8 @@ class ResponsysPayload(RequestsPayload):
         http_headers['Content-Type'] = 'application/json'
         http_headers['Accept'] = 'application/json'
         super(ResponsysPayload, self).__init__(message, defaults, backend,
-                                              headers=http_headers,
-                                              *args, **kwargs)
+                                               headers=http_headers,
+                                               *args, **kwargs)
 
     def init_payload(self):
         self.data = dict(
@@ -86,6 +86,10 @@ class ResponsysPayload(RequestsPayload):
         pass
         # self.unsupported_feature("text_body")
 
+    def set_from_email(self, email):
+        pass
+        # self.unsupported_feature("from_email")
+
     def set_extra_headers(self, headers):
         pass
         # self.unsupported_feature("extra_headers")
@@ -98,15 +102,11 @@ class ResponsysPayload(RequestsPayload):
         pass
         # self.unsupported_feature("reply_to")
 
-    def set_from_email(self, email):
-        pass
-        # self.unsupported_feature("from_email")
-
     def set_to(self, emails):
         self.to = emails
 
     def set_subject(self, subject):
-        self.subject = subject
+        self.subject = dict(name='SUBJECT', value=subject or '')
 
     def set_esp_extra(self, extra):
         self.esp_extra = extra
@@ -117,6 +117,14 @@ class ResponsysPayload(RequestsPayload):
     def set_merge_global_data(self, merge_global_data):
         self.data['mergeRule'].update(merge_global_data.get('mergeRule', dict()))
         self.data['mergeTriggerRecordData']['fieldNames'] = merge_global_data.get('fieldNames', [])
+
+        self.custom_data = merge_global_data.get('customData', None)
+
+        for recipient in self.data['mergeTriggerRecordData']['mergeTriggerRecords']:
+            if self.custom_data is not None:
+                recipient['optionalData'] = recipient['optionalData'] + self.custom_data
+
+            recipient['optionalData'].append(self.subject)
 
     def get_default_merge_rule(self):
         return dict(
