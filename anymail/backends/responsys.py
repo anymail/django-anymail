@@ -1,5 +1,6 @@
 import requests
 
+from ..exceptions import AnymailError
 from ..utils import get_anymail_setting
 from ..message import AnymailRecipientStatus
 from .base_requests import AnymailRequestsBackend, RequestsPayload
@@ -19,7 +20,7 @@ class EmailBackend(AnymailRequestsBackend):
         password = get_anymail_setting('password', esp_name=esp_name, kwargs=kwargs, default=None, allow_bare=True)
 
         api_url = get_anymail_setting('api_url', esp_name=esp_name, kwargs=kwargs,
-                                        default='/rest/api/v1.3/campaigns/test_email_alerts/email')
+                                        default='/rest/api/v1.3/campaigns/')
 
         login_url = get_anymail_setting('login_url', esp_name=esp_name, kwargs=kwargs,
                                         default='http://login2.responsys.net/rest/api/v1.3/auth/token')
@@ -33,7 +34,7 @@ class EmailBackend(AnymailRequestsBackend):
 
         response = requests.post(login_url, data=payload)
 
-        parsed_response = self.deserialize_json_response(response, payload, {})
+        parsed_response = self.deserialize_json_response(response, payload, dict())
 
         api_url = parsed_response['endPoint'] + api_url
 
@@ -45,7 +46,7 @@ class EmailBackend(AnymailRequestsBackend):
         return ResponsysPayload(message, defaults, self)
 
     def parse_recipient_status(self, response, payload, message):
-        recipientsDict = {}
+        recipientsDict = dict()
         parsed_response = self.deserialize_json_response(response, payload, message)
 
         for r in parsed_response:
@@ -57,7 +58,7 @@ class EmailBackend(AnymailRequestsBackend):
 class ResponsysPayload(RequestsPayload):
 
     def __init__(self, message, defaults, backend, *args, **kwargs):
-        http_headers = kwargs.pop('headers', {})
+        http_headers = kwargs.pop('headers', dict())
         http_headers['Authorization'] = '%s' % backend.auth_token
         http_headers['Content-Type'] = 'application/json'
         http_headers['Accept'] = 'application/json'
@@ -66,25 +67,71 @@ class ResponsysPayload(RequestsPayload):
                                               *args, **kwargs)
 
     def init_payload(self):
-        self.data = {}
+        self.data = dict(
+            mergeTriggerRecordData=dict(
+                mergeTriggerRecords=list(),
+                fieldNames=list()
+            ),
+            mergeRule=self.get_default_merge_rule()
+        )
+
+    def get_api_endpoint(self):
+        if self.esp_extra.get('campaign_name', None) is None:
+            raise AnymailError("Cannot call Responsys unknown campaign name. "
+                               "Set `message.esp_extra={'campaign_name': '<campaign_name>'}`",
+                               backend=self.backend, email_message=self.message, payload=self)
+        return "%s/email" % self.esp_extra.get('campaign_name')
 
     def set_text_body(self, body):
-        self.data = body
+        pass
+        # self.unsupported_feature("text_body")
 
     def set_extra_headers(self, headers):
         pass
+        # self.unsupported_feature("extra_headers")
 
     def set_html_body(self, body):
         pass
+        # self.unsupported_feature("html_body")
 
     def set_reply_to(self, emails):
         pass
+        # self.unsupported_feature("reply_to")
 
     def set_from_email(self, email):
         pass
+        # self.unsupported_feature("from_email")
 
-    def set_recipients(self, recipient_type, emails):
-        pass
+    def set_to(self, emails):
+        self.to = emails
 
     def set_subject(self, subject):
-        pass
+        self.subject = subject
+
+    def set_esp_extra(self, extra):
+        self.esp_extra = extra
+
+    def set_merge_data(self, merge_data):
+        self.data['mergeTriggerRecordData']['mergeTriggerRecords'] = merge_data.get('recipients', [])
+
+    def set_merge_global_data(self, merge_global_data):
+        self.data['mergeRule'].update(merge_global_data.get('mergeRule', dict()))
+        self.data['mergeTriggerRecordData']['fieldNames'] = merge_global_data.get('fieldNames', [])
+
+    def get_default_merge_rule(self):
+        return dict(
+            htmlValue='H',
+            matchColumnName1='EMAIL_ADDRESS_',
+            matchColumnName2=None,
+            optoutValue='O',
+            insertOnNoMatch=True,
+            defaultPermissionStatus='OPTIN',
+            rejectRecordIfChannelEmpty='E',
+            optinValue='I',
+            updateOnMatch='REPLACE_ALL',
+            textValue='T',
+            matchOperator='NONE'
+        )
+
+    def serialize_data(self):
+        return self.serialize_json(self.data)
