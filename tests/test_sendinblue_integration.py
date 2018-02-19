@@ -1,6 +1,5 @@
 import os
 import unittest
-from datetime import datetime, timedelta
 
 from django.test import SimpleTestCase
 from django.test.utils import override_settings
@@ -8,9 +7,9 @@ from django.test.utils import override_settings
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path, RUN_LIVE_TESTS
+from .utils import AnymailTestMixin, RUN_LIVE_TESTS
 
-SENDINBLUE_TEST_API_KEY = os.getenv('SENDGRID_TEST_API_KEY')
+SENDINBLUE_TEST_API_KEY = os.getenv('SENDINBLUE_TEST_API_KEY')
 
 
 @unittest.skipUnless(RUN_LIVE_TESTS, "RUN_LIVE_TESTS disabled in this environment")
@@ -35,7 +34,7 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
     def setUp(self):
         super(SendinBlueBackendIntegrationTests, self).setUp()
 
-        self.message = AnymailMessage('Anymail SendGrid integration test', 'Text content',
+        self.message = AnymailMessage('Anymail SendinBlue integration test', 'Text content',
                                       'from@example.com', ['to@example.com'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
@@ -48,8 +47,8 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
         sent_status = anymail_status.recipients['to@example.com'].status
         message_id = anymail_status.recipients['to@example.com'].message_id
 
-        self.assertEqual(sent_status, 'queued')  # SendGrid always queues
-        self.assertRegex(message_id, r'\<.+@example\.com\>')  # should use from_email's domain
+        self.assertEqual(sent_status, 'queued')  # SendinBlue always queues
+        self.assertRegex(message_id, r'\<.+@smtp-relay\.mailin\.fr\>')  # should use from_email's domain
         self.assertEqual(anymail_status.status, {sent_status})  # set of all recipient statuses
         self.assertEqual(anymail_status.message_id, message_id)
 
@@ -64,6 +63,8 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
             reply_to=['"Reply, with comma" <reply@example.com>'],  # SendinBlue API v3 only supports single reply-to
             headers={"X-Anymail-Test": "value", "X-Anymail-Count": 3},
         )
+        message.attach_alternative('<p>HTML content</p>', "text/html")  # SendinBlue need an HTML content to work
+
         message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
         message.attach("attachment2.csv", "ID,Name\n1,Amy Lina", "text/csv")
 
@@ -76,5 +77,5 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
             self.message.send()
         err = cm.exception
         self.assertEqual(err.status_code, 401)
-        # Make sure the exception message includes SendGrid's response:
-        self.assertIn("authorization grant is invalid", str(err))
+        # Make sure the exception message includes SendinBlue's response:
+        self.assertIn("Key not found", str(err))
