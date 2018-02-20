@@ -191,9 +191,6 @@ class SendinBluePayload(RequestsPayload):
     def set_template_id(self, template_id):
         self.template_id = template_id
 
-    def set_template_id(self, template_id):
-        self.template_id = template_id
-
     def set_text_body(self, body):
         if body:
             self.data['textContent'] = body

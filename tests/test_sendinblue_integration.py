@@ -61,6 +61,7 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
             cc=["cc1@example.com", "Copy 2 <cc2@example.com>"],
             bcc=["bcc1@example.com", "Blind Copy 2 <bcc2@example.com>"],
             reply_to=['"Reply, with comma" <reply@example.com>'],  # SendinBlue API v3 only supports single reply-to
+            tags=["tag 1"],
             headers={"X-Anymail-Test": "value", "X-Anymail-Count": 3},
             merge_global_data={
                 'global': 'global_value'
@@ -81,6 +82,7 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
             cc=["cc1@example.com", "cc2@example.com"],
             bcc=["bcc1@example.com", "bcc2@example.com"],
             reply_to=['reply@example.com'],  # SendinBlue API v3 only supports single reply-to
+            tags=["tag 1"],
             headers={"X-Anymail-Test": "value", "X-Anymail-Count": 3},
             merge_global_data={
                 'global': 'global_value'
