@@ -52,7 +52,7 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
         self.assertEqual(anymail_status.status, {sent_status})  # set of all recipient statuses
         self.assertEqual(anymail_status.message_id, message_id)
 
-    def test_all_options(self):
+    def test_all_options_without_template(self):
         message = AnymailMessage(
             subject="Anymail all-options integration test",
             body="This is the text body",
@@ -62,8 +62,30 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
             bcc=["bcc1@example.com", "Blind Copy 2 <bcc2@example.com>"],
             reply_to=['"Reply, with comma" <reply@example.com>'],  # SendinBlue API v3 only supports single reply-to
             headers={"X-Anymail-Test": "value", "X-Anymail-Count": 3},
+            merge_global_data={
+                'global': 'global_value'
+            },
         )
         message.attach_alternative('<p>HTML content</p>', "text/html")  # SendinBlue need an HTML content to work
+
+        message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
+        message.attach("attachment2.csv", "ID,Name\n1,Amy Lina", "text/csv")
+
+        message.send()
+        self.assertEqual(message.anymail_status.status, {'queued'})  # SendinBlue always queues
+
+    def test_all_options_with_template(self):
+        message = AnymailMessage(
+            template_id='1',
+            to=["to1@example.com", 'to2@example.com'],
+            cc=["cc1@example.com", "cc2@example.com"],
+            bcc=["bcc1@example.com", "bcc2@example.com"],
+            reply_to=['reply@example.com'],  # SendinBlue API v3 only supports single reply-to
+            headers={"X-Anymail-Test": "value", "X-Anymail-Count": 3},
+            merge_global_data={
+                'global': 'global_value'
+            },
+        )
 
         message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
         message.attach("attachment2.csv", "ID,Name\n1,Amy Lina", "text/csv")

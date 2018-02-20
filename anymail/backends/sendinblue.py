@@ -140,6 +140,7 @@ class SendinBluePayload(RequestsPayload):
         if 'replyTo' in data:
             if 'name' in data['replyTo']:
                 self.unsupported_feature("display names in (replyTo) when sending with a template")
+
             data['replyTo'] = data['replyTo']['email']
 
         return data
@@ -186,6 +187,9 @@ class SendinBluePayload(RequestsPayload):
             self.data['headers']["X-Mailin-tag"] = tags[0]
             if len(tags) > 1:
                 self.unsupported_feature('multiple tags (%r)' % tags)
+
+    def set_template_id(self, template_id):
+        self.template_id = template_id
 
     def set_template_id(self, template_id):
         self.template_id = template_id
