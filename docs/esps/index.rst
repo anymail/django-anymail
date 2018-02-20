@@ -35,15 +35,15 @@ Email Service Provider                        |Mailgun|   |Mailjet|   |Mandrill|
 -----------------------------------------------------------------------------------------------------------------------------------
 :attr:`~AnymailMessage.metadata`              Yes         Yes         Yes         No          Yes         No            Yes
 :attr:`~AnymailMessage.send_at`               Yes         No          Yes         No          Yes         No            Yes
-:attr:`~AnymailMessage.tags`                  Yes         Max 1 tag   Yes         Max 1 tag   Yes         No            Max 1 tag
+:attr:`~AnymailMessage.tags`                  Yes         Max 1 tag   Yes         Max 1 tag   Yes         Max 1 tag     Max 1 tag
 :attr:`~AnymailMessage.track_clicks`          Yes         Yes         Yes         Yes         Yes         No            Yes
 :attr:`~AnymailMessage.track_opens`           Yes         Yes         Yes         Yes         Yes         No            Yes
 
 .. rubric:: :ref:`templates-and-merge`
 -----------------------------------------------------------------------------------------------------------------------------------
-:attr:`~AnymailMessage.template_id`           No          Yes         Yes         Yes         Yes         No            Yes
+:attr:`~AnymailMessage.template_id`           No          Yes         Yes         Yes         Yes         Yes           Yes
 :attr:`~AnymailMessage.merge_data`            Yes         Yes         Yes         No          Yes         No            Yes
-:attr:`~AnymailMessage.merge_global_data`     (emulated)  Yes         Yes         Yes         Yes         No            Yes
+:attr:`~AnymailMessage.merge_global_data`     (emulated)  Yes         Yes         Yes         Yes         Yes           Yes
 
 .. rubric:: :ref:`Status <esp-send-status>` and :ref:`event tracking <event-tracking>`
 -----------------------------------------------------------------------------------------------------------------------------------
