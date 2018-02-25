@@ -68,3 +68,23 @@ Limitations and quirks
   :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error---or
   if you've enabled :setting:`ANYMAIL_IGNORE_UNSUPPORTED_FEATURES`,
   Anymail will use only the first one.
+
+**Attachment content-type**
+  Attachment content-type is determined from the filename
+  extension and you can't specify a different one. Trying
+  to send an attachment without a name or a name without
+  an extension generates an error with SendinBlue's API.
+
+**Inline images**
+  SendinBlue doesn't support inline images at all, it
+  only support basic attachment.
+
+**Email's display-names**
+  Email's display-names are only supported
+  **without** :attr:`template_id`. If you specify
+  a :attr:`template_id` all display-names will be hidden.
+
+**Template's limitation**
+  If you use a template you will suffer some limitations:
+  you can't change the subject or/and the body, and all email's
+  display-names will be hidden.
