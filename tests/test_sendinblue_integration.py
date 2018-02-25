@@ -66,6 +66,7 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
             merge_global_data={
                 'global': 'global_value'
             },
+            metadata={"meta1": "simple string", "meta2": 2},
         )
         message.attach_alternative('<p>HTML content</p>', "text/html")  # SendinBlue need an HTML content to work
 
@@ -87,6 +88,7 @@ class SendinBlueBackendIntegrationTests(SimpleTestCase, AnymailTestMixin):
             merge_global_data={
                 'global': 'global_value'
             },
+            metadata={"meta1": "simple string", "meta2": 2},
         )
 
         message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")

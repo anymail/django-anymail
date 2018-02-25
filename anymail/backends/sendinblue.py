@@ -223,3 +223,7 @@ class SendinBluePayload(RequestsPayload):
 
     def set_merge_global_data(self, merge_global_data):
         self.data['attributes'] = merge_global_data
+
+    def set_metadata(self, metadata):
+        # SendinBlue expects a single string payload
+        self.data['headers']["X-Mailin-custom"] = self.serialize_json(metadata)

@@ -272,9 +272,15 @@ class SendinBlueBackendAnymailFeatureTests(SendinBlueBackendMockAPITestCase):
 
     def test_metadata(self):
         self.message.metadata = {'user_id': "12345", 'items': 6, 'float': 98.6, 'long': longtype(123)}
+        self.message.send()
 
-        with self.assertRaises(AnymailUnsupportedFeature):
-            self.message.send()
+        data = self.get_api_call_json()
+
+        metadata = json.loads(data['headers']['X-Mailin-custom'])
+        self.assertEqual(metadata['user_id'], "12345")
+        self.assertEqual(metadata['items'], 6)
+        self.assertEqual(metadata['float'], 98.6)
+        self.assertEqual(metadata['long'], longtype(123))
 
     def test_send_at(self):
         utc_plus_6 = get_fixed_timezone(6 * 60)
@@ -417,11 +423,11 @@ class SendinBlueBackendAnymailFeatureTests(SendinBlueBackendMockAPITestCase):
 
         self.assertEqual(
             msg.anymail_status.message_id,
-            json.loads(msg.anymail_status.esp_response.content)['messageId']
+            json.loads(msg.anymail_status.esp_response.content.decode('utf-8'))['messageId']
         )
         self.assertEqual(
             msg.anymail_status.recipients['to1@example.com'].message_id,
-            json.loads(msg.anymail_status.esp_response.content)['messageId']
+            json.loads(msg.anymail_status.esp_response.content.decode('utf-8'))['messageId']
         )
 
     # noinspection PyUnresolvedReferences

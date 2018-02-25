@@ -33,7 +33,7 @@ Email Service Provider                        |Mailgun|   |Mailjet|   |Mandrill|
 ============================================  ==========  ==========  ==========  ==========  ==========  ============  ===========
 .. rubric:: :ref:`Anymail send options <anymail-send-options>`
 -----------------------------------------------------------------------------------------------------------------------------------
-:attr:`~AnymailMessage.metadata`              Yes         Yes         Yes         No          Yes         No            Yes
+:attr:`~AnymailMessage.metadata`              Yes         Yes         Yes         No          Yes         Yes           Yes
 :attr:`~AnymailMessage.send_at`               Yes         No          Yes         No          Yes         No            Yes
 :attr:`~AnymailMessage.tags`                  Yes         Max 1 tag   Yes         Max 1 tag   Yes         Max 1 tag     Max 1 tag
 :attr:`~AnymailMessage.track_clicks`          Yes         Yes         Yes         Yes         Yes         No            Yes
