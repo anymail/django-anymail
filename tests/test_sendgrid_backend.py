@@ -58,7 +58,7 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         # make sure backend assigned a Message-ID for event tracking
         self.assertRegex(data['headers']['Message-ID'], r'\<.+@sender\.example\.com\>')  # id uses from_email's domain
         # make sure we added the Message-ID to custom_args for event notification
-        self.assertEqual(data['headers']['Message-ID'], data['custom_args']['smtp-id'])
+        self.assertEqual(data['headers']['Message-ID'], data['custom_args']['anymail-id'])
 
     def test_name_addr(self):
         """Make sure RFC2822 name-addr format (with display-name) is allowed
@@ -120,7 +120,7 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         })
         # make sure custom Message-ID also added to custom_args
         self.assertEqual(data['custom_args'], {
-            'smtp-id': "<mycustommsgid@sales.example.com>",
+            'anymail-id': "<mycustommsgid@sales.example.com>",
         })
 
     def test_html_message(self):
@@ -345,7 +345,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         self.message.metadata = {'user_id': "12345", 'items': 6, 'float': 98.6, 'long': longtype(123)}
         self.message.send()
         data = self.get_api_call_json()
-        data['custom_args'].pop('smtp-id', None)  # remove Message-ID we added as tracking workaround
+        data['custom_args'].pop('anymail-id', None)  # remove Message-ID we added as tracking workaround
         self.assertEqual(data['custom_args'], {'user_id': "12345",
                                                'items': "6",  # int converted to a string,
                                                'float': "98.6",  # float converted to a string (watch binary rounding!)

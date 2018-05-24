@@ -69,10 +69,12 @@ class SendGridTrackingWebhookView(AnymailBaseWebhookView):
         else:
             metadata = {}
 
+        anymail_id = esp_event.get('anymail-id', None)
+        smtp_id = esp_event.get('smtp-id', None)
         return AnymailTrackingEvent(
             event_type=event_type,
             timestamp=timestamp,
-            message_id=esp_event.get('smtp-id', None),
+            message_id=anymail_id if anymail_id and anymail_id != smtp_id else smtp_id,  # backwards compatibility
             event_id=esp_event.get('sg_event_id', None),
             recipient=esp_event.get('email', None),
             reject_reason=reject_reason,
@@ -86,6 +88,7 @@ class SendGridTrackingWebhookView(AnymailBaseWebhookView):
 
     # Known keys in SendGrid events (used to recover metadata above)
     sendgrid_event_keys = {
+        'anymail-id',
         'asm_group_id',
         'attempt',  # MTA deferred count
         'category',

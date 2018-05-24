@@ -114,10 +114,8 @@ class SendGridPayload(RequestsPayload):
             self.data["headers"]["Message-ID"] = self.make_message_id()
         self.message_id = self.data["headers"]["Message-ID"]
 
-        # Workaround for missing message ID (smtp-id) in SendGrid engagement events
-        # (click and open tracking): because unique_args get merged into the raw event
-        # record, we can supply the 'smtp-id' field for any events missing it.
-        self.data.setdefault("custom_args", {})["smtp-id"] = self.message_id
+        # Set anymail-id to track our custom message ID
+        self.data.setdefault("custom_args", {})["anymail-id"] = self.message_id
 
     def make_message_id(self):
         """Returns a Message-ID that could be used for this payload
