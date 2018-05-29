@@ -23,7 +23,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         raw_events = [{
             "email": "recipient@example.com",
             "timestamp": 1461095246,
-            "anymail_id": "<wrfRRvF7Q0GgwUo2CvDmEA@example.com>",
+            "anymail_id": "3c2f4df8-c6dd-4cd2-9b91-6582b81a0349",
             "sg_event_id": "ZyjAM5rnQmuI1KFInHQ3Nw",
             "sg_message_id": "wrfRRvF7Q0GgwUo2CvDmEA.filter0425p1mdw1.13037.57168B4A1D.0",
             "event": "processed",
@@ -41,7 +41,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         self.assertEqual(event.event_type, "queued")
         self.assertEqual(event.timestamp, datetime(2016, 4, 19, 19, 47, 26, tzinfo=utc))
         self.assertEqual(event.esp_event, raw_events[0])
-        self.assertEqual(event.message_id, "<wrfRRvF7Q0GgwUo2CvDmEA@example.com>")
+        self.assertEqual(event.message_id, "3c2f4df8-c6dd-4cd2-9b91-6582b81a0349")
         self.assertEqual(event.event_id, "ZyjAM5rnQmuI1KFInHQ3Nw")
         self.assertEqual(event.recipient, "recipient@example.com")
         self.assertEqual(event.tags, ["tag1", "tag2"])
@@ -57,7 +57,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "event": "delivered",
             "email": "recipient@example.com",
             "timestamp": 1461095250,
-            "anymail_id": "<wrfRRvF7Q0GgwUo2CvDmEA@example.com>"
+            "anymail_id": "4ab185c2-0171-492f-9ce0-27de258efc99"
         }]
         response = self.client.post('/anymail/sendgrid/tracking/',
                                     content_type='application/json', data=json.dumps(raw_events))
@@ -69,7 +69,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         self.assertEqual(event.event_type, "delivered")
         self.assertEqual(event.timestamp, datetime(2016, 4, 19, 19, 47, 30, tzinfo=utc))
         self.assertEqual(event.esp_event, raw_events[0])
-        self.assertEqual(event.message_id, "<wrfRRvF7Q0GgwUo2CvDmEA@example.com>")
+        self.assertEqual(event.message_id, "4ab185c2-0171-492f-9ce0-27de258efc99")
         self.assertEqual(event.event_id, "nOSv8m0eTQ-vxvwNwt3fZQ")
         self.assertEqual(event.recipient, "recipient@example.com")
         self.assertEqual(event.mta_response, "250 2.0.0 OK 1461095248 m143si2210036ioe.159 - gsmtp ")
@@ -79,7 +79,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
     def test_dropped_invalid_event(self):
         raw_events = [{
             "email": "invalid@invalid",
-            "anymail_id": "<YZkwwo_vQUidhSh7sCzkvQ@example.com>",
+            "anymail_id": "c74002d9-7ccb-4f67-8b8c-766cec03c9a6",
             "timestamp": 1461095250,
             "sg_event_id": "3NPOePGOTkeM_U3fgWApfg",
             "sg_message_id": "filter0093p1las1.9128.5717FB8127.0",
@@ -95,7 +95,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "rejected")
         self.assertEqual(event.esp_event, raw_events[0])
-        self.assertEqual(event.message_id, "<YZkwwo_vQUidhSh7sCzkvQ@example.com>")
+        self.assertEqual(event.message_id, "c74002d9-7ccb-4f67-8b8c-766cec03c9a6")
         self.assertEqual(event.event_id, "3NPOePGOTkeM_U3fgWApfg")
         self.assertEqual(event.recipient, "invalid@invalid")
         self.assertEqual(event.reject_reason, "invalid")
@@ -104,7 +104,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
     def test_dropped_unsubscribed_event(self):
         raw_events = [{
             "email": "unsubscribe@example.com",
-            "anymail_id": "<Kwx3gAIKQOG7Nd5XEO7guQ@example.com>",
+            "anymail_id": "a36ec0f9-aabe-45c7-9a84-3e17afb5cb65",
             "timestamp": 1461095250,
             "sg_event_id": "oxy9OLwMTAy5EsuZn1qhIg",
             "sg_message_id": "filter0199p1las1.4745.5717FB6F5.0",
@@ -120,7 +120,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "rejected")
         self.assertEqual(event.esp_event, raw_events[0])
-        self.assertEqual(event.message_id, "<Kwx3gAIKQOG7Nd5XEO7guQ@example.com>")
+        self.assertEqual(event.message_id, "a36ec0f9-aabe-45c7-9a84-3e17afb5cb65")
         self.assertEqual(event.event_id, "oxy9OLwMTAy5EsuZn1qhIg")
         self.assertEqual(event.recipient, "unsubscribe@example.com")
         self.assertEqual(event.reject_reason, "unsubscribed")
@@ -137,7 +137,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "event": "bounce",
             "email": "noreply@example.com",
             "timestamp": 1461095250,
-            "anymail_id": "<Lli-03HcQ5-JLybO9fXsJg@example.com>",
+            "anymail_id": "de212213-bb66-4302-8f3f-20acdb7a104e",
             "type": "bounce"
         }]
         response = self.client.post('/anymail/sendgrid/tracking/',
@@ -149,7 +149,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "bounced")
         self.assertEqual(event.esp_event, raw_events[0])
-        self.assertEqual(event.message_id, "<Lli-03HcQ5-JLybO9fXsJg@example.com>")
+        self.assertEqual(event.message_id, "de212213-bb66-4302-8f3f-20acdb7a104e")
         self.assertEqual(event.event_id, "lC0Rc-FuQmKbnxCWxX1jRQ")
         self.assertEqual(event.recipient, "noreply@example.com")
         self.assertEqual(event.mta_response, "550 5.1.1 The email account that you tried to reach does not exist.")
@@ -163,7 +163,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "email": "recipient@example.com",
             "attempt": "1",
             "timestamp": 1461200990,
-            "anymail_id": "<20160421010427.2847.6797@example.com>",
+            "anymail_id": "ccf83222-0d7e-4542-8beb-893122afa757",
         }]
         response = self.client.post('/anymail/sendgrid/tracking/',
                                     content_type='application/json', data=json.dumps(raw_events))
@@ -174,7 +174,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "deferred")
         self.assertEqual(event.esp_event, raw_events[0])
-        self.assertEqual(event.message_id, "<20160421010427.2847.6797@example.com>")
+        self.assertEqual(event.message_id, "ccf83222-0d7e-4542-8beb-893122afa757")
         self.assertEqual(event.event_id, "b_syL5UiTvWC_Ky5L6Bs5Q")
         self.assertEqual(event.recipient, "recipient@example.com")
         self.assertEqual(event.mta_response,
@@ -187,7 +187,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "ip": "66.102.6.229",
             "sg_event_id": "MjIwNDg5NTgtZGE3OC00NDI1LWFiMmMtMDUyZTU2ZmFkOTFm",
             "sg_message_id": "wrfRRvF7Q0GgwUo2CvDmEA.filter0425p1mdw1.13037.57168B4A1D.0",
-            "anymail_id": "<20160421010427.2847.6797@example.com>",
+            "anymail_id": "44920b35-3e31-478b-bb67-b4f5e0c85ebc",
             "useragent": "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0",
             "event": "open"
         }]
@@ -200,7 +200,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "opened")
         self.assertEqual(event.esp_event, raw_events[0])
-        self.assertEqual(event.message_id, "<20160421010427.2847.6797@example.com>")
+        self.assertEqual(event.message_id, "44920b35-3e31-478b-bb67-b4f5e0c85ebc")
         self.assertEqual(event.event_id, "MjIwNDg5NTgtZGE3OC00NDI1LWFiMmMtMDUyZTU2ZmFkOTFm")
         self.assertEqual(event.recipient, "recipient@example.com")
         self.assertEqual(event.user_agent, "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0")
@@ -211,7 +211,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "sg_event_id": "OTdlOGUzYjctYjc5Zi00OWE4LWE4YWUtNjIxNjk2ZTJlNGVi",
             "sg_message_id": "_fjPjuJfRW-IPs5SuvYotg.filter0590p1mdw1.2098.57168CFC4B.0",
             "useragent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36",
-            "anymail_id": "<20160421010427.2847.6797@example.com>",
+            "anymail_id": "75de5af9-a090-4325-87f9-8c599ad66f60",
             "event": "click",
             "url_offset": {"index": 0, "type": "html"},
             "email": "recipient@example.com",
@@ -227,7 +227,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "clicked")
         self.assertEqual(event.esp_event, raw_events[0])
-        self.assertEqual(event.message_id, "<20160421010427.2847.6797@example.com>")
+        self.assertEqual(event.message_id, "75de5af9-a090-4325-87f9-8c599ad66f60")
         self.assertEqual(event.event_id, "OTdlOGUzYjctYjc5Zi00OWE4LWE4YWUtNjIxNjk2ZTJlNGVi")
         self.assertEqual(event.recipient, "recipient@example.com")
         self.assertEqual(event.user_agent, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36")
