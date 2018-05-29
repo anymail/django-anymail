@@ -1,6 +1,6 @@
+import uuid
 import warnings
 
-from django.core.mail import make_msgid
 from requests.structures import CaseInsensitiveDict
 
 from ..exceptions import AnymailConfigurationError, AnymailRequestsAPIError, AnymailWarning
@@ -99,7 +99,7 @@ class SendGridPayload(RequestsPayload):
         """Performs any necessary serialization on self.data, and returns the result."""
 
         if self.generate_message_id:
-            self.ensure_message_id()
+            self.set_anymail_id()
 
         self.build_merge_data()
         if self.merge_data is not None:
@@ -136,29 +136,10 @@ class SendGridPayload(RequestsPayload):
 
         return self.data
 
-    def ensure_message_id(self):
-        """Ensure message has a known Message-ID for later event tracking"""
-        headers = self.data["headers"]
-        if "Message-ID" not in headers:
-            # Only make our own if caller hasn't already provided one
-            headers["Message-ID"] = self.make_message_id()
-        self.message_id = headers["Message-ID"]
+    def set_anymail_id(self):
+        """Ensure message has a known anymail_id for later event tracking"""
 
-        # Workaround for missing message ID (smtp-id) in SendGrid engagement events
-        # (click and open tracking): because unique_args get merged into the raw event
-        # record, we can supply the 'smtp-id' field for any events missing it.
-        self.smtpapi.setdefault('unique_args', {})['smtp-id'] = self.message_id
-
-    def make_message_id(self):
-        """Returns a Message-ID that could be used for this payload
-
-        Tries to use the from_email's domain as the Message-ID's domain
-        """
-        try:
-            _, domain = self.data["from"].split("@")
-        except (AttributeError, KeyError, TypeError, ValueError):
-            domain = None
-        return make_msgid(domain=domain)
+        self.smtpapi.setdefault('unique_args', {})["anymail_id"] = str(uuid.uuid4())
 
     def build_merge_data(self):
         """Set smtpapi['sub'] and ['section']"""

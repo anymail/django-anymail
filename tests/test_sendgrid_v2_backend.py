@@ -63,12 +63,9 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         self.assertEqual(data['text'], "Here is the message.")
         self.assertEqual(data['from'], "from@sender.example.com")
         self.assertEqual(data['to'], ["to@example.com"])
-        # make sure backend assigned a Message-ID for event tracking
-        email_headers = json.loads(data['headers'])
-        self.assertRegex(email_headers['Message-ID'], r'\<.+@sender\.example\.com\>')  # id uses from_email's domain
-        # make sure we added the Message-ID to unique_args for event notification
+        # make sure the backend assigned the anymail_id to unique_args for event tracking and notification
         smtpapi = self.get_smtpapi()
-        self.assertEqual(email_headers['Message-ID'], smtpapi['unique_args']['smtp-id'])
+        self.assertUUIDIsValid(smtpapi['unique_args']['anymail_id'])
 
     @override_settings(ANYMAIL={'SENDGRID_USERNAME': 'sg_username', 'SENDGRID_PASSWORD': 'sg_password'})
     def test_user_pass_auth(self):
@@ -129,10 +126,9 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
             'Reply-To': 'another@example.com',
             'X-MyHeader': 'my value',
         })
-        # make sure custom Message-ID also added to unique_args
-        self.assertJSONEqual(data['x-smtpapi'], {
-            'unique_args': {'smtp-id': '<mycustommsgid@sales.example.com>'}
-        })
+        # make sure anymail_id also added to unique_args
+        smtpapi_json = json.loads(data['x-smtpapi'])
+        self.assertUUIDIsValid(smtpapi_json['unique_args']['anymail_id'])
 
     def test_html_message(self):
         text_content = 'This is an important message.'
@@ -293,8 +289,7 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         self.assertNotIn('ccname', data)
         self.assertNotIn('bcc', data)
         self.assertNotIn('bccname', data)
-        headers = json.loads(data['headers'])
-        self.assertNotIn('Reply-To', headers)
+        self.assertNotIn('headers', data)
 
         # Test empty `to` -- but send requires at least one recipient somewhere (like cc)
         self.message.to = []
@@ -354,7 +349,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         self.message.metadata = {'user_id': "12345", 'items': 6}
         self.message.send()
         smtpapi = self.get_smtpapi()
-        smtpapi['unique_args'].pop('smtp-id', None)  # remove Message-ID we added as tracking workaround
+        smtpapi['unique_args'].pop('anymail_id', None)  # remove Message-ID we added as tracking workaround
         self.assertEqual(smtpapi['unique_args'], {'user_id': "12345", 'items': 6})
 
     def test_send_at(self):
@@ -565,7 +560,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         sent = msg.send()
         self.assertEqual(sent, 1)
         self.assertEqual(msg.anymail_status.status, {'queued'})
-        self.assertRegex(msg.anymail_status.message_id, r'\<.+@example\.com\>')  # don't know exactly what it'll be
+        self.assertUUIDIsValid(msg.anymail_status.message_id)
         self.assertEqual(msg.anymail_status.recipients['to1@example.com'].status, 'queued')
         self.assertEqual(msg.anymail_status.recipients['to1@example.com'].message_id,
                          msg.anymail_status.message_id)

@@ -2,7 +2,6 @@ import uuid
 from email.utils import quote as rfc822_quote
 import warnings
 
-from django.core.mail import make_msgid
 from requests.structures import CaseInsensitiveDict
 
 from .base_requests import AnymailRequestsBackend, RequestsPayload
