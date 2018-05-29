@@ -139,7 +139,8 @@ class SendGridPayload(RequestsPayload):
     def set_anymail_id(self):
         """Ensure message has a known anymail_id for later event tracking"""
 
-        self.smtpapi.setdefault('unique_args', {})["anymail_id"] = str(uuid.uuid4())
+        self.message_id = str(uuid.uuid4())
+        self.smtpapi.setdefault('unique_args', {})["anymail_id"] = self.message_id
 
     def build_merge_data(self):
         """Set smtpapi['sub'] and ['section']"""
