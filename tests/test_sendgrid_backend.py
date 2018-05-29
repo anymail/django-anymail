@@ -55,10 +55,8 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         self.assertEqual(data['personalizations'], [{
             'to': [{'email': "to@example.com"}],
         }])
-        # make sure backend assigned a Message-ID for event tracking
-        self.assertRegex(data['headers']['Message-ID'], r'\<.+@sender\.example\.com\>')  # id uses from_email's domain
-        # make sure we added the Message-ID to custom_args for event notification
-        self.assertEqual(data['headers']['Message-ID'], data['custom_args']['anymail-id'])
+        # make sure the backend assigned the anymail_id for event tracking and notification
+        self.assertUUIDIsValid(data['custom_args']['anymail_id'])
 
     def test_name_addr(self):
         """Make sure RFC2822 name-addr format (with display-name) is allowed
@@ -119,9 +117,7 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
             'Message-ID': "<mycustommsgid@sales.example.com>",
         })
         # make sure custom Message-ID also added to custom_args
-        self.assertEqual(data['custom_args'], {
-            'anymail-id': "<mycustommsgid@sales.example.com>",
-        })
+        self.assertUUIDIsValid(data['custom_args']['anymail_id'])
 
     def test_html_message(self):
         text_content = 'This is an important message.'
@@ -345,7 +341,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         self.message.metadata = {'user_id': "12345", 'items': 6, 'float': 98.6, 'long': longtype(123)}
         self.message.send()
         data = self.get_api_call_json()
-        data['custom_args'].pop('anymail-id', None)  # remove Message-ID we added as tracking workaround
+        data['custom_args'].pop('anymail_id', None)  # remove Message-ID we added as tracking workaround
         self.assertEqual(data['custom_args'], {'user_id': "12345",
                                                'items': "6",  # int converted to a string,
                                                'float': "98.6",  # float converted to a string (watch binary rounding!)
@@ -579,7 +575,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         sent = msg.send()
         self.assertEqual(sent, 1)
         self.assertEqual(msg.anymail_status.status, {'queued'})
-        self.assertRegex(msg.anymail_status.message_id, r'\<.+@example\.com\>')  # don't know exactly what it'll be
+        self.assertUUIDIsValid(msg.anymail_status.message_id)  # don't know exactly what it'll be
         self.assertEqual(msg.anymail_status.recipients['to1@example.com'].status, 'queued')
         self.assertEqual(msg.anymail_status.recipients['to1@example.com'].message_id,
                          msg.anymail_status.message_id)

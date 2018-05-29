@@ -23,7 +23,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         raw_events = [{
             "email": "recipient@example.com",
             "timestamp": 1461095246,
-            "smtp-id": "<wrfRRvF7Q0GgwUo2CvDmEA@example.com>",
+            "anymail_id": "<wrfRRvF7Q0GgwUo2CvDmEA@example.com>",
             "sg_event_id": "ZyjAM5rnQmuI1KFInHQ3Nw",
             "sg_message_id": "wrfRRvF7Q0GgwUo2CvDmEA.filter0425p1mdw1.13037.57168B4A1D.0",
             "event": "processed",
@@ -57,7 +57,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "event": "delivered",
             "email": "recipient@example.com",
             "timestamp": 1461095250,
-            "smtp-id": "<wrfRRvF7Q0GgwUo2CvDmEA@example.com>"
+            "anymail_id": "<wrfRRvF7Q0GgwUo2CvDmEA@example.com>"
         }]
         response = self.client.post('/anymail/sendgrid/tracking/',
                                     content_type='application/json', data=json.dumps(raw_events))
@@ -79,7 +79,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
     def test_dropped_invalid_event(self):
         raw_events = [{
             "email": "invalid@invalid",
-            "smtp-id": "<YZkwwo_vQUidhSh7sCzkvQ@example.com>",
+            "anymail_id": "<YZkwwo_vQUidhSh7sCzkvQ@example.com>",
             "timestamp": 1461095250,
             "sg_event_id": "3NPOePGOTkeM_U3fgWApfg",
             "sg_message_id": "filter0093p1las1.9128.5717FB8127.0",
@@ -104,7 +104,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
     def test_dropped_unsubscribed_event(self):
         raw_events = [{
             "email": "unsubscribe@example.com",
-            "smtp-id": "<Kwx3gAIKQOG7Nd5XEO7guQ@example.com>",
+            "anymail_id": "<Kwx3gAIKQOG7Nd5XEO7guQ@example.com>",
             "timestamp": 1461095250,
             "sg_event_id": "oxy9OLwMTAy5EsuZn1qhIg",
             "sg_message_id": "filter0199p1las1.4745.5717FB6F5.0",
@@ -137,7 +137,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "event": "bounce",
             "email": "noreply@example.com",
             "timestamp": 1461095250,
-            "smtp-id": "<Lli-03HcQ5-JLybO9fXsJg@example.com>",
+            "anymail_id": "<Lli-03HcQ5-JLybO9fXsJg@example.com>",
             "type": "bounce"
         }]
         response = self.client.post('/anymail/sendgrid/tracking/',
@@ -163,7 +163,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "email": "recipient@example.com",
             "attempt": "1",
             "timestamp": 1461200990,
-            "smtp-id": "<20160421010427.2847.6797@example.com>",
+            "anymail_id": "<20160421010427.2847.6797@example.com>",
         }]
         response = self.client.post('/anymail/sendgrid/tracking/',
                                     content_type='application/json', data=json.dumps(raw_events))
@@ -187,7 +187,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "ip": "66.102.6.229",
             "sg_event_id": "MjIwNDg5NTgtZGE3OC00NDI1LWFiMmMtMDUyZTU2ZmFkOTFm",
             "sg_message_id": "wrfRRvF7Q0GgwUo2CvDmEA.filter0425p1mdw1.13037.57168B4A1D.0",
-            "smtp-id": "<20160421010427.2847.6797@example.com>",
+            "anymail_id": "<20160421010427.2847.6797@example.com>",
             "useragent": "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0",
             "event": "open"
         }]
@@ -211,7 +211,7 @@ class SendGridDeliveryTestCase(WebhookTestCase):
             "sg_event_id": "OTdlOGUzYjctYjc5Zi00OWE4LWE4YWUtNjIxNjk2ZTJlNGVi",
             "sg_message_id": "_fjPjuJfRW-IPs5SuvYotg.filter0590p1mdw1.2098.57168CFC4B.0",
             "useragent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36",
-            "smtp-id": "<20160421010427.2847.6797@example.com>",
+            "anymail_id": "<20160421010427.2847.6797@example.com>",
             "event": "click",
             "url_offset": {"index": 0, "type": "html"},
             "email": "recipient@example.com",

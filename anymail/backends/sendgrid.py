@@ -1,3 +1,4 @@
+import uuid
 from email.utils import quote as rfc822_quote
 import warnings
 
@@ -99,7 +100,7 @@ class SendGridPayload(RequestsPayload):
         """Performs any necessary serialization on self.data, and returns the result."""
 
         if self.generate_message_id:
-            self.ensure_message_id()
+            self.set_anymail_id()
         self.build_merge_data()
 
         if not self.data["headers"]:
@@ -107,26 +108,10 @@ class SendGridPayload(RequestsPayload):
 
         return self.serialize_json(self.data)
 
-    def ensure_message_id(self):
-        """Ensure message has a known Message-ID for later event tracking"""
-        if "Message-ID" not in self.data["headers"]:
-            # Only make our own if caller hasn't already provided one
-            self.data["headers"]["Message-ID"] = self.make_message_id()
-        self.message_id = self.data["headers"]["Message-ID"]
+    def set_anymail_id(self):
+        """Ensure message has a known anymail_id for later event tracking"""
 
-        # Set anymail-id to track our custom message ID
-        self.data.setdefault("custom_args", {})["anymail-id"] = self.message_id
-
-    def make_message_id(self):
-        """Returns a Message-ID that could be used for this payload
-
-        Tries to use the from_email's domain as the Message-ID's domain
-        """
-        try:
-            _, domain = self.data["from"]["email"].split("@")
-        except (AttributeError, KeyError, TypeError, ValueError):
-            domain = None
-        return make_msgid(domain=domain)
+        self.data.setdefault("custom_args", {})["anymail_id"] = str(uuid.uuid4())
 
     def build_merge_data(self):
         """Set personalizations[...]['substitutions'] and data['sections']"""
