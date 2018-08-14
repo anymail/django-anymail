@@ -32,14 +32,14 @@ matrix:
     # Django 2.1: Python 3.5, 3.6, or 3.7
     - { env: DJANGO=2.1, python: 3.5 }
     - { env: DJANGO=2.1, python: 3.6 }
-    - { env: DJANGO=2.1, python: 3.7-dev }
+    - { env: DJANGO=2.1, python: 3.7, dist: xenial, sudo: true }
     - { env: DJANGO=2.1, python: pypy3 }
     # Django development master (direct from GitHub source):
-    - { env: DJANGO=master, python: 3.7-dev }
+    - { env: DJANGO=master, python: 3.6 }
 
   allow_failures:
     - env: DJANGO=master
-      python: 3.7-dev
+      python: 3.6
 
 cache: pip
 
