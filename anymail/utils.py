@@ -291,7 +291,8 @@ class Attachment(object):
                     self.content = attachment.as_string().encode(self.encoding)
             self.mimetype = attachment.get_content_type()
 
-            if get_content_disposition(attachment) == 'inline':
+            content_disposition = get_content_disposition(attachment)
+            if content_disposition == 'inline' or (not content_disposition and 'Content-ID' in attachment):
                 self.inline = True
                 self.content_id = attachment["Content-ID"]  # probably including the <...>
                 if self.content_id is not None:
