@@ -33,6 +33,10 @@ v4.3
 Features
 ~~~~~~~~
 
+*  Treat MIME attachments that have a *Content-ID* but no explicit *Content-Disposition*
+   header as inline, matching the behavior of many email clients. For maximum
+   compatibility, you should always set both (or use Anymail's inline helper functions).
+   (Thanks `@costela`_.)
 *  Add (undocumented) DEBUG_API_REQUESTS Anymail setting. When enabled, prints raw
    API request and response during send. Currently implemented only for Requests-based
    backends (all but Amazon SES and SparkPost). Because this can expose API keys and
