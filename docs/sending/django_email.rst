@@ -88,6 +88,15 @@ and :meth:`~email.message.Message.add_header` should be helpful.)
 Even if you mark an attachment as inline, some email clients may decide to also
 display it as an attachment. This is largely outside your control.
 
+.. versionchanged:: 4.3
+
+    For convenience, Anymail will treat an attachment with a :mailheader:`Content-ID`
+    but no :mailheader:`Content-Disposition` as inline. (Many---though not all---email
+    clients make the same assumption. But to ensure consistent behavior with non-Anymail
+    email backends, you should always set *both* :mailheader:`Content-ID` and
+    :mailheader:`Content-Disposition: inline` headers for inline images. Or just use
+    Anymail's :ref:`inline image helpers <inline-images>`, which handle this for you.)
+
 
 .. _message-headers:
 

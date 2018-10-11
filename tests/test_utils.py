@@ -1,6 +1,7 @@
 # Tests for the anymail/utils.py module
 # (not to be confused with utilities for testing found in in tests/utils.py)
 import base64
+from email.mime.image import MIMEImage
 from unittest import skipIf
 
 import six
@@ -21,6 +22,7 @@ except ImportError:
 from anymail.exceptions import AnymailInvalidAddress, _LazyError
 from anymail.utils import (
     parse_address_list, parse_single_address, EmailAddress,
+    Attachment,
     is_lazy, force_non_lazy, force_non_lazy_dict, force_non_lazy_list,
     update_deep,
     get_request_uri, get_request_basic_auth, parse_rfc2822date, querydict_getfirst)
@@ -159,6 +161,51 @@ class ParseAddressListTests(SimpleTestCase):
 
         with self.assertRaisesMessage(AnymailInvalidAddress, "Invalid email address"):
             parse_single_address(" ")
+
+
+class NormalizedAttachmentTests(SimpleTestCase):
+    """Test utils.Attachment"""
+
+    # (Several basic tests could be added here)
+
+    def test_content_disposition_attachment(self):
+        image = MIMEImage(b";-)", "x-emoticon")
+        image["Content-Disposition"] = 'attachment; filename="emoticon.txt"'
+        att = Attachment(image, "ascii")
+        self.assertEqual(att.name, "emoticon.txt")
+        self.assertEqual(att.content, b";-)")
+        self.assertFalse(att.inline)
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+
+    def test_content_disposition_inline(self):
+        image = MIMEImage(b";-)", "x-emoticon")
+        image["Content-Disposition"] = 'inline'
+        att = Attachment(image, "ascii")
+        self.assertIsNone(att.name)
+        self.assertEqual(att.content, b";-)")
+        self.assertTrue(att.inline)  # even without the Content-ID
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+
+        image["Content-ID"] = "<abc123@example.net>"
+        att = Attachment(image, "ascii")
+        self.assertEqual(att.content_id, "<abc123@example.net>")
+        self.assertEqual(att.cid, "abc123@example.net")
+
+    def test_content_id_implies_inline(self):
+        """A MIME object with a Content-ID should be assumed to be inline"""
+        image = MIMEImage(b";-)", "x-emoticon")
+        image["Content-ID"] = "<abc123@example.net>"
+        att = Attachment(image, "ascii")
+        self.assertTrue(att.inline)
+        self.assertEqual(att.content_id, "<abc123@example.net>")
+
+        # ... but not if explicit Content-Disposition says otherwise
+        image["Content-Disposition"] = "attachment"
+        att = Attachment(image, "ascii")
+        self.assertFalse(att.inline)
+        self.assertIsNone(att.content_id)  # ignored for non-inline Attachment
 
 
 class LazyCoercionTests(SimpleTestCase):
