@@ -251,11 +251,51 @@ class MailgunTestCase(WebhookTestCase):
         kwargs = self.assert_handler_called_once_with(self.tracking_handler, sender=MailgunTrackingWebhookView,
                                                       event=ANY, esp_name='Mailgun')
         event = kwargs['event']
-        self.assertEqual(event.event_type, "bounced")
+        self.assertEqual(event.event_type, "deferred")
         self.assertEqual(event.recipient, "undeliverable@nomx.example.com")
-        self.assertEqual(event.reject_reason, "bounced")
+        self.assertEqual(event.reject_reason, "other")
         self.assertEqual(event.description, "No MX for nomx.example.com")
         self.assertEqual(event.mta_response, "No MX for nomx.example.com")
+
+    def test_failed_greylisted_event(self):
+        raw_event = mailgun_sign_payload({
+            "event-data": {
+                "event": "failed",
+                "severity": "temporary",
+                "reason": "greylisted",
+                "timestamp": 1534111899.659519,
+                "log-level": "warn",
+                "message": {
+                    "headers": {
+                        "to": "undeliverable@nomx.example.com",
+                        "message-id": "20180812214638.1.4A7D468E9BC18C5D@example.org",
+                        "from": "Test Sender ",
+                        "subject": "Testing"
+                    },
+                },
+                "recipient": "undeliverable@mx.example.com",
+                "delivery-status": {
+                    "mx-host": "mx.example.com",
+                    "attempt-no": 1,
+                    "description": "Recipient address rejected: Greylisted",
+                    "session-seconds": 0.0,
+                    "retry-seconds": 300,
+                    "code": 450,
+                    "message": "Recipient address rejected: Greylisted"
+                }
+            },
+        })
+        response = self.client.post('/anymail/mailgun/tracking/',
+                                    data=json.dumps(raw_event), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(self.tracking_handler, sender=MailgunTrackingWebhookView,
+                                                      event=ANY, esp_name='Mailgun')
+        event = kwargs['event']
+        self.assertEqual(event.event_type, "deferred")
+        self.assertEqual(event.recipient, "undeliverable@mx.example.com")
+        self.assertEqual(event.reject_reason, "other")
+        self.assertEqual(event.description, "Recipient address rejected: Greylisted")
+        self.assertEqual(event.mta_response, "Recipient address rejected: Greylisted")
 
     def test_rejected_event(self):
         # (The "rejected" event is documented and appears in Mailgun dashboard logs,

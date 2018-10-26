@@ -87,16 +87,20 @@ class MailgunTrackingWebhookView(MailgunBaseWebhookView):
         # (these appear in webhook doc examples, but aren't actually documented anywhere)
         "bounce": RejectReason.BOUNCED,
         "suppress-bounce": RejectReason.BOUNCED,
-        "generic": RejectReason.BOUNCED,  # ??? appears to be used for any temporary failure?
+        "generic": RejectReason.OTHER,  # ??? appears to be used for any temporary failure?
+    }
+
+    severities = {
+        # Remap some event types based on "severity" payload field
+        (EventType.BOUNCED, 'temporary'): EventType.DEFERRED
     }
 
     def esp_to_anymail_event(self, esp_event):
         event_data = esp_event.get('event-data', {})
 
-        try:
-            event_type = self.event_types[event_data['event']]
-        except KeyError:
-            event_type = EventType.UNKNOWN
+        event_type = self.event_types.get(event_data['event'], EventType.UNKNOWN)
+
+        event_type = self.severities.get((EventType.BOUNCED, event_data.get('severity')), event_type)
 
         # Use signature.token for event_id, rather than event_data.id,
         # because the latter is only "guaranteed to be unique within a day".
