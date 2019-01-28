@@ -77,6 +77,7 @@ class SendGridPayload(RequestsPayload):
         self.merge_field_format = backend.merge_field_format
         self.merge_data = None  # late-bound per-recipient data
         self.merge_global_data = None
+        self.merge_metadata = None
 
         http_headers = kwargs.pop('headers', {})
         http_headers['Authorization'] = 'Bearer %s' % backend.api_key
