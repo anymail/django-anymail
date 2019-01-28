@@ -236,7 +236,6 @@ class SendGridPayload(RequestsPayload):
 
                 personalization["custom_args"] = recipient_custom_args
 
-
     #
     # Payload construction
     #
