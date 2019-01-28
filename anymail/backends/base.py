@@ -245,6 +245,7 @@ class BasePayload(object):
         ('template_id', last, force_non_lazy),
         ('merge_data', combine, force_non_lazy_dict),
         ('merge_global_data', combine, force_non_lazy_dict),
+        ('merge_metadata', combine, force_non_lazy_dict),
         ('esp_extra', combine, force_non_lazy_dict),
     )
     esp_message_attrs = ()  # subclasses can override
@@ -494,6 +495,9 @@ class BasePayload(object):
 
     def set_merge_global_data(self, merge_global_data):
         self.unsupported_feature("merge_global_data")
+
+    def set_merge_metadata(self, merge_metadata):
+        self.unsupported_feature("merge_metadata")
 
     # ESP-specific payload construction
     def set_esp_extra(self, extra):

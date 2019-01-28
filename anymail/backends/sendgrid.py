@@ -101,6 +101,7 @@ class SendGridPayload(RequestsPayload):
         if self.generate_message_id:
             self.set_anymail_id()
         self.build_merge_data()
+        self.build_merge_metadata()
 
         if not self.data["headers"]:
             del self.data["headers"]  # don't send empty headers
@@ -204,6 +205,37 @@ class SendGridPayload(RequestsPayload):
                     "Search SENDGRID_MERGE_FIELD_FORMAT in the Anymail docs for more info.",
                     AnymailWarning)
 
+    def build_merge_metadata(self):
+        if self.merge_metadata is None:
+            return
+
+        if self.merge_data is not None:
+            # Burst apart each to-email in personalizations[0] into a separate
+            # personalization, and add merge_metadata for that recipient
+            assert len(self.data["personalizations"]) == 1
+            base_personalizations = self.data["personalizations"].pop()
+            to_list = base_personalizations.pop("to")  # {email, name?} for each message.to
+            for recipient in to_list:
+                personalization = base_personalizations.copy()  # captures cc, bcc, and any esp_extra
+                personalization["to"] = [recipient]
+                self.data["personalizations"].append(personalization)
+
+        for personalization in self.data["personalizations"]:
+            recipient_email = personalization["to"][0]["email"]
+            recipient_metadata = self.merge_metadata.get(recipient_email)
+            if recipient_metadata:
+                recipient_custom_args = self.transform_metadata(recipient_metadata)
+
+                if self.data.get("custom_args"):
+                    merged_custom_args = {}
+                    merged_custom_args.update(self.data.get("custom_args"))
+                    merged_custom_args.update(recipient_custom_args)
+                    recipient_custom_args = merged_custom_args
+                    del self.data["custom_args"]
+
+                personalization["custom_args"] = recipient_custom_args
+
+
     #
     # Payload construction
     #
@@ -296,11 +328,14 @@ class SendGridPayload(RequestsPayload):
         self.data.setdefault("attachments", []).append(att)
 
     def set_metadata(self, metadata):
+        self.data["custom_args"] = self.transform_metadata(metadata)
+
+    def transform_metadata(self, metadata):
         # SendGrid requires custom_args values to be strings -- not integers.
         # (And issues the cryptic error {"field": null, "message": "Bad Request", "help": null}
         # if they're not.)
         # We'll stringify ints and floats; anything else is the caller's responsibility.
-        self.data["custom_args"] = {
+        return {
             k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
             for k, v in metadata.items()
         }
@@ -343,6 +378,12 @@ class SendGridPayload(RequestsPayload):
         # or data['section'] in build_merge_data, after we know
         # template type and merge_field_format.
         self.merge_global_data = merge_global_data
+
+    def set_merge_metadata(self, merge_metadata):
+        # Becomes personalizations[...]['custom_args'] in
+        # build_merge_data, after we know recipients, template type,
+        # and merge_field_format.
+        self.merge_metadata = merge_metadata
 
     def set_esp_extra(self, extra):
         self.merge_field_format = extra.pop("merge_field_format", self.merge_field_format)
