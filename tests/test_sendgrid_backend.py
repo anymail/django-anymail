@@ -11,6 +11,7 @@ import six
 from django.core import mail
 from django.test import SimpleTestCase, override_settings, tag
 from django.utils.timezone import get_fixed_timezone, override as override_current_timezone
+from mock import patch
 
 from anymail.exceptions import (AnymailAPIError, AnymailConfigurationError, AnymailSerializationError,
                                 AnymailUnsupportedFeature, AnymailWarning)
@@ -32,6 +33,13 @@ class SendGridBackendMockAPITestCase(RequestsBackendMockAPITestCase):
 
     def setUp(self):
         super(SendGridBackendMockAPITestCase, self).setUp()
+
+        # Patch uuid4 to generate predictable anymail_ids for testing
+        patch_uuid4 = patch('anymail.backends.sendgrid.uuid.uuid4',
+                            side_effect=["mocked-uuid-%d" % n for n in range(1, 5)])
+        patch_uuid4.start()
+        self.addCleanup(patch_uuid4.stop)
+
         # Simple message useful for many tests
         self.message = mail.EmailMultiAlternatives('Subject', 'Text Body', 'from@example.com', ['to@example.com'])
 
@@ -57,7 +65,7 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
             'to': [{'email': "to@example.com"}],
         }])
         # make sure the backend assigned the anymail_id for event tracking and notification
-        self.assertUUIDIsValid(data['custom_args']['anymail_id'])
+        self.assertEqual(data['custom_args']['anymail_id'], 'mocked-uuid-1')
 
     def test_name_addr(self):
         """Make sure RFC2822 name-addr format (with display-name) is allowed
@@ -118,7 +126,7 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
             'Message-ID': "<mycustommsgid@sales.example.com>",
         })
         # make sure custom Message-ID also added to custom_args
-        self.assertUUIDIsValid(data['custom_args']['anymail_id'])
+        self.assertEqual(data['custom_args']['anymail_id'], 'mocked-uuid-1')
 
     def test_html_message(self):
         text_content = 'This is an important message.'
@@ -573,6 +581,121 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         with self.assertWarnsRegex(AnymailWarning, r'SENDGRID_MERGE_FIELD_FORMAT'):
             self.message.send()
 
+    def test_merge_metadata(self):
+        self.message.to = ['alice@example.com', 'Bob <bob@example.com>']
+        self.message.merge_metadata = {
+            'alice@example.com': {'order_id': 123},
+            'bob@example.com': {'order_id': 678, 'tier': 'premium'},
+        }
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data['personalizations'], [
+            {'to': [{'email': 'alice@example.com'}],
+             'custom_args': {'order_id': '123'}},
+            {'to': [{'email': 'bob@example.com', 'name': '"Bob"'}],
+             'custom_args': {'order_id': '678', 'tier': 'premium'}},
+        ])
+        self.assertEqual(data['custom_args'], {'anymail_id': 'mocked-uuid-1'})
+
+    def test_metadata_with_merge_metadata(self):
+        # Per SendGrid docs: "personalizations[x].custom_args will be merged
+        # with message level custom_args, overriding any conflicting keys."
+        # So there's no need to merge global metadata with per-recipient merge_metadata
+        # (like we have to for template merge_global_data and merge_data).
+        self.message.to = ['alice@example.com', 'Bob <bob@example.com>']
+        self.message.metadata = {'tier': 'basic', 'batch': 'ax24'}
+        self.message.merge_metadata = {
+            'alice@example.com': {'order_id': 123},
+            'bob@example.com': {'order_id': 678, 'tier': 'premium'},
+        }
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data['personalizations'], [
+            {'to': [{'email': 'alice@example.com'}],
+             'custom_args': {'order_id': '123'}},
+            {'to': [{'email': 'bob@example.com', 'name': '"Bob"'}],
+             'custom_args': {'order_id': '678', 'tier': 'premium'}},
+        ])
+        self.assertEqual(data['custom_args'],
+                         {'tier': 'basic', 'batch': 'ax24', 'anymail_id': 'mocked-uuid-1'})
+
+    def test_merge_metadata_with_merge_data(self):
+        # (using dynamic templates)
+        self.message.to = ['alice@example.com', 'Bob <bob@example.com>']
+        self.message.cc = ['cc@example.com']  # gets applied to *each* recipient in a merge
+        self.message.template_id = "d-5a963add2ec84305813ff860db277d7a"
+        self.message.merge_data = {
+            'alice@example.com': {'name': "Alice", 'group': "Developers"},
+            'bob@example.com': {'name': "Bob"}
+            # and no data for celia@example.com
+        }
+        self.message.merge_global_data = {
+            'group': "Users",
+            'site': "ExampleCo",
+        }
+        self.message.merge_metadata = {
+            'alice@example.com': {'order_id': 123},
+            'bob@example.com': {'order_id': 678, 'tier': 'premium'},
+            # and no metadata for celia@example.com
+        }
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data['personalizations'], [
+            {'to': [{'email': 'alice@example.com'}],
+             'cc': [{'email': 'cc@example.com'}],  # all recipients get the cc
+             'dynamic_template_data': {
+                 'name': "Alice", 'group': "Developers", 'site': "ExampleCo"},
+             'custom_args': {'order_id': '123'}},
+            {'to': [{'email': 'bob@example.com', 'name': '"Bob"'}],
+             'dynamic_template_data': {
+                 'name': "Bob", 'group': "Users", 'site': "ExampleCo"},
+             'custom_args': {'order_id': '678', 'tier': 'premium'}},
+            {'to': [{'email': 'celia@example.com'}],
+             'cc': [{'email': 'cc@example.com'}],
+             'dynamic_template_data': {
+                 'group': "Users", 'site': "ExampleCo"}},
+        ])
+
+    def test_merge_metadata_with_legacy_template(self):
+        self.message.to = ['alice@example.com', 'Bob <bob@example.com>']
+        self.message.cc = ['cc@example.com']  # gets applied to *each* recipient in a merge
+        self.message.template_id = "5a963add2ec84305813ff860db277d7a"
+        self.message.esp_extra = {'merge_field_format': ':{}'}
+        self.message.merge_data = {
+            'alice@example.com': {'name': "Alice", 'group': "Developers"},
+            'bob@example.com': {'name': "Bob"}
+            # and no data for celia@example.com
+        }
+        self.message.merge_global_data = {
+            'group': "Users",
+            'site': "ExampleCo",
+        }
+        self.message.merge_metadata = {
+            'alice@example.com': {'order_id': 123},
+            'bob@example.com': {'order_id': 678, 'tier': 'premium'},
+            # and no metadata for celia@example.com
+        }
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data['personalizations'], [
+            {'to': [{'email': 'alice@example.com'}],
+             'cc': [{'email': 'cc@example.com'}],  # all recipients get the cc
+             'custom_args': {'order_id': '123'},
+             'substitutions': {':name': "Alice", ':group': "Developers", ':site': ":site"}},
+            {'to': [{'email': 'bob@example.com', 'name': '"Bob"'}],
+             'cc': [{'email': 'cc@example.com'}],
+             'custom_args': {'order_id': '678', 'tier': 'premium'},
+             'substitutions': {':name': "Bob", ':group': ":group", ':site': ":site"}},
+            {'to': [{'email': 'celia@example.com'}],
+             'cc': [{'email': 'cc@example.com'}],
+             # no custom_args
+             'substitutions': {':group': ":group", ':site': ":site"}},
+        ])
+        self.assertEqual(data['sections'], {
+            ':group': "Users",
+            ':site': "ExampleCo",
+        })
+
     @override_settings(ANYMAIL_SENDGRID_GENERATE_MESSAGE_ID=False)  # else we force custom_args
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
@@ -666,7 +789,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         sent = msg.send()
         self.assertEqual(sent, 1)
         self.assertEqual(msg.anymail_status.status, {'queued'})
-        self.assertUUIDIsValid(msg.anymail_status.message_id)  # don't know exactly what it'll be
+        self.assertEqual(msg.anymail_status.message_id, 'mocked-uuid-1')
         self.assertEqual(msg.anymail_status.recipients['to1@example.com'].status, 'queued')
         self.assertEqual(msg.anymail_status.recipients['to1@example.com'].message_id,
                          msg.anymail_status.message_id)
