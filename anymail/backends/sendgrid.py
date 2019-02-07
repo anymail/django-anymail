@@ -210,7 +210,7 @@ class SendGridPayload(RequestsPayload):
         if self.merge_metadata is None:
             return
 
-        if self.merge_data is not None:
+        if self.merge_data is None:
             # Burst apart each to-email in personalizations[0] into a separate
             # personalization, and add merge_metadata for that recipient
             assert len(self.data["personalizations"]) == 1
@@ -221,20 +221,22 @@ class SendGridPayload(RequestsPayload):
                 personalization["to"] = [recipient]
                 self.data["personalizations"].append(personalization)
 
+        global_custom_args = self.data.get("custom_args")
         for personalization in self.data["personalizations"]:
             recipient_email = personalization["to"][0]["email"]
             recipient_metadata = self.merge_metadata.get(recipient_email)
             if recipient_metadata:
                 recipient_custom_args = self.transform_metadata(recipient_metadata)
 
-                if self.data.get("custom_args"):
+                if global_custom_args:
                     merged_custom_args = {}
-                    merged_custom_args.update(self.data.get("custom_args"))
+                    merged_custom_args.update(global_custom_args)
                     merged_custom_args.update(recipient_custom_args)
                     recipient_custom_args = merged_custom_args
-                    del self.data["custom_args"]
 
                 personalization["custom_args"] = recipient_custom_args
+
+        del self.data["custom_args"]
 
     #
     # Payload construction
