@@ -621,7 +621,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
 
     def test_merge_metadata_with_merge_data(self):
         # (using dynamic templates)
-        self.message.to = ['alice@example.com', 'Bob <bob@example.com>']
+        self.message.to = ['alice@example.com', 'Bob <bob@example.com>', 'celia@example.com']
         self.message.cc = ['cc@example.com']  # gets applied to *each* recipient in a merge
         self.message.template_id = "d-5a963add2ec84305813ff860db277d7a"
         self.message.merge_data = {
@@ -647,6 +647,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
                  'name': "Alice", 'group': "Developers", 'site': "ExampleCo"},
              'custom_args': {'order_id': '123'}},
             {'to': [{'email': 'bob@example.com', 'name': '"Bob"'}],
+             'cc': [{'email': 'cc@example.com'}],
              'dynamic_template_data': {
                  'name': "Bob", 'group': "Users", 'site': "ExampleCo"},
              'custom_args': {'order_id': '678', 'tier': 'premium'}},
@@ -657,7 +658,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         ])
 
     def test_merge_metadata_with_legacy_template(self):
-        self.message.to = ['alice@example.com', 'Bob <bob@example.com>']
+        self.message.to = ['alice@example.com', 'Bob <bob@example.com>', 'celia@example.com']
         self.message.cc = ['cc@example.com']  # gets applied to *each* recipient in a merge
         self.message.template_id = "5a963add2ec84305813ff860db277d7a"
         self.message.esp_extra = {'merge_field_format': ':{}'}
