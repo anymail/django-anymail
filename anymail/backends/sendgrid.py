@@ -221,22 +221,12 @@ class SendGridPayload(RequestsPayload):
                 personalization["to"] = [recipient]
                 self.data["personalizations"].append(personalization)
 
-        global_custom_args = self.data.get("custom_args")
         for personalization in self.data["personalizations"]:
             recipient_email = personalization["to"][0]["email"]
             recipient_metadata = self.merge_metadata.get(recipient_email)
             if recipient_metadata:
                 recipient_custom_args = self.transform_metadata(recipient_metadata)
-
-                if global_custom_args:
-                    merged_custom_args = {}
-                    merged_custom_args.update(global_custom_args)
-                    merged_custom_args.update(recipient_custom_args)
-                    recipient_custom_args = merged_custom_args
-
                 personalization["custom_args"] = recipient_custom_args
-
-        del self.data["custom_args"]
 
     #
     # Payload construction
