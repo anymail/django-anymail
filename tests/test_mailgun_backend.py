@@ -448,7 +448,11 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
         self.assertEqual(data['o:tracking-opens'], 'no')
         self.assertEqual(data['o:tracking-clicks'], 'yes')
 
-    # template_id: Mailgun doesn't support stored templates
+    def test_template_id(self):
+        self.message.template_id = "welcome_template"
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data['template'], "welcome_template")
 
     def test_merge_data(self):
         self.message.to = ['alice@example.com', 'Bob <bob@example.com>']

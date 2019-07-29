@@ -253,8 +253,8 @@ class MailgunPayload(RequestsPayload):
     def set_track_opens(self, track_opens):
         self.data["o:tracking-opens"] = "yes" if track_opens else "no"
 
-    # template_id: Mailgun doesn't offer stored templates.
-    # (The message body and other fields *are* the template content.)
+    def set_template_id(self, template_id):
+        self.data["template"] = template_id
 
     def set_merge_data(self, merge_data):
         # Processed at serialization time (to allow merging global data)

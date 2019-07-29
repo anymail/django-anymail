@@ -233,14 +233,10 @@ Limitations and quirks
 
 .. _mailgun-templates:
 
-Batch sending/merge and ESP templates
+Batch sending/merge
 -------------------------------------
 
-Mailgun does not offer :ref:`ESP stored templates <esp-stored-templates>`,
-so Anymail's :attr:`~anymail.message.AnymailMessage.template_id` message
-attribute is not supported with the Mailgun backend.
-
-Mailgun *does* support :ref:`batch sending <batch-send>` with per-recipient
+Mailgun supports :ref:`batch sending <batch-send>` with per-recipient
 merge data. You can refer to Mailgun "recipient variables" in your
 message subject and body, and supply the values with Anymail's
 normalized :attr:`~anymail.message.AnymailMessage.merge_data`
