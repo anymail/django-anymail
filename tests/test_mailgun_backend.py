@@ -451,7 +451,7 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
     def test_template_id(self):
         self.message.template_id = "welcome_template"
         self.message.send()
-        data = self.get_api_call_json()
+        data = self.get_api_call_data()
         self.assertEqual(data['template'], "welcome_template")
 
     def test_merge_data(self):
