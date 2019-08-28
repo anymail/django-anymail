@@ -165,7 +165,7 @@ class SendinBluePayload(RequestsPayload):
         self.unsupported_feature("merge_data")
 
     def set_merge_global_data(self, merge_global_data):
-        self.data['attributes'] = merge_global_data
+        self.data['params'] = merge_global_data
 
     def set_metadata(self, metadata):
         # SendinBlue expects a single string payload

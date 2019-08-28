@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import json
-
 from base64 import b64encode, b64decode
 from datetime import datetime
 from decimal import Decimal
@@ -16,7 +15,6 @@ from django.utils.timezone import get_fixed_timezone, override as override_curre
 from anymail.exceptions import (AnymailAPIError, AnymailConfigurationError, AnymailSerializationError,
                                 AnymailUnsupportedFeature)
 from anymail.message import attach_inline_image_file
-
 from .mock_requests_backend import RequestsBackendMockAPITestCase, SessionSharingTestCasesMixin
 from .utils import sample_image_content, sample_image_path, SAMPLE_IMAGE_FILENAME, AnymailTestMixin
 
@@ -367,6 +365,14 @@ class SendinBlueBackendAnymailFeatureTests(SendinBlueBackendMockAPITestCase):
         with self.assertRaises(AnymailUnsupportedFeature):
             self.message.send()
 
+    def test_merge_global_data(self):
+        self.message.merge_global_data = {
+            'a': 'b'
+        }
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data['params'], {'a': 'b'})
+
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
 
@@ -392,8 +398,8 @@ class SendinBlueBackendAnymailFeatureTests(SendinBlueBackendMockAPITestCase):
             },
             'tracking_settings': {
                 'subscription_tracking': {
-                        'enable': True,
-                        'substitution_tag': '[unsubscribe_url]',
+                    'enable': True,
+                    'substitution_tag': '[unsubscribe_url]',
                 },
             },
         }
@@ -410,7 +416,7 @@ class SendinBlueBackendAnymailFeatureTests(SendinBlueBackendMockAPITestCase):
         """ The anymail_status should be attached to the message when it is sent """
         # the DEFAULT_RAW_RESPONSE above is the *only* success response SendinBlue returns,
         # so no need to override it here
-        msg = mail.EmailMessage('Subject', 'Message', 'from@example.com', ['to1@example.com'],)
+        msg = mail.EmailMessage('Subject', 'Message', 'from@example.com', ['to1@example.com'], )
         sent = msg.send()
         self.assertEqual(sent, 1)
         self.assertEqual(msg.anymail_status.status, {'queued'})
