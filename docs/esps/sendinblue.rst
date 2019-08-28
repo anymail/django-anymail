@@ -131,9 +131,8 @@ SendinBlue can handle.
   to the SendinBlue API if the name is not set correctly.
 
 **Additional template limitations**
-  If you are sending using a SendinBlue template, their API doesn't allow display
-  names in recipient or reply-to emails, and doesn't support overriding the template's
-  from_email, subject, or body. See the :ref:`templates <sendinblue-templates>`
+  If you are sending using a SendinBlue template, their API doesn't support overriding the template's
+  body. See the :ref:`templates <sendinblue-templates>`
   section below.
 
 **Single Reply-To**
@@ -141,15 +140,6 @@ SendinBlue can handle.
 
   If you are ignoring unsupported features and have multiple reply addresses,
   Anymail will use only the first one.
-
-**Single tag**
-  SendinBlue supports a single message tag, which can be used for filtering in their
-  dashboard statistics and logs panels, and is available in tracking webhooks.
-  Anymail will pass the first of a message's :attr:`~anymail.message.AnymailMessage.tags`
-  to SendinBlue, using their :mailheader:`X-Mailin-tag` email header.
-
-  Trying to send a message with more than one tag will result in an error unless you
-  are ignoring unsupported features.
 
 **Metadata**
   Anymail passes :attr:`~anymail.message.AnymailMessage.metadata` to SendinBlue
@@ -189,7 +179,7 @@ the messages's :attr:`~anymail.message.AnymailMessage.merge_global_data`:
   .. code-block:: python
 
       message = EmailMessage(
-          subject=None,  # required for SendinBlue templates
+          subject="My Subject",  # optional for SendinBlue templates
           body=None,  # required for SendinBlue templates
           to=["alice@example.com"]  # single recipient...
           # ...multiple to emails would all get the same message
@@ -208,14 +198,9 @@ variables using %-delimited names, e.g., `%order_no%` or `%ship_date%`
 from the example above.
 
 Note that SendinBlue's API does not permit overriding a template's
-subject, body, or from_email. You *must* set them to `None` as shown above,
+body. You *must* set it to `None` as shown above,
 or Anymail will raise an :exc:`~anymail.exceptions.AnymailUnsupportedFeature`
 error (if you are not ignoring unsupported features).
-
-Also, SendinBlue's API does not permit display names in recipient or reply-to
-emails when sending with a template. Code like `to=["Alice <alice@example.com>"]`
-will result in an unsupported feature error. (SendinBlue supports display names
-only in *non*-template sends.)
 
 
 .. _sendinblue-webhooks:

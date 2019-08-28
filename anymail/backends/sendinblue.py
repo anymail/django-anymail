@@ -1,5 +1,4 @@
 from requests.structures import CaseInsensitiveDict
-from six.moves.urllib.parse import quote
 
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 from ..exceptions import AnymailRequestsAPIError
@@ -67,7 +66,6 @@ class SendinBluePayload(RequestsPayload):
 
     def __init__(self, message, defaults, backend, *args, **kwargs):
         self.all_recipients = []  # used for backend.parse_recipient_status
-        self.template_id = None
 
         http_headers = kwargs.pop('headers', {})
         http_headers['api-key'] = backend.api_key
@@ -76,10 +74,7 @@ class SendinBluePayload(RequestsPayload):
         super(SendinBluePayload, self).__init__(message, defaults, backend, headers=http_headers, *args, **kwargs)
 
     def get_api_endpoint(self):
-        if self.template_id:
-            return "smtp/templates/%s/send" % quote(str(self.template_id), safe='')
-        else:
-            return "smtp/email"
+        return "smtp/email"
 
     def init_payload(self):
         self.data = {  # becomes json
@@ -91,47 +86,10 @@ class SendinBluePayload(RequestsPayload):
 
         if not self.data['headers']:
             del self.data['headers']  # don't send empty headers
-
-        # SendinBlue use different argument's name if we use template functionality
-        if self.template_id:
-            data = self._transform_data_for_templated_email(self.data)
-        else:
-            data = self.data
-
-        return self.serialize_json(data)
-
-    def _transform_data_for_templated_email(self, data):
-        """
-        Transform the default Payload's data (used for basic transactional email) to
-        the data used by SendinBlue in case of a templated transactional email.
-        :param data: The data we want to transform
-        :return: The transformed data
-        """
-        if data.pop('subject', False):
-            self.unsupported_feature("overriding template subject")
-        if data.pop('sender', False):
-            self.unsupported_feature("overriding template from_email")
-        if data.pop('textContent', False) or data.pop('htmlContent', False):
+        if self.data.get('templateId') and (self.data.pop('textContent', False) or self.data.pop('htmlContent', False)):
             self.unsupported_feature("overriding template body content")
 
-        transformation = {
-            'to': 'emailTo',
-            'cc': 'emailCc',
-            'bcc': 'emailBcc',
-        }
-        for key, new_key in transformation.items():
-            if key in data:
-                if any(email.get('name') for email in data[key]):
-                    self.unsupported_feature("display names in %s when sending with a template" % key)
-                data[new_key] = [email['email'] for email in data[key]]
-                del data[key]
-
-        if 'replyTo' in data:
-            if data['replyTo'].get('name'):
-                self.unsupported_feature("display names in reply_to when sending with a template")
-            data['replyTo'] = data['replyTo']['email']
-
-        return data
+        return self.serialize_json(self.data)
 
     #
     # Payload construction
@@ -171,12 +129,10 @@ class SendinBluePayload(RequestsPayload):
 
     def set_tags(self, tags):
         if len(tags) > 0:
-            self.data['headers']["X-Mailin-tag"] = tags[0]
-            if len(tags) > 1:
-                self.unsupported_feature('multiple tags (%r)' % tags)
+            self.data['tags'] = tags
 
     def set_template_id(self, template_id):
-        self.template_id = template_id
+        self.data['templateId'] = template_id
 
     def set_text_body(self, body):
         if body:
