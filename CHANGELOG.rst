@@ -25,10 +25,10 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
-vNext
------
+v7.0
+----
 
-*Not yet released*
+*2019-09-07*
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
@@ -38,21 +38,21 @@ Breaking changes
   (now-deprecated) SendinBlue template send API, but involves two breaking changes:
 
   * You *must* `convert <https://help.sendinblue.com/hc/en-us/articles/360000991960>`_
-    each old Sendinblue template to the new language as you upgrade to Anymail vNext, or
+    each old Sendinblue template to the new language as you upgrade to Anymail v7.0, or
     certain features may be silently ignored on template sends (notably `reply_to` and
     recipient display names).
 
   * Sendinblue's API no longer supports sending attachments when using templates.
 
   Ordinary, non-template sending is not affected by these changes. See
-  `docs <https://anymail.readthedocs.io/en/latest/esps/sendinblue/#batch-sending-merge-and-esp-templates>`_
+  `docs <https://anymail.readthedocs.io/en/stable/esps/sendinblue/#batch-sending-merge-and-esp-templates>`_
   for more info and alternatives. (Thanks `@Thorbenl`_.)
 
 Features
 ~~~~~~~~
 
 * **Mailgun:** Support Mailgun's new (ESP stored) handlebars templates via `template_id`.
-  See `docs <https://anymail.readthedocs.io/en/latest/esps/mailgun/#batch-sending-merge-and-esp-templates>`__.
+  See `docs <https://anymail.readthedocs.io/en/stable/esps/mailgun/#batch-sending-merge-and-esp-templates>`__.
   (Thanks `@anstosa`_.)
 
 * **SendinBlue:** Support multiple `tags`. (Thanks `@Thorbenl`_.)

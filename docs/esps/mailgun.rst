@@ -246,7 +246,7 @@ Batch sending/merge and ESP templates
 Mailgun supports :ref:`ESP stored templates <esp-stored-templates>`, on-the-fly
 templating, and :ref:`batch sending <batch-send>` with per-recipient merge data.
 
-.. versionchanged:: 6.2
+.. versionchanged:: 7.0
 
   Added support for Mailgun's stored (handlebars) templates.
 
