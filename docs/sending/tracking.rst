@@ -13,7 +13,7 @@ Webhook support is optional. If you haven't yet, you'll need to
 :ref:`configure webhooks <webhooks-configuration>` in your Django
 project. (You may also want to review :ref:`securing-webhooks`.)
 
-Once you've enabled webhooks, Anymail will send a ``anymail.signals.tracking``
+Once you've enabled webhooks, Anymail will send an ``anymail.signals.tracking``
 custom Django :mod:`signal <django.dispatch>` for each ESP tracking event it receives.
 You can connect your own receiver function to this signal for further processing.
 
@@ -45,7 +45,7 @@ in multiple receivers, if that makes your code cleaner. These
 :ref:`signal receiver functions <signal-receivers>` are documented
 in more detail below.
 
-Note that your tracking signal recevier(s) will be called for all tracking
+Note that your tracking signal receiver(s) will be called for all tracking
 webhook types you've enabled at your ESP, so you should always check the
 :attr:`~AnymailTrackingEvent.event_type` as shown in the examples above
 to ensure you're processing the expected events.
@@ -173,7 +173,7 @@ Normalized tracking event
 
             Not all ESPs provide all reject reasons, and this area is often
             under-documented by the ESP. Anymail does its best to interpret
-            the ESP event, but you may find (e.g.,) that it will report
+            the ESP event, but you may find that it will report
             `'timed_out'` for one ESP, and `'bounced'` for another, sending
             to the same non-existent mailbox.
 
@@ -241,7 +241,7 @@ Your Anymail signal receiver must be a function with this signature:
             in a 400 HTTP error to the webhook. See discussion
             below.
 
-If (any of) your signal receivers raise an exception, Anymail
+If any of your signal receivers raise an exception, Anymail
 will discontinue processing the current batch of events and return
 an HTTP 400 error to the ESP. Most ESPs respond to this by re-sending
 the event(s) later, a limited number of times.
