@@ -130,12 +130,9 @@ SendinBlue can handle.
   Anymail has no way to communicate an attachment's desired content-type
   to the SendinBlue API if the name is not set correctly.
 
-**No attachments with templates**
-  If you are sending using a SendinBlue template, their API doesn't support ordinary
-  file attachments. Attempting to send an attachment with a template will result in the
-  SendinBlue API error message, "Please don't pass attachment content & templateId in same
-  request, instead use attachment url only."
-  See the :ref:`templates <sendinblue-templates>` section below.
+**Attachments using templates only with new template language**
+  If you are sending an email using a SendinBlue template,
+  you have to use the new template language in order to add file attachments.
 
 **Single Reply-To**
   SendinBlue's v3 API only supports a single Reply-To address.
@@ -225,19 +222,6 @@ If you want to use the template's sender, be sure to set ``from_email`` to ``Non
 
 You can also override the template's subject and reply-to address (but not body)
 using standard :class:`~django.core.mail.EmailMessage` attributes.
-
-SendinBlue's template feature does not currently support providing attachment content
-directly with the message---you'll get a SendinBlue API error if you try. If you must
-send file attachments with SendinBlue templates, you can either upload them into
-SendinBlue's template designer, or arrange to have the attachment content hosted on
-a public URL and use Anymail's :attr:`~anymail.message.AnymailMessage.esp_extra`
-to pass the URL to the SendinBlue API (see the Anymail SendinBlue integration tests
-for an example of this). A better---and portable---option may be to avoid SendinBlue
-templates and instead render the email in your Django code, allowing you to add any
-file attachments you want. See :ref:`django-templates` for details.
-
-(Note that SendinBlue doesn't support *inline* image attachments at all, whether you're
-using a template or not.)
 
 
 .. _new template language:
