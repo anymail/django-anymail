@@ -130,10 +130,6 @@ SendinBlue can handle.
   Anymail has no way to communicate an attachment's desired content-type
   to the SendinBlue API if the name is not set correctly.
 
-**Attachments using templates only with new template language**
-  If you are sending an email using a SendinBlue template,
-  you have to use the new template language in order to add file attachments.
-
 **Single Reply-To**
   SendinBlue's v3 API only supports a single Reply-To address.
 
