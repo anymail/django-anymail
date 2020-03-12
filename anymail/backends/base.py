@@ -252,7 +252,7 @@ class BasePayload(object):
 
     # If any of these attrs are set on a message, treat the message
     # as a batch send (separate message for each `to` recipient):
-    batch_attrs = ('merge_data', 'merge_metadata')
+    batch_attrs = ('merge_data', 'merge_global_data', 'merge_metadata')
 
     def __init__(self, message, defaults, backend):
         self.message = message
