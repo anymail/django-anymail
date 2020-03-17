@@ -133,8 +133,9 @@ class SendGridPayload(RequestsPayload):
         if self.merge_data or self.merge_global_data:
             # Always build dynamic_template_data first,
             # then convert it to legacy template format if needed
+            only_global_merge_data = self.merge_global_data and not self.merge_data
             for personalization in self.data["personalizations"]:
-                assert len(personalization["to"]) == 1
+                assert len(personalization["to"]) == 1 or only_global_merge_data
                 recipient_email = personalization["to"][0]["email"]
                 dynamic_template_data = self.merge_global_data.copy()
                 dynamic_template_data.update(self.merge_data.get(recipient_email, {}))

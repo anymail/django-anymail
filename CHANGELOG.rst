@@ -25,6 +25,19 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes on master*
+
+Fixes
+~~~~~
+
+* **SendGrid:** Allow non-batch template send to multiple recipients when
+  `merge_global_data` is set without `merge_data`. (Broken in v6.0. Thanks to
+  `@vgrebenschikov`_ for the bug report.)
+
+
 v7.0
 ----
 
@@ -1021,4 +1034,5 @@ Features
 .. _@sebbacon: https://github.com/sebbacon
 .. _@Thorbenl: https://github.com/Thorbenl
 .. _@varche1: https://github.com/varche1
+.. _@vgrebenschikov: https://github.com/vgrebenschikov
 .. _@yourcelf: https://github.com/yourcelf

@@ -493,6 +493,20 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
              'custom_args': {'anymail_id': 'mocked-uuid-2'},
              'substitutions': {"<%test%>": "data"}}])
 
+    def test_merge_data_global_only(self):
+        # a template with only global data can be used to send the same message
+        # to multiple recipients (non-batch)
+        self.message.template_id = "d-5a963add2ec84305813ff860db277d7a"
+        self.message.merge_global_data = {"test": "data"}
+        self.message.to = ["one@example.com", "two@example.com"]
+        self.message.send()
+
+        data = self.get_api_call_json()
+        self.assertEqual(data['personalizations'], [
+            {'to': [{'email': 'one@example.com'}, {'email': 'two@example.com'}],  # not batch
+             'custom_args': {'anymail_id': 'mocked-uuid-1'},
+             'dynamic_template_data': {"test": "data"}}])
+
     def test_legacy_merge_data(self):
         # unless a new "dynamic template" is specified, Anymail assumes the legacy
         # "substitutions" format for merge data
