@@ -450,6 +450,35 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
         self.assertEqual(recipients['bob@example.com'].status, 'sent')
         self.assertEqual(recipients['bob@example.com'].message_id, 'e2ecbbfc-fe12-463d-b933-9fe22915106d')
 
+    def test_merge_data_single_recipient(self):
+        self.set_mock_response(raw=self._mock_batch_response)
+        message = AnymailMessage(
+            from_email='from@example.com',
+            template_id=1234567,  # Postmark only supports merge_data content in a template
+            to=['alice@example.com'],
+            merge_data={
+                'alice@example.com': {'name': "Alice", 'group': "Developers"},
+                'nobody@example.com': {'name': "Not a recipient for this message"},
+            },
+            merge_global_data={'group': "Users", 'site': "ExampleCo"}
+        )
+        message.send()
+
+        self.assert_esp_called('/email/withTemplate/')
+        data = self.get_api_call_json()
+        messages = data
+
+        self.assertEqual(data, {
+            "From": "from@example.com",
+            "To": "alice@example.com",
+            "TemplateId": 1234567,
+            "TemplateModel": {"name": "Alice", "group": "Developers", "site": "ExampleCo"},
+        })
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients['alice@example.com'].status, 'sent')
+        self.assertEqual(recipients['alice@example.com'].message_id, 'b7bc2f4a-e38e-4336-af7d-e6c392c2f817')
+
     def test_merge_data_no_template(self):
         # merge_data={} can be used to force batch sending without a template
         self.set_mock_response(raw=self._mock_batch_response)

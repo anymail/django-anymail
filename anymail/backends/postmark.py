@@ -185,6 +185,8 @@ class PostmarkPayload(RequestsPayload):
             data = {"Messages": [self.data_for_recipient(to) for to in self.to_emails]}
         elif api_endpoint == "email/batch":
             data = [self.data_for_recipient(to) for to in self.to_emails]
+        elif api_endpoint == "email/withTemplate/":
+            data = self.data_for_recipient(self.to_emails.pop())
         return self.serialize_json(data)
 
     def data_for_recipient(self, to):
