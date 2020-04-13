@@ -33,6 +33,8 @@ vNext
 Fixes
 ~~~~~
 
+* **Postmark:** Fix API error when sending with template to single recipient.
+  (Thanks to `@jc-ee`_ for finding and fixing the issue.)
 * **SendGrid:** Allow non-batch template send to multiple recipients when
   `merge_global_data` is set without `merge_data`. (Broken in v6.0. Thanks to
   `@vgrebenschikov`_ for the bug report.)
@@ -1026,6 +1028,7 @@ Features
 .. _@ewingrj: https://github.com/ewingrj
 .. _@fdemmer: https://github.com/fdemmer
 .. _@janneThoft: https://github.com/janneThoft
+.. _@jc-ee: https://github.com/jc-ee
 .. _@joshkersey: https://github.com/joshkersey
 .. _@Lekensteyn: https://github.com/Lekensteyn
 .. _@lewistaylor: https://github.com/lewistaylor
