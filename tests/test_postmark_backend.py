@@ -466,7 +466,6 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
 
         self.assert_esp_called('/email/withTemplate/')
         data = self.get_api_call_json()
-        messages = data
 
         self.assertEqual(data, {
             "From": "from@example.com",
