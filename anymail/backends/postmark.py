@@ -179,14 +179,19 @@ class PostmarkPayload(RequestsPayload):
         return params
 
     def serialize_data(self):
-        data = self.data
         api_endpoint = self.get_api_endpoint()
-        if api_endpoint == "email/batchWithTemplates":
+        if api_endpoint == "email":
+            data = self.data
+        elif api_endpoint == "email/batchWithTemplates":
             data = {"Messages": [self.data_for_recipient(to) for to in self.to_emails]}
         elif api_endpoint == "email/batch":
             data = [self.data_for_recipient(to) for to in self.to_emails]
         elif api_endpoint == "email/withTemplate/":
-            data = self.data_for_recipient(self.to_emails.pop())
+            assert len(self.to_emails) == 1
+            data = self.data_for_recipient(self.to_emails[0])
+        else:
+            raise AssertionError("PostmarkPayload.serialize_data missing"
+                                 " case for api_endpoint %r" % api_endpoint)
         return self.serialize_json(data)
 
     def data_for_recipient(self, to):
