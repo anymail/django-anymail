@@ -9,7 +9,10 @@ from time import mktime
 import six
 from django.conf import settings
 from django.core.mail.message import sanitize_address, DEFAULT_ATTACHMENT_MIME_TYPE
-from django.utils.encoding import force_text
+if six.PY2:
+    from django.utils.encoding import force_text as force_str
+else:
+    from django.utils.encoding import force_str
 from django.utils.functional import Promise
 from django.utils.timezone import utc, get_fixed_timezone
 from requests.structures import CaseInsensitiveDict
@@ -147,7 +150,7 @@ def parse_address_list(address_list, field=None):
     # from the list -- which may split comma-seperated strings into multiple addresses.
     # (See django.core.mail.message: EmailMessage.message to/cc/bcc/reply_to handling;
     # also logic for ADDRESS_HEADERS in forbid_multi_line_headers.)
-    address_list_strings = [force_text(address) for address in address_list]  # resolve lazy strings
+    address_list_strings = [force_str(address) for address in address_list]  # resolve lazy strings
     name_email_pairs = getaddresses(address_list_strings)
     if name_email_pairs == [] and address_list_strings == [""]:
         name_email_pairs = [('', '')]  # getaddresses ignores a single empty string
