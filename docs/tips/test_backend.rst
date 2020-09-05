@@ -22,7 +22,7 @@ Anymail's own internal tests, but you may find it useful for some of your test c
   and some common problems like malformed addresses may be detected.
   (But no ESP-specific checks are run.)
 
-* Anymail's test backend also adds an :attr:`anymail_send_params` attribute to each EmailMessage
+* Anymail's test backend also adds an :attr:`anymail_test_params` attribute to each EmailMessage
   as it sends it. This is a dict of the actual params that would be used to send the message,
   including both Anymail-specific attributes from the EmailMessage and options that would
   come from Anymail settings defaults.
@@ -49,4 +49,4 @@ Here's an example:
             self.assertEqual(mail.outbox[0].tags, ["confirmation"])  # an Anymail custom attr
 
             # Or verify the Anymail params, including any merged settings defaults:
-            self.assertTrue(mail.outbox[0].anymail_send_params["track_clicks"])
+            self.assertTrue(mail.outbox[0].anymail_test_params["track_clicks"])
