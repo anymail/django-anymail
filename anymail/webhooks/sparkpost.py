@@ -64,6 +64,7 @@ class SparkPostTrackingWebhookView(SparkPostBaseWebhookView):
         'delay': EventType.DEFERRED,
         'click': EventType.CLICKED,
         'open': EventType.OPENED,
+        'initial_open': EventType.OPENED,
         'generation_failure': EventType.FAILED,
         'generation_rejection': EventType.REJECTED,
         'list_unsubscribe': EventType.UNSUBSCRIBED,
