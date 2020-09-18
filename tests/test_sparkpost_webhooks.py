@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from django.test import tag
+from django.test import override_settings, tag
 from django.utils.timezone import utc
 from mock import ANY
 
@@ -273,9 +273,49 @@ class SparkPostDeliveryTestCase(WebhookTestCase):
         self.assertEqual(event.event_type, "opened")
         self.assertEqual(event.user_agent, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/537.36")
 
+    @override_settings(ANYMAIL_SPARKPOST_TRACK_INITIAL_OPEN_AS_OPENED=True)
+    def test_initial_open_event_as_opened(self):
+        # Mapping SparkPost "initial_open" to Anymail normalized "opened" is opt-in via a setting,
+        # for backwards compatibility and to avoid reporting duplicate "opened" events when all
+        # SparkPost event types are enabled.
+        raw_events = [{"msys": {"track_event": {
+            "type": "initial_open",
+            "raw_rcpt_to": "recipient@example.com",
+            "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/537.36",
+        }}}]
+        response = self.client.post('/anymail/sparkpost/tracking/',
+                                    content_type='application/json', data=json.dumps(raw_events))
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(self.tracking_handler, sender=SparkPostTrackingWebhookView,
+                                                      event=ANY, esp_name='SparkPost')
+        event = kwargs['event']
+        self.assertIsInstance(event, AnymailTrackingEvent)
+        self.assertEqual(event.event_type, "opened")
+        self.assertEqual(event.user_agent, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/537.36")
+
+    def test_initial_open_event_as_unknown(self):
+        # By default, SparkPost "initial_open" is *not* mapped to Anymail "opened".
+        raw_events = [{"msys": {"track_event": {
+            "type": "initial_open",
+            "raw_rcpt_to": "recipient@example.com",
+            "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/537.36",
+        }}}]
+        response = self.client.post('/anymail/sparkpost/tracking/',
+                                    content_type='application/json', data=json.dumps(raw_events))
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(self.tracking_handler, sender=SparkPostTrackingWebhookView,
+                                                      event=ANY, esp_name='SparkPost')
+        event = kwargs['event']
+        self.assertIsInstance(event, AnymailTrackingEvent)
+        self.assertEqual(event.event_type, "unknown")
+        # Here's how to get the raw SparkPost event type:
+        self.assertEqual(event.esp_event["msys"].get("track_event", {}).get("type"), "initial_open")
+        # Note that other Anymail normalized event properties are still available:
+        self.assertEqual(event.user_agent, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/537.36")
+
     def test_click_event(self):
         raw_events = [{"msys": {"track_event": {
-            "type": "click",
+            "type": "amp_click",
             "raw_rcpt_to": "recipient@example.com",
             "target_link_name": "Example Link Name",
             "target_link_url": "http://example.com",
@@ -292,3 +332,20 @@ class SparkPostDeliveryTestCase(WebhookTestCase):
         self.assertEqual(event.recipient, "recipient@example.com")
         self.assertEqual(event.user_agent, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/537.36")
         self.assertEqual(event.click_url, "http://example.com")
+
+    def test_amp_events(self):
+        raw_events = [{"msys": {"track_event": {
+            "type": "amp_open",
+        }}}, {"msys": {"track_event": {
+            "type": "amp_initial_open",
+        }}}, {"msys": {"track_event": {
+            "type": "amp_click",
+        }}}]
+        response = self.client.post('/anymail/sparkpost/tracking/',
+                                    content_type='application/json', data=json.dumps(raw_events))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.tracking_handler.call_count, 3)
+        events = [kwargs["event"] for (args, kwargs) in self.tracking_handler.call_args_list]
+        self.assertEqual(events[0].event_type, "opened")
+        self.assertEqual(events[1].event_type, "unknown")  # amp_initial_open is mapped to "unknown" by default
+        self.assertEqual(events[2].event_type, "clicked")

@@ -8,6 +8,7 @@ from .base import AnymailBaseWebhookView
 from ..exceptions import AnymailConfigurationError
 from ..inbound import AnymailInboundMessage
 from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason
+from ..utils import get_anymail_setting
 
 
 class SparkPostBaseWebhookView(AnymailBaseWebhookView):
@@ -64,11 +65,19 @@ class SparkPostTrackingWebhookView(SparkPostBaseWebhookView):
         'delay': EventType.DEFERRED,
         'click': EventType.CLICKED,
         'open': EventType.OPENED,
-        'initial_open': EventType.OPENED,
+        'amp_click': EventType.CLICKED,
+        'amp_open': EventType.OPENED,
         'generation_failure': EventType.FAILED,
         'generation_rejection': EventType.REJECTED,
         'list_unsubscribe': EventType.UNSUBSCRIBED,
         'link_unsubscribe': EventType.UNSUBSCRIBED,
+    }
+
+    # Additional event_types mapping when Anymail setting
+    # SPARKPOST_TRACK_INITIAL_OPEN_AS_OPENED is enabled.
+    initial_open_event_types = {
+        'initial_open': EventType.OPENED,
+        'amp_initial_open': EventType.OPENED,
     }
 
     reject_reasons = {
@@ -96,6 +105,19 @@ class SparkPostTrackingWebhookView(SparkPostBaseWebhookView):
         '90': (RejectReason.UNSUBSCRIBED, EventType.UNSUBSCRIBED),  # Unsubscribe
         '100': (RejectReason.OTHER, EventType.AUTORESPONDED),  # Challenge-Response
     }
+
+    def __init__(self, **kwargs):
+        # Set Anymail setting SPARKPOST_TRACK_INITIAL_OPEN_AS_OPENED True
+        # to report *both* "open" and "initial_open" as Anymail "opened" events.
+        # (Otherwise only "open" maps to "opened", matching the behavior of most
+        # other ESPs.) Handling "initial_open" is opt-in, to help avoid duplicate
+        # "opened" events on the same first open.
+        track_initial_open_as_opened = get_anymail_setting(
+            'track_initial_open_as_opened', default=False,
+            esp_name=self.esp_name, kwargs=kwargs)
+        if track_initial_open_as_opened:
+            self.event_types = {**self.event_types, **self.initial_open_event_types}
+        super().__init__(**kwargs)
 
     def esp_to_anymail_event(self, event_class, event, raw_event):
         if event_class == 'relay_message':

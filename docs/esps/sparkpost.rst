@@ -103,6 +103,17 @@ You must specify the full, versioned API endpoint as shown above (not just the b
 .. _SparkPost API Endpoint: https://developers.sparkpost.com/api/index.html#header-api-endpoints
 
 
+.. setting:: ANYMAIL_SPARKPOST_TRACK_INITIAL_OPEN_AS_OPENED
+
+.. rubric:: SPARKPOST_TRACK_INITIAL_OPEN_AS_OPENED
+
+.. versionadded:: vNext
+
+Boolean, default ``False``. When using Anymail's tracking webhooks, whether to report
+SparkPost's "Initial Open" event as an Anymail normalized "opened" event.
+(SparkPost's "Open" event is always normalized to Anymail's "opened" event.
+See :ref:`sparkpost-webhooks` below.)
+
 .. _sparkpost-esp-extra:
 
 esp_extra support
@@ -268,33 +279,49 @@ Status tracking webhooks
 ------------------------
 
 If you are using Anymail's normalized :ref:`status tracking <event-tracking>`, set up the
-webhook in your `SparkPost account settings under "Webhooks"`_:
+webhook in your `SparkPost configuration under "Webhooks"`_:
 
 * Target URL: :samp:`https://{yoursite.example.com}/anymail/sparkpost/tracking/`
 * Authentication: choose "Basic Auth." For username and password enter the two halves of the
   *random:random* shared secret you created for your :setting:`ANYMAIL_WEBHOOK_SECRET`
   Django setting. (Anymail doesn't support OAuth webhook auth.)
-* Events: click "Select" and then *clear* the checkbox for "Relay Events" category (which is for
-  inbound email). You can leave all the other categories of events checked, or disable
-  any you aren't interested in tracking.
+* Events: you can leave "All events" selected, or choose "Select individual events"
+  to pick the specific events you're interested in tracking.
 
 SparkPost will report these Anymail :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
 queued, rejected, bounced, deferred, delivered, opened, clicked, complained, unsubscribed,
 subscribed.
 
+By default, Anymail reports SparkPost's "Open"---but *not* its "Initial Open"---event
+as Anymail's normalized "opened" :attr:`~anymail.signals.AnymailTrackingEvent.event_type`.
+This avoids duplicate "opened" events when both SparkPost types are enabled.
+
+.. versionadded:: vNext
+
+    To receive SparkPost "Initial Open" events as Anymail's "opened", set
+    :setting:`"SPARKPOST_TRACK_INITIAL_OPEN_AS_OPENED": True <ANYMAIL_SPARKPOST_TRACK_INITIAL_OPEN_AS_OPENED>`
+    in your ANYMAIL settings dict. You will probably want to disable SparkPost "Open"
+    events when using this setting.
+
+.. versionchanged:: vNext
+
+    SparkPost's "AMP Click" and "AMP Open" are reported as Anymail's "clicked" and
+    "opened" events. If you enable the SPARKPOST_TRACK_INITIAL_OPEN_AS_OPENED setting,
+    "AMP Initial Open" will also map to "opened." (Earlier Anymail releases reported
+    all AMP events as "unknown".)
+
+
 The event's :attr:`~anymail.signals.AnymailTrackingEvent.esp_event` field will be
 a single, raw `SparkPost event`_. (Although SparkPost calls webhooks with batches of events,
 Anymail will invoke your signal receiver separately for each event in the batch.)
-The esp_event is the raw, `wrapped json event structure`_ as provided by SparkPost:
+The esp_event is the raw, wrapped json event structure as provided by SparkPost:
 `{'msys': {'<event_category>': {...<actual event data>...}}}`.
 
 
-.. _SparkPost account settings under "Webhooks":
-    https://app.sparkpost.com/account/webhooks
+.. _SparkPost configuration under "Webhooks":
+    https://app.sparkpost.com/webhooks
 .. _SparkPost event:
-    https://support.sparkpost.com/customer/portal/articles/1976204-webhook-event-reference
-.. _wrapped json event structure:
-    https://support.sparkpost.com/customer/en/portal/articles/2311698-comparing-webhook-and-message-event-data
+    https://developers.sparkpost.com/api/webhooks/#header-webhook-event-types
 
 
 .. _sparkpost-inbound:
