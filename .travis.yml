@@ -55,6 +55,7 @@ jobs:
     # Install without optional extras (don't need to cover entire matrix)
     - { env: TOXENV=django31-py37-none, python: 3.7 }
     - { env: TOXENV=django31-py37-amazon_ses, python: 3.7 }
+    - { env: TOXENV=django31-py37-postal, python: 3.7 }
     # Test some specific older package versions
     - { env: TOXENV=django22-py37-all-old_urllib3, python: 3.7 }
 

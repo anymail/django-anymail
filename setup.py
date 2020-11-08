@@ -56,10 +56,11 @@ setup(
         "sendgrid": [],
         "sendinblue": [],
         "sparkpost": [],
+        "postal": ["cryptography"],
     },
     include_package_data=True,
     test_suite="runtests.runtests",
-    tests_require=["mock", "boto3"],
+    tests_require=["mock", "boto3", "cryptography"],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Programming Language :: Python",
