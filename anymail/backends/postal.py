@@ -29,6 +29,8 @@ class EmailBackend(AnymailRequestsBackend):
         return PostalPayload(message, defaults, self)
 
     def raise_for_status(self, response, payload, message):
+        super().raise_for_status(response, payload, message)
+
         data = self.deserialize_json_response(response, payload, message)
 
         if data["status"] != "success":
@@ -94,9 +96,31 @@ class PostalPayload(RequestsPayload):
         self.data["plain_body"] = body
 
     def set_html_body(self, body):
-        if "html" in self.data:
+        if "html_body" in self.data:
             self.unsupported_feature("multiple html parts")
         self.data["html_body"] = body
+
+    def make_attachment(self, attachment):
+        """Returns Postal attachment dict for attachment"""
+        att = {
+            "name": attachment.name or "",
+            "data": attachment.b64content,
+            "content_type": attachment.mimetype,
+        }
+        if attachment.inline:
+            # see https://github.com/postalhq/postal/issues/731
+            # but it might be possible with the send/raw endpoint
+            self.unsupported_feature('inline attachments')
+        return att
+
+    def set_attachments(self, attachments):
+        if attachments:
+            self.data["attachments"] = [
+                self.make_attachment(attachment) for attachment in attachments
+            ]
+
+    def set_envelope_sender(self, email):
+        self.data["sender"] = str(email)
 
     def set_tags(self, tags):
         if len(tags) > 1:
