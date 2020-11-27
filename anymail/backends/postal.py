@@ -28,19 +28,15 @@ class EmailBackend(AnymailRequestsBackend):
     def build_message_payload(self, message, defaults):
         return PostalPayload(message, defaults, self)
 
-    def raise_for_status(self, response, payload, message):
-        super().raise_for_status(response, payload, message)
+    def parse_recipient_status(self, response, payload, message):
+        parsed_response = self.deserialize_json_response(response, payload, message)
 
-        data = self.deserialize_json_response(response, payload, message)
-
-        if data["status"] != "success":
+        if parsed_response["status"] != "success":
             raise AnymailRequestsAPIError(
                 email_message=message, payload=payload, response=response, backend=self
             )
 
-    def parse_recipient_status(self, response, payload, message):
         # If we get here, the send call was successful.
-        parsed_response = self.deserialize_json_response(response, payload, message)
         messages = parsed_response["data"]["messages"]
 
         return {

@@ -431,8 +431,7 @@ class PostalBackendAnymailFeatureTests(PostalBackendMockAPITestCase):
         self.assertIsNone(self.message.anymail_status.status)
         self.assertIsNone(self.message.anymail_status.message_id)
         self.assertEqual(self.message.anymail_status.recipients, {})
-        # TODO esp_response is None because post_to_esp calls raise_for_status which tries to deserialize the response
-        # self.assertEqual(self.message.anymail_status.esp_response, mock_response)
+        self.assertEqual(self.message.anymail_status.esp_response, mock_response)
 
     def test_json_serialization_errors(self):
         """Try to provide more information about non-json-serializable data"""
