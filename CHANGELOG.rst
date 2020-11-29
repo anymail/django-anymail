@@ -25,6 +25,20 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes*
+
+Fixes
+~~~~~
+
+* **SparkPost:** Drop support for multiple `from_email` addresses. SparkPost has
+  started issuing a cryptic "No sending domain specified" error for this case; with
+  this fix, Anymail will now treat it as an unsupported feature.
+
+
+
 v8.1
 ----
 

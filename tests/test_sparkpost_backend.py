@@ -10,7 +10,7 @@ from django.test import override_settings, tag
 from django.utils.timezone import get_fixed_timezone, override as override_current_timezone, utc
 
 from anymail.exceptions import (
-    AnymailAPIError, AnymailConfigurationError, AnymailInvalidAddress, AnymailRecipientsRefused,
+    AnymailAPIError, AnymailConfigurationError, AnymailRecipientsRefused,
     AnymailSerializationError, AnymailUnsupportedFeature)
 from anymail.message import attach_inline_image_file
 
@@ -317,20 +317,6 @@ class SparkPostBackendStandardEmailTests(SparkPostBackendMockAPITestCase):
                 "header_to": "",
             },
         }])
-
-    def test_multiple_from_emails(self):
-        """SparkPost supports multiple addresses in from_email"""
-        self.message.from_email = 'first@example.com, "From, also" <second@example.com>'
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(data["content"]["from"],
-                         'first@example.com, "From, also" <second@example.com>')
-
-        # Make sure the far-more-likely scenario of a single from_email
-        # with an unquoted display-name issues a reasonable error:
-        self.message.from_email = 'Unquoted, display-name <from@example.com>'
-        with self.assertRaises(AnymailInvalidAddress):
-            self.message.send()
 
     def test_api_failure(self):
         self.set_mock_response(status_code=400)

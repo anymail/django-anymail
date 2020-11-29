@@ -59,9 +59,7 @@ class SparkPostBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail all-options integration test",
             body="This is the text body",
-            # Caution: although SparkPost allows multiple From addresses,
-            # many ISPs will just bounce email that tries it...
-            from_email="Test From <test@test-sp.anymail.info>, also-from@test-sp.anymail.info",
+            from_email="Test From <test@test-sp.anymail.info>",
             to=["to1@test.sink.sparkpostmail.com", "Recipient 2 <to2@test.sink.sparkpostmail.com>"],
             # Limit the live b/cc's to avoid running through our small monthly allowance:
             # cc=["cc1@test.sink.sparkpostmail.com", "Copy 2 <cc2@test.sink.sparkpostmail.com>"],
