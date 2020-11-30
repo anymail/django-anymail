@@ -1,12 +1,19 @@
+import binascii
 import json
 from base64 import b64decode
 from datetime import datetime
 
+
 from django.utils.timezone import utc
 
 from .base import AnymailBaseWebhookView
-from ..exceptions import AnymailInvalidAddress, AnymailWebhookValidationFailure, AnymailImproperlyInstalled, _LazyError, \
-    AnymailConfigurationError
+from ..exceptions import (
+    AnymailInvalidAddress,
+    AnymailWebhookValidationFailure,
+    AnymailImproperlyInstalled,
+    _LazyError,
+    AnymailConfigurationError,
+)
 from ..inbound import AnymailInboundMessage
 from ..signals import (
     inbound,
@@ -22,6 +29,7 @@ try:
     from cryptography.hazmat.primitives import serialization, hashes
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.exceptions import InvalidSignature
 except ImportError:
     # This module gets imported by anymail.urls, so don't complain about cryptography missing
     # unless one of the Postal webhook views is actually used and needs it
@@ -30,6 +38,7 @@ except ImportError:
     hashes = error
     default_backend = error
     padding = error
+    InvalidSignature = object
 
 
 class PostalBaseWebhookView(AnymailBaseWebhookView):
@@ -65,7 +74,7 @@ class PostalBaseWebhookView(AnymailBaseWebhookView):
                 padding.PKCS1v15(),
                 hashes.SHA1()
             )
-        except:
+        except (InvalidSignature, binascii.Error):
             raise AnymailWebhookValidationFailure(
                 "Postal webhook called with incorrect signature")
 

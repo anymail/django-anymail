@@ -1,12 +1,19 @@
 from base64 import b64encode
 
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
 from django.test import override_settings
 
 from tests.utils import ClientWithCsrfChecks
+
+try:
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding
+except ImportError:
+    rsa = None
+    serialization = None
+    hashes = None
+    padding = None
 
 
 def make_key():
@@ -21,7 +28,10 @@ def make_key():
 def derive_public_webhook_key(private_key):
     """Derive public """
     public_key = private_key.public_key()
-    public_bytes = public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+    public_bytes = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
     public_bytes = b'\n'.join(public_bytes.splitlines()[1:-1])
     return public_bytes.decode('utf-8')
 
@@ -45,3 +55,6 @@ class ClientWithPostalSignature(ClientWithCsrfChecks):
         webhook_key = derive_public_webhook_key(self.private_key)
         with override_settings(ANYMAIL={'POSTAL_WEBHOOK_KEY': webhook_key}):
             return super().post(*args, **kwargs)
+
+if not rsa:
+    ClientWithPostalSignature = None

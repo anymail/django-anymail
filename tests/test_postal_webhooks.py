@@ -1,4 +1,5 @@
 import json
+import unittest
 from base64 import b64encode
 from datetime import datetime
 
@@ -9,24 +10,19 @@ from mock import ANY
 from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.postal import PostalTrackingWebhookView
-
+from .utils_postal import ClientWithPostalSignature, make_key
 from .webhook_cases import WebhookTestCase
 
 
 @tag('postal')
+@unittest.skipUnless(ClientWithPostalSignature, "Install 'cryptography' to run postal webhook tests")
 class PostalWebhookSecurityTestCase(WebhookTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-
-        from .utils_postal import ClientWithPostalSignature
-        cls.client_class = ClientWithPostalSignature
+    client_class = ClientWithPostalSignature
 
     def setUp(self):
         super().setUp()
         self.clear_basic_auth()
 
-        from .utils_postal import make_key
         self.client.set_private_key(make_key())
 
     def test_failed_signature_check(self):
@@ -47,19 +43,14 @@ class PostalWebhookSecurityTestCase(WebhookTestCase):
 
 
 @tag('postal')
+@unittest.skipUnless(ClientWithPostalSignature, "Install 'cryptography' to run postal webhook tests")
 class PostalDeliveryTestCase(WebhookTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-
-        from .utils_postal import ClientWithPostalSignature
-        cls.client_class = ClientWithPostalSignature
+    client_class = ClientWithPostalSignature
 
     def setUp(self):
         super().setUp()
         self.clear_basic_auth()
 
-        from .utils_postal import make_key
         self.client.set_private_key(make_key())
 
     def test_bounce_event(self):
@@ -182,7 +173,7 @@ class PostalDeliveryTestCase(WebhookTestCase):
                     "tag": None
                 },
                 "status": "Held",
-                "details": "Recipient (suppressed@example.com) is on the suppression list (reason: too many soft fails)",
+                "details": "Recipient (suppressed@example.com) is on the suppression list",
                 "output": "server output",
                 "sent_with_ssl": None,
                 "timestamp": 1606752751.8933666,
@@ -205,7 +196,7 @@ class PostalDeliveryTestCase(WebhookTestCase):
         self.assertEqual(event.recipient, "suppressed@example.com")
         self.assertEqual(event.reject_reason, None)
         self.assertEqual(event.description,
-                         "Recipient (suppressed@example.com) is on the suppression list (reason: too many soft fails)")
+                         "Recipient (suppressed@example.com) is on the suppression list")
         self.assertEqual(event.mta_response,
                          "server output")
 
@@ -304,7 +295,7 @@ class PostalDeliveryTestCase(WebhookTestCase):
                     "id": 1575,
                     "token": "lPDuNhHfV8aU",
                     "direction": "incoming",
-                    "message_id": "CAOjxUF=cDWPZrDQ+rX+F077YiTONCtY=hTyNZw6OJ1MXTn-BYw@other-mta.example.com",
+                    "message_id": "asdf@other-mta.example.com",
                     "to": "incoming@example.com",
                     "from": "sender@example.com",
                     "subject": "test",
@@ -313,7 +304,7 @@ class PostalDeliveryTestCase(WebhookTestCase):
                     "tag": None
                 },
                 "status": "HardFail",
-                "details": "Received a 400 from https://anymail.example.com/anymail/postal/tracking/.  Sent bounce message to sender (see message <msg:1576>)",
+                "details": "Received a 400 from https://anymail.example.com/anymail/postal/tracking/.",
                 "output": "Not found",
                 "sent_with_ssl": False,
                 "timestamp": 1606756014.1078613,
