@@ -39,8 +39,7 @@ class ClientWithPostalSignature(ClientWithCsrfChecks):
         self.private_key = private_key
 
     def post(self, *args, **kwargs):
-        data = kwargs['data']
-        signature = b64encode(sign(self.private_key, data.encode('utf-8')))
+        signature = b64encode(sign(self.private_key, kwargs['data'].encode('utf-8')))
         kwargs.setdefault('HTTP_X_POSTAL_SIGNATURE', signature)
 
         webhook_key = derive_public_webhook_key(self.private_key)

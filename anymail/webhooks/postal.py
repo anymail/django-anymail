@@ -14,6 +14,7 @@ from ..signals import (
     AnymailInboundEvent,
     AnymailTrackingEvent,
     EventType,
+    RejectReason,
 )
 from ..utils import parse_single_address, get_anymail_setting
 
@@ -79,6 +80,11 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
 
+        if 'rcpt_to' in esp_event:
+            raise AnymailConfigurationError(
+                "You seem to have set Postal's *inbound* webhook "
+                "to Anymail's Postal *tracking* webhook URL.")
+
         raw_timestamp = esp_event.get("timestamp")
         timestamp = (
             datetime.fromtimestamp(int(raw_timestamp), tz=utc)
@@ -114,7 +120,7 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
 
         # extract message-related fields
         message = payload.get("message") or payload.get("original_message", {})
-        message_id = message.get("message_id")
+        message_id = message.get("id")
         tag = message.get("tag")
         recipient = None
         message_to = message.get("to")
@@ -136,7 +142,7 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
         event = AnymailTrackingEvent(
             event_type=event_type,
             timestamp=timestamp,
-            event_id=None,
+            event_id=esp_event.get('uuid'),
             esp_event=esp_event,
             click_url=click_url,
             description=description,
@@ -144,7 +150,7 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
             metadata=None,
             mta_response=mta_response,
             recipient=recipient,
-            reject_reason=None,  # Postal doesn't provide a reject reason
+            reject_reason=RejectReason.BOUNCED if event_type == EventType.BOUNCED else None,
             tags=[tag],
             user_agent=user_agent,
         )

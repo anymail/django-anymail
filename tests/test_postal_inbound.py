@@ -179,16 +179,3 @@ class PostalInboundTestCase(WebhookTestCase):
         with self.assertRaisesMessage(AnymailConfigurationError, errmsg):
             self.client.post('/anymail/postal/inbound/', content_type='application/json',
                              data=json.dumps({"status": "Held"}))
-
-    def test_failed_signature_check(self):
-        response = self.client.post('/anymail/postal/inbound/',
-                                    content_type='application/json', data=json.dumps({'some': 'data'}), HTTP_X_POSTAL_SIGNATURE=b64encode('invalid'.encode('utf-8')))
-        self.assertEqual(response.status_code, 400)
-
-        response = self.client.post('/anymail/postal/inbound/',
-                                    content_type='application/json', data=json.dumps({'some': 'data'}), HTTP_X_POSTAL_SIGNATURE='garbage')
-        self.assertEqual(response.status_code, 400)
-
-        response = self.client.post('/anymail/postal/inbound/',
-                                    content_type='application/json', data=json.dumps({'some': 'data'}), HTTP_X_POSTAL_SIGNATURE='')
-        self.assertEqual(response.status_code, 400)
