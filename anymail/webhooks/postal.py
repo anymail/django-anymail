@@ -101,19 +101,14 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
             "Held": EventType.QUEUED,
         }
 
-        def get_event_type(event):
-            if "status" in event:
-                return status_types.get(event["status"], EventType.UNKNOWN)
-
-            if "bounce" in event:
-                return EventType.BOUNCED
-
-            if "url" in event:
-                return EventType.CLICKED
-
-            return EventType.UNKNOWN
-
-        event_type = get_event_type(payload)
+        if "status" in payload:
+            event_type = status_types.get(payload["status"], EventType.UNKNOWN)
+        elif "bounce" in payload:
+            event_type = EventType.BOUNCED
+        elif "url" in payload:
+            event_type = EventType.CLICKED
+        else:
+            event_type = EventType.UNKNOWN
 
         description = payload.get("details")
         mta_response = payload.get("output")
