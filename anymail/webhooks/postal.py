@@ -131,8 +131,10 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
                 pass
 
         if message.get("direction") == "incoming":
-            # This is a tracking event about inbound email, so it's not interesting to anymail.
-            # We can safely ignore this.
+            # Let's ignore tracking events about an inbound emails.
+            # This happens when an inbound email could not be forwarded.
+            # The email didn't originate from Anymail, so the user can't do much about it.
+            # It is part of normal Postal operation, not a configuration error.
             return []
 
         # only for MessageLinkClicked
