@@ -9,18 +9,24 @@ from mock import ANY
 from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.postal import PostalTrackingWebhookView
-from .utils_postal import ClientWithPostalSignature, make_key
+
 from .webhook_cases import WebhookTestCase
 
 
 @tag('postal')
 class PostalWebhookSecurityTestCase(WebhookTestCase):
-    client_class = ClientWithPostalSignature
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        from .utils_postal import ClientWithPostalSignature
+        cls.client_class = ClientWithPostalSignature
 
     def setUp(self):
         super().setUp()
         self.clear_basic_auth()
 
+        from .utils_postal import make_key
         self.client.set_private_key(make_key())
 
     def test_failed_signature_check(self):
@@ -42,12 +48,18 @@ class PostalWebhookSecurityTestCase(WebhookTestCase):
 
 @tag('postal')
 class PostalDeliveryTestCase(WebhookTestCase):
-    client_class = ClientWithPostalSignature
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        from .utils_postal import ClientWithPostalSignature
+        cls.client_class = ClientWithPostalSignature
 
     def setUp(self):
         super().setUp()
         self.clear_basic_auth()
 
+        from .utils_postal import make_key
         self.client.set_private_key(make_key())
 
     def test_bounce_event(self):

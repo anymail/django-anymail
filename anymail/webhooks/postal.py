@@ -22,7 +22,6 @@ try:
     from cryptography.hazmat.primitives import serialization, hashes
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives.asymmetric import padding
-    from cryptography.exceptions import InvalidSignature
 except ImportError:
     # This module gets imported by anymail.urls, so don't complain about cryptography missing
     # unless one of the Postal webhook views is actually used and needs it
@@ -31,7 +30,6 @@ except ImportError:
     hashes = error
     default_backend = error
     padding = error
-    InvalidSignature = object
 
 
 class PostalBaseWebhookView(AnymailBaseWebhookView):

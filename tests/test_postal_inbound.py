@@ -10,18 +10,23 @@ from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent
 from anymail.webhooks.postal import PostalInboundWebhookView
 from .utils import sample_image_content, sample_email_content
-from .utils_postal import ClientWithPostalSignature, make_key
 from .webhook_cases import WebhookTestCase
 
 
 @tag('postal')
 class PostalInboundTestCase(WebhookTestCase):
-    client_class = ClientWithPostalSignature
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        from .utils_postal import ClientWithPostalSignature
+        cls.client_class = ClientWithPostalSignature
 
     def setUp(self):
         super().setUp()
         self.clear_basic_auth()
 
+        from .utils_postal import make_key
         self.client.set_private_key(make_key())
 
     def test_inbound_basics(self):
