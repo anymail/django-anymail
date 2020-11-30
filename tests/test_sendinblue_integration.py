@@ -8,14 +8,14 @@ from anymail.message import AnymailMessage
 
 from .utils import AnymailTestMixin
 
-SENDINBLUE_TEST_API_KEY = os.getenv('SENDINBLUE_TEST_API_KEY')
+ANYMAIL_TEST_SENDINBLUE_API_KEY = os.getenv('ANYMAIL_TEST_SENDINBLUE_API_KEY')
 
 
 @tag('sendinblue', 'live')
-@unittest.skipUnless(SENDINBLUE_TEST_API_KEY,
-                     "Set SENDINBLUE_TEST_API_KEY environment variable "
+@unittest.skipUnless(ANYMAIL_TEST_SENDINBLUE_API_KEY,
+                     "Set ANYMAIL_TEST_SENDINBLUE_API_KEY environment variable "
                      "to run SendinBlue integration tests")
-@override_settings(ANYMAIL_SENDINBLUE_API_KEY=SENDINBLUE_TEST_API_KEY,
+@override_settings(ANYMAIL_SENDINBLUE_API_KEY=ANYMAIL_TEST_SENDINBLUE_API_KEY,
                    ANYMAIL_SENDINBLUE_SEND_DEFAULTS=dict(),
                    EMAIL_BACKEND="anymail.backends.sendinblue.EmailBackend")
 class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
@@ -23,7 +23,7 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     SendinBlue doesn't have sandbox so these tests run
     against the **live** SendinBlue API, using the
-    environment variable `SENDINBLUE_TEST_API_KEY` as the API key
+    environment variable `ANYMAIL_TEST_SENDINBLUE_API_KEY` as the API key
     If those variables are not set, these tests won't run.
 
     https://developers.sendinblue.com/docs/faq#section-how-can-i-test-the-api-

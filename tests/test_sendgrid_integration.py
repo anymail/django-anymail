@@ -9,15 +9,15 @@ from anymail.message import AnymailMessage
 
 from .utils import AnymailTestMixin, sample_image_path
 
-SENDGRID_TEST_API_KEY = os.getenv('SENDGRID_TEST_API_KEY')
-SENDGRID_TEST_TEMPLATE_ID = os.getenv('SENDGRID_TEST_TEMPLATE_ID')
+ANYMAIL_TEST_SENDGRID_API_KEY = os.getenv('ANYMAIL_TEST_SENDGRID_API_KEY')
+ANYMAIL_TEST_SENDGRID_TEMPLATE_ID = os.getenv('ANYMAIL_TEST_SENDGRID_TEMPLATE_ID')
 
 
 @tag('sendgrid', 'live')
-@unittest.skipUnless(SENDGRID_TEST_API_KEY,
-                     "Set SENDGRID_TEST_API_KEY environment variable "
+@unittest.skipUnless(ANYMAIL_TEST_SENDGRID_API_KEY,
+                     "Set ANYMAIL_TEST_SENDGRID_API_KEY environment variable "
                      "to run SendGrid integration tests")
-@override_settings(ANYMAIL_SENDGRID_API_KEY=SENDGRID_TEST_API_KEY,
+@override_settings(ANYMAIL_SENDGRID_API_KEY=ANYMAIL_TEST_SENDGRID_API_KEY,
                    ANYMAIL_SENDGRID_SEND_DEFAULTS={"esp_extra": {
                        "mail_settings": {"sandbox_mode": {"enable": True}},
                    }},
@@ -26,7 +26,7 @@ class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """SendGrid v3 API integration tests
 
     These tests run against the **live** SendGrid API, using the
-    environment variable `SENDGRID_TEST_API_KEY` as the API key
+    environment variable `ANYMAIL_TEST_SENDGRID_API_KEY` as the API key
     If those variables are not set, these tests won't run.
 
     The SEND_DEFAULTS above force SendGrid's v3 sandbox mode, which avoids sending mail.
@@ -107,15 +107,15 @@ class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(recipient_status['to1@sink.sendgrid.net'].status, 'queued')
         self.assertEqual(recipient_status['to2@sink.sendgrid.net'].status, 'queued')
 
-    @unittest.skipUnless(SENDGRID_TEST_TEMPLATE_ID,
-                         "Set the SENDGRID_TEST_TEMPLATE_ID environment variable "
+    @unittest.skipUnless(ANYMAIL_TEST_SENDGRID_TEMPLATE_ID,
+                         "Set the ANYMAIL_TEST_SENDGRID_TEMPLATE_ID environment variable "
                          "to a template in your SendGrid account to test stored templates")
     def test_stored_template(self):
         message = AnymailMessage(
             from_email="Test From <from@example.com>",
             to=["to@sink.sendgrid.net"],
             # Anymail's live test template has merge fields "name", "order_no", and "dept"...
-            template_id=SENDGRID_TEST_TEMPLATE_ID,
+            template_id=ANYMAIL_TEST_SENDGRID_TEMPLATE_ID,
             merge_data={
                 'to@sink.sendgrid.net': {
                     'name': "Test Recipient",

@@ -8,16 +8,16 @@ from anymail.message import AnymailMessage
 
 from .utils import AnymailTestMixin, sample_image_path
 
-MAILJET_TEST_API_KEY = os.getenv('MAILJET_TEST_API_KEY')
-MAILJET_TEST_SECRET_KEY = os.getenv('MAILJET_TEST_SECRET_KEY')
+ANYMAIL_TEST_MAILJET_API_KEY = os.getenv('ANYMAIL_TEST_MAILJET_API_KEY')
+ANYMAIL_TEST_MAILJET_SECRET_KEY = os.getenv('ANYMAIL_TEST_MAILJET_SECRET_KEY')
 
 
 @tag('mailjet', 'live')
-@unittest.skipUnless(MAILJET_TEST_API_KEY and MAILJET_TEST_SECRET_KEY,
-                     "Set MAILJET_TEST_API_KEY and MAILJET_TEST_SECRET_KEY "
+@unittest.skipUnless(ANYMAIL_TEST_MAILJET_API_KEY and ANYMAIL_TEST_MAILJET_SECRET_KEY,
+                     "Set ANYMAIL_TEST_MAILJET_API_KEY and ANYMAIL_TEST_MAILJET_SECRET_KEY "
                      "environment variables to run Mailjet integration tests")
-@override_settings(ANYMAIL={"MAILJET_API_KEY": MAILJET_TEST_API_KEY,
-                            "MAILJET_SECRET_KEY": MAILJET_TEST_SECRET_KEY,
+@override_settings(ANYMAIL={"MAILJET_API_KEY": ANYMAIL_TEST_MAILJET_API_KEY,
+                            "MAILJET_SECRET_KEY": ANYMAIL_TEST_MAILJET_SECRET_KEY,
                             "MAILJET_SEND_DEFAULTS": {"esp_extra": {"SandboxMode": True}},  # don't actually send mail
                             },
                    EMAIL_BACKEND="anymail.backends.mailjet.EmailBackend")
@@ -25,7 +25,7 @@ class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Mailjet API integration tests
 
     These tests run against the **live** Mailjet API, using the
-    environment variables `MAILJET_TEST_API_KEY` and `MAILJET_TEST_SECRET_KEY`
+    environment variables `ANYMAIL_TEST_MAILJET_API_KEY` and `ANYMAIL_TEST_MAILJET_SECRET_KEY`
     as the API key and API secret key, respectively.
     If those variables are not set, these tests won't run.
 

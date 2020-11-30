@@ -51,9 +51,9 @@ The package is released under the BSD license.
 
 .. END shared-intro
 
-.. image:: https://travis-ci.org/anymail/django-anymail.svg?branch=main
-       :target: https://travis-ci.org/anymail/django-anymail
-       :alt:    build status on Travis-CI
+.. image:: https://github.com/anymail/django-anymail/workflows/test/badge.svg?branch=main
+       :target: https://github.com/anymail/django-anymail/actions?query=workflow:test+branch:main
+       :alt:    build status in GitHub Actions
 
 .. image:: https://readthedocs.org/projects/anymail/badge/?version=stable
        :target: https://anymail.readthedocs.io/en/stable/

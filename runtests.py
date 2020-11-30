@@ -22,7 +22,7 @@ def setup_and_run_tests(test_labels=None):
     exclude_tags = envlist('ANYMAIL_SKIP_TESTS')
 
     # In automated testing, don't run live tests unless specifically requested
-    if envbool('CONTINUOUS_INTEGRATION') and not envbool('RUN_LIVE_TESTS'):
+    if envbool('CONTINUOUS_INTEGRATION') and not envbool('ANYMAIL_RUN_LIVE_TESTS'):
         exclude_tags.append('live')
 
     if tags:
@@ -49,13 +49,13 @@ def runtests(test_labels=None):
 
 
 def envbool(var, default=False):
-    """Returns value of environment variable var as a bool, or default if not set.
+    """Returns value of environment variable var as a bool, or default if not set/empty.
 
     Converts `'true'` to `True`, and `'false'` to `False`.
     See :func:`~distutils.util.strtobool` for full list of allowable values.
     """
-    val = os.getenv(var, None)
-    if val is None:
+    val = os.getenv(var, '')
+    if val == '':
         return default
     else:
         return strtobool(val)

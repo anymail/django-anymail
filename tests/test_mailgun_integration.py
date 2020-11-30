@@ -12,24 +12,24 @@ from anymail.message import AnymailMessage
 from .utils import AnymailTestMixin, sample_image_path
 
 
-MAILGUN_TEST_API_KEY = os.getenv('MAILGUN_TEST_API_KEY')
-MAILGUN_TEST_DOMAIN = os.getenv('MAILGUN_TEST_DOMAIN')
+ANYMAIL_TEST_MAILGUN_API_KEY = os.getenv('ANYMAIL_TEST_MAILGUN_API_KEY')
+ANYMAIL_TEST_MAILGUN_DOMAIN = os.getenv('ANYMAIL_TEST_MAILGUN_DOMAIN')
 
 
 @tag('mailgun', 'live')
-@unittest.skipUnless(MAILGUN_TEST_API_KEY and MAILGUN_TEST_DOMAIN,
-                     "Set MAILGUN_TEST_API_KEY and MAILGUN_TEST_DOMAIN environment variables "
+@unittest.skipUnless(ANYMAIL_TEST_MAILGUN_API_KEY and ANYMAIL_TEST_MAILGUN_DOMAIN,
+                     "Set ANYMAIL_TEST_MAILGUN_API_KEY and ANYMAIL_TEST_MAILGUN_DOMAIN environment variables "
                      "to run Mailgun integration tests")
-@override_settings(ANYMAIL={'MAILGUN_API_KEY': MAILGUN_TEST_API_KEY,
-                            'MAILGUN_SENDER_DOMAIN': MAILGUN_TEST_DOMAIN,
+@override_settings(ANYMAIL={'MAILGUN_API_KEY': ANYMAIL_TEST_MAILGUN_API_KEY,
+                            'MAILGUN_SENDER_DOMAIN': ANYMAIL_TEST_MAILGUN_DOMAIN,
                             'MAILGUN_SEND_DEFAULTS': {'esp_extra': {'o:testmode': 'yes'}}},
                    EMAIL_BACKEND="anymail.backends.mailgun.EmailBackend")
 class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Mailgun API integration tests
 
     These tests run against the **live** Mailgun API, using the
-    environment variable `MAILGUN_TEST_API_KEY` as the API key
-    and `MAILGUN_TEST_DOMAIN` as the sender domain.
+    environment variable `ANYMAIL_TEST_MAILGUN_API_KEY` as the API key
+    and `ANYMAIL_TEST_MAILGUN_DOMAIN` as the sender domain.
     If those variables are not set, these tests won't run.
 
     """
@@ -43,8 +43,8 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     def fetch_mailgun_events(self, message_id, event=None,
                              initial_delay=2, retry_delay=2, max_retries=5):
         """Return list of Mailgun events related to message_id"""
-        url = "https://api.mailgun.net/v3/%s/events" % MAILGUN_TEST_DOMAIN
-        auth = ("api", MAILGUN_TEST_API_KEY)
+        url = "https://api.mailgun.net/v3/%s/events" % ANYMAIL_TEST_MAILGUN_DOMAIN
+        auth = ("api", ANYMAIL_TEST_MAILGUN_API_KEY)
 
         # Despite the docs, Mailgun's events API actually expects the message-id
         # without the <...> brackets (so, not exactly "as returned by the messages API")
@@ -116,7 +116,7 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         )
         message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
         message.attach("vedhæftet fil.csv", "ID,Name\n1,3", "text/csv")
-        cid = message.attach_inline_image_file(sample_image_path(), domain=MAILGUN_TEST_DOMAIN)
+        cid = message.attach_inline_image_file(sample_image_path(), domain=ANYMAIL_TEST_MAILGUN_DOMAIN)
         message.attach_alternative(
             "<div>This is the <i>html</i> body <img src='cid:%s'></div>" % cid,
             "text/html")
@@ -195,7 +195,7 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     #     self.assertIn("'from' parameter is not a valid address", str(err))
 
     @override_settings(ANYMAIL={'MAILGUN_API_KEY': "Hey, that's not an API key",
-                                'MAILGUN_SENDER_DOMAIN': MAILGUN_TEST_DOMAIN,
+                                'MAILGUN_SENDER_DOMAIN': ANYMAIL_TEST_MAILGUN_DOMAIN,
                                 'MAILGUN_SEND_DEFAULTS': {'esp_extra': {'o:testmode': 'yes'}}})
     def test_invalid_api_key(self):
         with self.assertRaises(AnymailAPIError) as cm:

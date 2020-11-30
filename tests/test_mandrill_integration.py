@@ -9,19 +9,19 @@ from anymail.message import AnymailMessage
 
 from .utils import AnymailTestMixin, sample_image_path
 
-MANDRILL_TEST_API_KEY = os.getenv('MANDRILL_TEST_API_KEY')
+ANYMAIL_TEST_MANDRILL_API_KEY = os.getenv('ANYMAIL_TEST_MANDRILL_API_KEY')
 
 
 @tag('mandrill', 'live')
-@unittest.skipUnless(MANDRILL_TEST_API_KEY,
-                     "Set MANDRILL_TEST_API_KEY environment variable to run integration tests")
-@override_settings(MANDRILL_API_KEY=MANDRILL_TEST_API_KEY,
+@unittest.skipUnless(ANYMAIL_TEST_MANDRILL_API_KEY,
+                     "Set ANYMAIL_TEST_MANDRILL_API_KEY environment variable to run integration tests")
+@override_settings(MANDRILL_API_KEY=ANYMAIL_TEST_MANDRILL_API_KEY,
                    EMAIL_BACKEND="anymail.backends.mandrill.EmailBackend")
 class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Mandrill API integration tests
 
     These tests run against the **live** Mandrill API, using the
-    environment variable `MANDRILL_TEST_API_KEY` as the API key.
+    environment variable `ANYMAIL_TEST_MANDRILL_API_KEY` as the API key.
     If that variable is not set, these tests won't run.
 
     See https://mandrill.zendesk.com/hc/en-us/articles/205582447

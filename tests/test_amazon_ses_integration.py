@@ -10,13 +10,13 @@ from anymail.message import AnymailMessage
 from .utils import AnymailTestMixin, sample_image_path
 
 
-AMAZON_SES_TEST_ACCESS_KEY_ID = os.getenv("AMAZON_SES_TEST_ACCESS_KEY_ID")
-AMAZON_SES_TEST_SECRET_ACCESS_KEY = os.getenv("AMAZON_SES_TEST_SECRET_ACCESS_KEY")
-AMAZON_SES_TEST_REGION_NAME = os.getenv("AMAZON_SES_TEST_REGION_NAME", "us-east-1")
+ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID = os.getenv("ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID")
+ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY = os.getenv("ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY")
+ANYMAIL_TEST_AMAZON_SES_REGION_NAME = os.getenv("ANYMAIL_TEST_AMAZON_SES_REGION_NAME", "us-east-1")
 
 
-@unittest.skipUnless(AMAZON_SES_TEST_ACCESS_KEY_ID and AMAZON_SES_TEST_SECRET_ACCESS_KEY,
-                     "Set AMAZON_SES_TEST_ACCESS_KEY_ID and AMAZON_SES_TEST_SECRET_ACCESS_KEY "
+@unittest.skipUnless(ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID and ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY,
+                     "Set ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID and ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY "
                      "environment variables to run Amazon SES integration tests")
 @override_settings(
     EMAIL_BACKEND="anymail.backends.amazon_ses.EmailBackend",
@@ -25,9 +25,9 @@ AMAZON_SES_TEST_REGION_NAME = os.getenv("AMAZON_SES_TEST_REGION_NAME", "us-east-
             # This setting provides Anymail-specific AWS credentials to boto3.client(),
             # overriding any credentials in the environment or boto config. It's often
             # *not* the best approach -- see the Anymail and boto3 docs for other options.
-            "aws_access_key_id": AMAZON_SES_TEST_ACCESS_KEY_ID,
-            "aws_secret_access_key": AMAZON_SES_TEST_SECRET_ACCESS_KEY,
-            "region_name": AMAZON_SES_TEST_REGION_NAME,
+            "aws_access_key_id": ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID,
+            "aws_secret_access_key": ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY,
+            "region_name": ANYMAIL_TEST_AMAZON_SES_REGION_NAME,
             # Can supply any other boto3.client params, including botocore.config.Config as dict
             "config": {"retries": {"max_attempts": 2}},
         },
@@ -38,9 +38,9 @@ class AmazonSESBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Amazon SES API integration tests
 
     These tests run against the **live** Amazon SES API, using the environment
-    variables `AMAZON_SES_TEST_ACCESS_KEY_ID` and `AMAZON_SES_TEST_SECRET_ACCESS_KEY`
+    variables `ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID` and `ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY`
     as AWS credentials. If those variables are not set, these tests won't run.
-    (You can also set the environment variable `AMAZON_SES_TEST_REGION_NAME`
+    (You can also set the environment variable `ANYMAIL_TEST_AMAZON_SES_REGION_NAME`
     to test SES using a region other than the default "us-east-1".)
 
     Amazon SES doesn't offer a test mode -- it tries to send everything you ask.
@@ -142,7 +142,7 @@ class AmazonSESBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         "AMAZON_SES_CLIENT_PARAMS": {
             "aws_access_key_id": "test-invalid-access-key-id",
             "aws_secret_access_key": "test-invalid-secret-access-key",
-            "region_name": AMAZON_SES_TEST_REGION_NAME,
+            "region_name": ANYMAIL_TEST_AMAZON_SES_REGION_NAME,
         }
     })
     def test_invalid_aws_credentials(self):

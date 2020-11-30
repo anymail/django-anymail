@@ -213,6 +213,18 @@ Limitations and quirks
   use only the domain portion and substitute its own encoded mailbox before
   the @.
 
+**Multiple from_email addresses**
+  Prior to November, 2020, SparkPost supporting sending messages with multiple
+  *From* addresses. (This is technically allowed by email specs, but many
+  ISPs bounce such messages.) Anymail v8.1 and earlier will pass multiple
+  ``from_email`` addresses to SparkPost's API.
+
+  SparkPost has since dropped support for more than one from address, and now issues
+  error code 7001 "No sending domain specified". To avoid confusion, Anymail v8.2
+  treats multiple from addresses as an unsupported feature in the SparkPost backend.
+
+  .. versionchanged:: 8.2
+
 
 .. _sparkpost-templates:
 

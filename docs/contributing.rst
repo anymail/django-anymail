@@ -66,7 +66,7 @@ Pull requests are always welcome to fix bugs and improve support for ESP and Dja
 Testing
 -------
 
-Anymail is `tested on Travis CI`_ against several combinations of Django
+Anymail is `tested via GitHub Actions`_ against several combinations of Django
 and Python versions. Tests are run at least once a week, to check whether ESP APIs
 and other dependencies have changed out from under Anymail.
 
@@ -119,8 +119,8 @@ API keys or other settings. For example:
 
     .. code-block:: console
 
-        $ export MAILGUN_TEST_API_KEY='your-Mailgun-API-key'
-        $ export MAILGUN_TEST_DOMAIN='mail.example.com'  # sending domain for that API key
+        $ export ANYMAIL_TEST_MAILGUN_API_KEY='your-Mailgun-API-key'
+        $ export ANYMAIL_TEST_MAILGUN_DOMAIN='mail.example.com'  # sending domain for that API key
         $ tox -e django31-py38-all tests.test_mailgun_integration
 
 Check the ``*_integration_tests.py`` files in the `tests source`_ to see which variables
@@ -132,7 +132,7 @@ for all 20+ supported combinations of Python and Django, sending hundreds of mes
 
 
 .. _pyenv: https://github.com/pyenv/pyenv
-.. _tested on Travis CI: https://travis-ci.org/anymail/django-anymail
+.. _tested via GitHub Actions: https://github.com/anymail/django-anymail/actions?query=workflow:test
 .. _tests source: https://github.com/anymail/django-anymail/blob/main/tests
 .. _.travis.yml: https://github.com/anymail/django-anymail/blob/main/.travis.yml
 

@@ -11,8 +11,8 @@ from .utils import AnymailTestMixin, sample_image_path
 
 # For most integration tests, Postmark's sandboxed "POSTMARK_API_TEST" token is used.
 # But to test template sends, a real Postmark server token and template id are needed:
-POSTMARK_TEST_SERVER_TOKEN = os.getenv('POSTMARK_TEST_SERVER_TOKEN')
-POSTMARK_TEST_TEMPLATE_ID = os.getenv('POSTMARK_TEST_TEMPLATE_ID')
+ANYMAIL_TEST_POSTMARK_SERVER_TOKEN = os.getenv('ANYMAIL_TEST_POSTMARK_SERVER_TOKEN')
+ANYMAIL_TEST_POSTMARK_TEMPLATE_ID = os.getenv('ANYMAIL_TEST_POSTMARK_TEMPLATE_ID')
 
 
 @tag('postmark', 'live')
@@ -88,15 +88,15 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(err.status_code, 422)
         self.assertIn("Invalid 'From' address", str(err))
 
-    @unittest.skipUnless(POSTMARK_TEST_SERVER_TOKEN and POSTMARK_TEST_TEMPLATE_ID,
-                         "Set POSTMARK_TEST_SERVER_TOKEN and POSTMARK_TEST_TEMPLATE_ID "
+    @unittest.skipUnless(ANYMAIL_TEST_POSTMARK_SERVER_TOKEN and ANYMAIL_TEST_POSTMARK_TEMPLATE_ID,
+                         "Set ANYMAIL_TEST_POSTMARK_SERVER_TOKEN and ANYMAIL_TEST_POSTMARK_TEMPLATE_ID "
                          "environment variables to run Postmark template integration tests")
-    @override_settings(ANYMAIL_POSTMARK_SERVER_TOKEN=POSTMARK_TEST_SERVER_TOKEN)
+    @override_settings(ANYMAIL_POSTMARK_SERVER_TOKEN=ANYMAIL_TEST_POSTMARK_SERVER_TOKEN)
     def test_template(self):
         message = AnymailMessage(
             from_email="from@test-pm.anymail.info",
             to=["test+to1@anymail.info", "Second Recipient <test+to2@anymail.info>"],
-            template_id=POSTMARK_TEST_TEMPLATE_ID,
+            template_id=ANYMAIL_TEST_POSTMARK_TEMPLATE_ID,
             merge_data={
                 "test+to1@anymail.info": {"name": "Recipient 1", "order_no": "12345"},
                 "test+to2@anymail.info": {"order_no": "6789"},

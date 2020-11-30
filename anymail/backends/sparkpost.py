@@ -117,10 +117,8 @@ class SparkPostPayload(RequestsPayload):
             "recipients": [],
         }
 
-    def set_from_email_list(self, emails):
-        # SparkPost supports multiple From email addresses,
-        # as a single comma-separated string
-        self.data["content"]["from"] = ", ".join(email.address for email in emails)
+    def set_from_email(self, email):
+        self.data["content"]["from"] = email.address
 
     def set_to(self, emails):
         if emails:

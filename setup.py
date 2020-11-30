@@ -19,7 +19,7 @@ with open(path.join(here, "anymail/_version.py"), encoding='utf-8') as f:
 def long_description_from_readme(rst):
     # Freeze external links (on PyPI) to refer to this X.Y or X.Y.Z tag.
     # (This relies on tagging releases with 'vX.Y' or 'vX.Y.Z' in GitHub.)
-    rst = re.sub(r'(?<=branch=)main'       # Travis build status: branch=main --> branch=vX.Y.Z
+    rst = re.sub(r'(?<=branch[=:])main'    # GitHub Actions build status: branch=main --> branch=vX.Y.Z
                  r'|(?<=/)stable'          # ReadTheDocs links: /stable --> /vX.Y.Z
                  r'|(?<=version=)stable',  # ReadTheDocs badge: version=stable --> version=vX.Y.Z
                  release_tag, rst)  # (?<=...) is "positive lookbehind": must be there, but won't get replaced
