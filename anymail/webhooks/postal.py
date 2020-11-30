@@ -5,8 +5,8 @@ from datetime import datetime
 from django.utils.timezone import utc
 
 from .base import AnymailBaseWebhookView
-from ..exceptions import AnymailInvalidAddress, AnymailWebhookValidationFailure, AnymailImproperlyInstalled, _LazyError
-from ..utils import parse_single_address, get_anymail_setting
+from ..exceptions import AnymailInvalidAddress, AnymailWebhookValidationFailure, AnymailImproperlyInstalled, _LazyError, \
+    AnymailConfigurationError
 from ..inbound import AnymailInboundMessage
 from ..signals import (
     inbound,
@@ -15,6 +15,7 @@ from ..signals import (
     AnymailTrackingEvent,
     EventType,
 )
+from ..utils import parse_single_address, get_anymail_setting
 
 try:
     from cryptography.hazmat.primitives import serialization, hashes
@@ -65,7 +66,7 @@ class PostalBaseWebhookView(AnymailBaseWebhookView):
                 padding.PKCS1v15(),
                 hashes.SHA1()
             )
-        except InvalidSignature:
+        except:
             raise AnymailWebhookValidationFailure(
                 "Postal webhook called with incorrect signature")
 
@@ -159,10 +160,18 @@ class PostalInboundWebhookView(PostalBaseWebhookView):
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
 
+        if 'status' in esp_event:
+            raise AnymailConfigurationError(
+                "You seem to have set Postal's *tracking* webhook "
+                "to Anymail's Postal *inbound* webhook URL.")
+
         raw_mime = esp_event["message"]
         if esp_event.get("base64") is True:
             raw_mime = b64decode(esp_event["message"]).decode("utf-8")
         message = AnymailInboundMessage.parse_raw_mime(raw_mime)
+
+        message.envelope_sender = esp_event.get('mail_from', None)
+        message.envelope_recipient = esp_event.get('rcpt_to', None)
 
         event = AnymailInboundEvent(
             event_type=EventType.INBOUND,
