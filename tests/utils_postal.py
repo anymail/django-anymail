@@ -4,16 +4,14 @@ from django.test import override_settings
 
 from tests.utils import ClientWithCsrfChecks
 
+HAS_CRYPTOGRAPHY = True
 try:
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding
 except ImportError:
-    rsa = None
-    serialization = None
-    hashes = None
-    padding = None
+    HAS_CRYPTOGRAPHY = False
 
 
 def make_key():
@@ -42,7 +40,7 @@ def sign(private_key, message):
     return signature
 
 
-class ClientWithPostalSignature(ClientWithCsrfChecks):
+class _ClientWithPostalSignature(ClientWithCsrfChecks):
     private_key = None
 
     def set_private_key(self, private_key):
@@ -56,5 +54,5 @@ class ClientWithPostalSignature(ClientWithCsrfChecks):
         with override_settings(ANYMAIL={'POSTAL_WEBHOOK_KEY': webhook_key}):
             return super().post(*args, **kwargs)
 
-if not rsa:
-    ClientWithPostalSignature = None
+
+ClientWithPostalSignature = _ClientWithPostalSignature if HAS_CRYPTOGRAPHY else None
