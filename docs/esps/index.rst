@@ -16,6 +16,7 @@ and notes about any quirks or limitations:
    mailgun
    mailjet
    mandrill
+   postal
    postmark
    sendgrid
    sendinblue
@@ -31,34 +32,34 @@ The table below summarizes the Anymail features supported for each ESP.
 
 .. rst-class:: sticky-left
 
-============================================  ============  ===========  ==========  ===========  ==========  ==========  ============  ===========
-Email Service Provider                        |Amazon SES|  |Mailgun|    |Mailjet|   |Mandrill|   |Postmark|  |SendGrid|  |Sendinblue|  |SparkPost|
-============================================  ============  ===========  ==========  ===========  ==========  ==========  ============  ===========
+============================================  ============  ===========  ==========  ===========  ==========  ==========  ==========  ============  ===========
+Email Service Provider                        |Amazon SES|  |Mailgun|    |Mailjet|   |Mandrill|   |Postal|    |Postmark|  |SendGrid|  |Sendinblue|  |SparkPost|
+============================================  ============  ===========  ==========  ===========  ==========  ==========  ==========  ============  ===========
 .. rubric:: :ref:`Anymail send options <anymail-send-options>`
----------------------------------------------------------------------------------------------------------------------------------------------------
-:attr:`~AnymailMessage.envelope_sender`       Yes           Domain only  Yes         Domain only  No          No          No            Yes
-:attr:`~AnymailMessage.metadata`              Yes           Yes          Yes         Yes          Yes         Yes         Yes           Yes
-:attr:`~AnymailMessage.merge_metadata`        No            Yes          Yes         Yes          Yes         Yes         No            Yes
-:attr:`~AnymailMessage.send_at`               No            Yes          No          Yes          No          Yes         No            Yes
-:attr:`~AnymailMessage.tags`                  Yes           Yes          Max 1 tag   Yes          Max 1 tag   Yes         Yes           Max 1 tag
-:attr:`~AnymailMessage.track_clicks`          No            Yes          Yes         Yes          Yes         Yes         No            Yes
-:attr:`~AnymailMessage.track_opens`           No            Yes          Yes         Yes          Yes         Yes         No            Yes
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+:attr:`~AnymailMessage.envelope_sender`       Yes           Domain only  Yes         Domain only  Yes         No          No          No            Yes
+:attr:`~AnymailMessage.metadata`              Yes           Yes          Yes         Yes          No          Yes         Yes         Yes           Yes
+:attr:`~AnymailMessage.merge_metadata`        No            Yes          Yes         Yes          No          Yes         Yes         No            Yes
+:attr:`~AnymailMessage.send_at`               No            Yes          No          Yes          No          No          Yes         No            Yes
+:attr:`~AnymailMessage.tags`                  Yes           Yes          Max 1 tag   Yes          Max 1 tag   Max 1 tag   Yes         Yes           Max 1 tag
+:attr:`~AnymailMessage.track_clicks`          No            Yes          Yes         Yes          No          Yes         Yes         No            Yes
+:attr:`~AnymailMessage.track_opens`           No            Yes          Yes         Yes          No          Yes         No          Yes
 
 .. rubric:: :ref:`templates-and-merge`
----------------------------------------------------------------------------------------------------------------------------------------------------
-:attr:`~AnymailMessage.template_id`           Yes           Yes          Yes         Yes          Yes         Yes         Yes           Yes
-:attr:`~AnymailMessage.merge_data`            Yes           Yes          Yes         Yes          Yes         Yes         No            Yes
-:attr:`~AnymailMessage.merge_global_data`     Yes           (emulated)   Yes         Yes          Yes         Yes         Yes           Yes
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+:attr:`~AnymailMessage.template_id`           Yes           Yes          Yes         Yes          No          Yes         Yes         Yes           Yes
+:attr:`~AnymailMessage.merge_data`            Yes           Yes          Yes         Yes          No          Yes         Yes         No            Yes
+:attr:`~AnymailMessage.merge_global_data`     Yes           (emulated)   Yes         Yes          No          Yes         Yes         Yes           Yes
 
 .. rubric:: :ref:`Status <esp-send-status>` and :ref:`event tracking <event-tracking>`
----------------------------------------------------------------------------------------------------------------------------------------------------
-:attr:`~AnymailMessage.anymail_status`        Yes           Yes          Yes         Yes          Yes         Yes         Yes           Yes
-|AnymailTrackingEvent| from webhooks          Yes           Yes          Yes         Yes          Yes         Yes         Yes           Yes
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+:attr:`~AnymailMessage.anymail_status`        Yes           Yes          Yes         Yes          Yes         Yes         Yes         Yes           Yes
+|AnymailTrackingEvent| from webhooks          Yes           Yes          Yes         Yes          Yes         Yes         Yes         Yes           Yes
 
 .. rubric:: :ref:`Inbound handling <inbound>`
----------------------------------------------------------------------------------------------------------------------------------------------------
-|AnymailInboundEvent| from webhooks           Yes           Yes          Yes         Yes          Yes         Yes         No            Yes
-============================================  ============  ===========  ==========  ===========  ==========  ==========  ============  ===========
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+|AnymailInboundEvent| from webhooks           Yes           Yes          Yes         Yes          Yes         Yes         Yes         No            Yes
+============================================  ============  ===========  ==========  ===========  ==========  ==========  ==========  ============  ===========
 
 
 Trying to choose an ESP? Please **don't** start with this table. It's far more
@@ -70,6 +71,7 @@ meaningless. (And even specific features don't matter if you don't plan to use t
 .. |Mailgun| replace:: :ref:`mailgun-backend`
 .. |Mailjet| replace:: :ref:`mailjet-backend`
 .. |Mandrill| replace:: :ref:`mandrill-backend`
+.. |Postal| replace:: :ref:`postal-backend`
 .. |Postmark| replace:: :ref:`postmark-backend`
 .. |SendGrid| replace:: :ref:`sendgrid-backend`
 .. |Sendinblue| replace:: :ref:`sendinblue-backend`
