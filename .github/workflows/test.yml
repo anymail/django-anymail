@@ -2,6 +2,7 @@ name: test
 
 on:
   push:
+  pull_request:
   schedule:
     # Weekly build (on branch main) every Thursday at 12:00 UTC.
     # (Used to monitor compatibility with ESP APIs and other dependencies.)

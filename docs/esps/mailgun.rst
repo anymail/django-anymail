@@ -471,6 +471,8 @@ The *action* for your route will be either:
    :samp:`forward("https://{random}:{random}@{yoursite.example.com}/anymail/mailgun/inbound/")`
    :samp:`forward("https://{random}:{random}@{yoursite.example.com}/anymail/mailgun/inbound_mime/")`
 
+     * *forward* is required to select Mailgun's "forward" action 
+       (Anymail does not support using the "store" action)
      * *random:random* is an :setting:`ANYMAIL_WEBHOOK_SECRET` shared secret
      * *yoursite.example.com* is your Django site
 
@@ -489,7 +491,7 @@ Anymail will verify Mailgun inbound message events using your
 :setting:`MAILGUN_WEBHOOK_SIGNING_KEY <ANYMAIL_MAILGUN_WEBHOOK_SIGNING_KEY>`
 Anymail setting. By default, Mailgun's webhook signature provides similar security
 to Anymail's shared webhook secret, so it's acceptable to omit the
-:setting:`ANYMAIL_WEBHOOK_SECRET` setting (and "{random}:{random}@" portion of the
+:setting:`ANYMAIL_WEBHOOK_SECRET` setting (and "random:random@" portion of the
 action) with Mailgun inbound routing.
 
 
