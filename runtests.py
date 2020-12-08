@@ -20,7 +20,6 @@ def setup_and_run_tests(test_labels=None):
 
     tags = envlist('ANYMAIL_ONLY_TEST')
     exclude_tags = envlist('ANYMAIL_SKIP_TESTS')
-    print('exclude', exclude_tags)
 
     # In automated testing, don't run live tests unless specifically requested
     if envbool('CONTINUOUS_INTEGRATION') and not envbool('ANYMAIL_RUN_LIVE_TESTS'):
