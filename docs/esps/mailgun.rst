@@ -356,7 +356,7 @@ handlebars templates, and you're only sending to one recipient at a time, here's
       # This works only for a single recipient, and is not at all portable between ESPs.
       message = EmailMessage(
           from_email="shipping@example.com",
-          to=["alice@example.com"]  # single recipient *only* (no batch send)
+          to=["alice@example.com"],  # single recipient *only* (no batch send)
           subject="Your order has shipped",  # recipient variables *not* available
       )
       message.template_id = 'shipping-notification'  # name of template in our account
