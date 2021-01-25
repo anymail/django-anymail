@@ -57,28 +57,25 @@ often help you pinpoint the problem...
 .. _contact:
 .. _support:
 
-Support
--------
+Getting support
+---------------
 
 If you've gone through the troubleshooting above and still aren't sure what's wrong,
-the Anymail community is happy to help. Anymail is supported and maintained by the
-people who use it---like you! (Anymail contributors volunteer their time, and are
-not employees of any ESP.)
+the Anymail community is happy to help.
+
+Anymail is supported and maintained by the people who use it---like you!
+Our contributors volunteer their time (and most are not employees of any ESP).
 
 Here's how to contact the Anymail community:
 
 **"How do I...?"**
 
   If the *Search docs* box on the left doesn't find an answer,
-  ask a `question on Stack Overflow`_ and tag it "django-anymail".
+  ask a question in the GitHub `Anymail discussions`_ forum.
 
 **"I'm getting an error or unexpected behavior..."**
 
-  Either ask a `question on Stack Overflow`_ tagged "django-anymail"
-  or open a `GitHub issue`_. (But please don't raise the same issue
-  in both places.)
-
-  Be sure to include:
+  Ask a question in the GitHub `Anymail discussions`_ forum. Be sure to include:
 
   * which ESP you're using (Mailgun, SendGrid, etc.)
   * what versions of Anymail, Django, and Python you're running
@@ -102,13 +99,13 @@ Here's how to contact the Anymail community:
 
 **"Could Anymail support this ESP or feature...?"**
 
-  If there's already a `GitHub issue`_ open, express your support using GitHub's
-  `thumbs up reaction`_. If not, open a new issue. Either way, be sure to add a comment
-  if you're able to help with development or testing.
+  If the idea has already been suggested in the GitHub `Anymail discussions`_ forum,
+  express your support using GitHub's `thumbs up reaction`_. If not, add the idea
+  as a new discussion topic. And either way, if you'd be able to help with development
+  or testing, please add a comment saying so.
 
 
+.. _Anymail discussions: https://github.com/anymail/django-anymail/discussions
 .. _GitHub issue: https://github.com/anymail/django-anymail/issues
-.. _question on Stack Overflow:
-    https://stackoverflow.com/questions/ask?tags=django-anymail
 .. _thumbs up reaction:
     https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/
