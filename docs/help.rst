@@ -70,7 +70,17 @@ Here's how to contact the Anymail community:
 
 **"How do I...?"**
 
-  If the *Search docs* box on the left doesn't find an answer,
+  .. raw:: html
+
+        <div class="anymail-inline-search-form" role="search">
+          <form class="wy-form" action="../search/" method="get">
+            <input type="search" name="q" placeholder="Search docs">
+            <input type="hidden" name="check_keywords" value="yes">
+            <input type="hidden" name="area" value="default">
+          </form>
+        </div>
+
+  If searching the docs doesn't find an answer,
   ask a question in the GitHub `Anymail discussions`_ forum.
 
 **"I'm getting an error or unexpected behavior..."**

@@ -43,3 +43,16 @@ table.sticky-left th:first-of-type[colspan] > p {
 .rst-content a:visited code.xref {
   color: inherit;
 }
+
+
+/* Inline search forms (Anymail addition) */
+.anymail-inline-search-form {
+  margin-top: -1em;
+  margin-bottom: 1em;
+}
+.anymail-inline-search-form input[type=search] {
+  width: 280px;
+  max-width: 100%;
+  border-radius: 50px;
+  padding: 6px 12px;
+}
