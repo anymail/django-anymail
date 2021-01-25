@@ -3,6 +3,7 @@ name: test
 on:
   push:
   pull_request:
+  workflow_dispatch:
   schedule:
     # Weekly build (on branch main) every Thursday at 12:00 UTC.
     # (Used to monitor compatibility with ESP APIs and other dependencies.)
@@ -10,9 +11,27 @@ on:
 
 
 jobs:
+  skip_duplicate_runs:
+    # Avoid running the tests twice on the same code
+    # (particularly live integration tests that eat up ESP test quota)
+    runs-on: ubuntu-18.04
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        # uses: fkirc/skip-duplicate-actions@v3.3.0
+        uses: fkirc/skip-duplicate-actions@ea548f2a2a08c55dcb111418ca62181f7887e297
+        with:
+          concurrent_skipping: "same_content"
+          skip_after_successful_duplicate: "true"
+          cancel_others: "true"
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+
   test:
     name: ${{ matrix.config.tox }} ${{ matrix.config.options }}
     runs-on: ubuntu-18.04
+    needs: skip_duplicate_runs
+    if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
