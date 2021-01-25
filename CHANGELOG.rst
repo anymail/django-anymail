@@ -42,6 +42,8 @@ Other
 
 * Move CI testing to GitHub Actions (and stop using Travis-CI).
 
+* Internal: catch invalid recipient status earlier in ESP response parsing
+
 
 
 v8.1

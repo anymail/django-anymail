@@ -85,6 +85,14 @@ class AnymailRecipientStatus:
     """Information about an EmailMessage's send status for a single recipient"""
 
     def __init__(self, message_id, status):
+        try:
+            # message_id must be something that can be put in a set
+            # (see AnymailStatus.set_recipient_status)
+            set([message_id])
+        except TypeError:
+            raise TypeError("Invalid message_id %r is not scalar type" % message_id)
+        if status is not None and status not in ANYMAIL_STATUSES:
+            raise ValueError("Invalid status %r" % status)
         self.message_id = message_id  # ESP message id
         self.status = status  # one of ANYMAIL_STATUSES, or None for not yet sent to ESP
 
