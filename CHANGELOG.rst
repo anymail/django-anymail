@@ -50,6 +50,8 @@ Other
 
 * Test against Django 3.2 prerelease (including support for Python 3.9)
 
+* Document how to send AMP for Email with Django, and note which ESPs support it.
+
 * Move CI testing to GitHub Actions (and stop using Travis-CI).
 
 * Internal: catch invalid recipient status earlier in ESP response parsing
