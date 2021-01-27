@@ -301,6 +301,15 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
         with self.assertRaises(AnymailUnsupportedFeature):
             self.message.send()
 
+    def test_amp_html_alternative(self):
+        # Mailgun *does* support text/x-amp-html alongside text/html
+        self.message.attach_alternative("<p>HTML</p>", "text/html")
+        self.message.attach_alternative("<p>And AMP HTML</p>", "text/x-amp-html")
+        self.message.send()
+        data = self.get_api_call_data()
+        self.assertEqual(data["html"], "<p>HTML</p>")
+        self.assertEqual(data["amp-html"], "<p>And AMP HTML</p>")
+
     def test_alternatives_fail_silently(self):
         # Make sure fail_silently is respected
         self.message.attach_alternative("{'not': 'allowed'}", "application/json")

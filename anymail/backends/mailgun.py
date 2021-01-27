@@ -310,6 +310,14 @@ class MailgunPayload(RequestsPayload):
             self.unsupported_feature("multiple html parts")
         self.data["html"] = body
 
+    def add_alternative(self, content, mimetype):
+        if mimetype.lower() == "text/x-amp-html":
+            if "amp-html" in self.data:
+                self.unsupported_feature("multiple html parts")
+            self.data["amp-html"] = content
+        else:
+            super().add_alternative(content, mimetype)
+
     def add_attachment(self, attachment):
         # http://docs.python-requests.org/en/v2.4.3/user/advanced/#post-multiple-multipart-encoded-files
         if attachment.inline:

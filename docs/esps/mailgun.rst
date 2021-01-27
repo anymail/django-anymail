@@ -237,6 +237,13 @@ Limitations and quirks
   Your tracking webhooks will receive metadata values (either that you provided or the
   default empty string) for *every* key used with *any* recipient in the send.
 
+**AMP for Email**
+  Mailgun supports sending AMPHTML email content. To include it, use
+  ``message.attach_alternative("...AMPHTML content...", "text/x-amp-html")``
+  (and be sure to also include regular HTML and/or text bodies, too).
+
+  .. versionadded:: 8.2
+
 
 .. _undocumented API requirement:
     https://mailgun.uservoice.com/forums/156243-feature-requests/suggestions/35668606

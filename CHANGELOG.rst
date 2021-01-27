@@ -30,6 +30,12 @@ vNext
 
 *Unreleased changes*
 
+Features
+~~~~~~~~
+
+* **Mailgun:** Add support for AMP for Email
+  (via ``message.attach_alternative(..., "text/x-amp-html")``).
+
 Fixes
 ~~~~~
 
