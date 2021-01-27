@@ -352,6 +352,15 @@ class MailgunInboundWebhookView(MailgunBaseWebhookView):
                 "You seem to have set Mailgun's *%s tracking* webhook "
                 "to Anymail's Mailgun *inbound* webhook URL." % request.POST['event'])
 
+        if 'attachments' in request.POST:
+            # Inbound route used store() rather than forward().
+            # ("attachments" seems to be the only POST param that differs between
+            # store and forward; Anymail could support store by handling the JSON
+            # attachments param in message_from_mailgun_parsed.)
+            raise AnymailConfigurationError(
+                "You seem to have configured Mailgun's receiving route using the store()"
+                " action. Anymail's inbound webhook requires the forward() action.")
+
         if 'body-mime' in request.POST:
             # Raw-MIME
             message = AnymailInboundMessage.parse_raw_mime(request.POST['body-mime'])

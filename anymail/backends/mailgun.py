@@ -47,6 +47,30 @@ class EmailBackend(AnymailRequestsBackend):
     def build_message_payload(self, message, defaults):
         return MailgunPayload(message, defaults, self)
 
+    def raise_for_status(self, response, payload, message):
+        # Mailgun issues a terse 404 for unrecognized sender domains.
+        # Add some context:
+        if response.status_code == 404 and "Domain not found" in response.text:
+            raise AnymailRequestsAPIError(
+                "Unknown sender domain {sender_domain!r}.\n"
+                "Check the domain is verified with Mailgun, and that the ANYMAIL"
+                " MAILGUN_API_URL setting {api_url!r} is the correct region.".format(
+                    sender_domain=payload.sender_domain, api_url=self.api_url),
+                email_message=message, payload=payload,
+                response=response, backend=self)
+
+        super().raise_for_status(response, payload, message)
+
+        # Mailgun issues a cryptic "Mailgun Magnificent API" success response
+        # for invalid API endpoints. Convert that to a useful error:
+        if response.status_code == 200 and "Mailgun Magnificent API" in response.text:
+            raise AnymailRequestsAPIError(
+                "Invalid Mailgun API endpoint %r.\n"
+                "Check your ANYMAIL MAILGUN_SENDER_DOMAIN"
+                " and MAILGUN_API_URL settings." % response.url,
+                email_message=message, payload=payload,
+                response=response, backend=self)
+
     def parse_recipient_status(self, response, payload, message):
         # The *only* 200 response from Mailgun seems to be:
         #     {

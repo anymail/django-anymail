@@ -667,6 +667,31 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
         self.message.send()
         self.assert_esp_called('/example.com%20%23%20oops/messages')
 
+    def test_unknown_sender_domain(self):
+        self.set_mock_response(raw=b"""{
+            "message": "Domain not found: example.com"
+        }""", status_code=404)
+        with self.assertRaisesMessage(
+            AnymailAPIError,
+            "Unknown sender domain 'example.com'.\n"
+            "Check the domain is verified with Mailgun, and that the ANYMAIL MAILGUN_API_URL"
+            " setting 'https://api.mailgun.net/v3/' is the correct region."
+        ):
+            self.message.send()
+
+    @override_settings(
+        # This is *not* a valid MAILGUN_API_URL setting (it should end at "...v3/"):
+        ANYMAIL_MAILGUN_API_URL='https://api.mailgun.net/v3/example.com/messages')
+    def test_magnificent_api(self):
+        # (Wouldn't a truly "magnificent API" just provide a helpful error message?)
+        self.set_mock_response(raw=b"Mailgun Magnificent API", status_code=200)
+        with self.assertRaisesMessage(
+            AnymailAPIError,
+            "Invalid Mailgun API endpoint 'https://api.mailgun.net/v3/example.com/messages/example.com/messages'.\n"
+            "Check your ANYMAIL MAILGUN_SENDER_DOMAIN and MAILGUN_API_URL settings."
+        ):
+            self.message.send()
+
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
 

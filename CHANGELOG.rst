@@ -40,6 +40,8 @@ Fixes
 Other
 ~~~~~
 
+* **Mailgun:** Improve error messages for some common configuration issues.
+
 * Test against Django 3.2 prerelease (including support for Python 3.9)
 
 * Move CI testing to GitHub Actions (and stop using Travis-CI).

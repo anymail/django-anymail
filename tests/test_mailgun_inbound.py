@@ -196,6 +196,29 @@ class MailgunInboundTestCase(WebhookTestCase):
             self.client.post('/anymail/mailgun/inbound/',
                              data=json.dumps(raw_event), content_type='application/json')
 
+    def test_misconfigured_store_action(self):
+        # store() notification includes "attachments" json; forward() includes "attachment-count"
+        raw_event = mailgun_sign_legacy_payload({
+            'token': '06c96bafc3f42a66b9edd546347a2fe18dc23461fe80dc52f0',
+            'timestamp': '1461261330',
+            'recipient': 'test@inbound.example.com',
+            'sender': 'envelope-from@example.org',
+            'body-plain': 'Test body plain',
+            'body-html': '<div>Test body html</div>',
+            'attachments': json.dumps([{
+                "url": "https://storage.mailgun.net/v3/domains/example.com/messages/MESSAGE_KEY/attachments/0",
+                "content-type": "application/pdf",
+                "name": "attachment.pdf",
+                "size": 20202
+            }]),
+        })
+        with self.assertRaisesMessage(
+            AnymailConfigurationError,
+            "You seem to have configured Mailgun's receiving route using the store() action."
+            " Anymail's inbound webhook requires the forward() action."
+        ):
+            self.client.post('/anymail/mailgun/inbound/', data=raw_event)
+
     def test_misconfigured_tracking_legacy(self):
         raw_event = mailgun_sign_legacy_payload({
             'domain': 'example.com',
