@@ -30,6 +30,17 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = long_description_from_readme(f.read())
 
 
+requirements_dev = [
+    "flake8",
+    "sphinx",
+    "sphinx-rtd-theme",
+    "tox",
+    "twine",
+]
+
+requirements_test = ["mock", "boto3"]
+
+
 setup(
     name="django-anymail",
     version=version,
@@ -56,10 +67,13 @@ setup(
         "sendgrid": [],
         "sendinblue": [],
         "sparkpost": [],
+        # Development/test-only requirements (install with python -m pip -e '.[dev,test]')
+        "dev": requirements_dev,
+        "test": requirements_test,
     },
     include_package_data=True,
     test_suite="runtests.runtests",
-    tests_require=["mock", "boto3"],
+    tests_require=requirements_test,
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Programming Language :: Python",

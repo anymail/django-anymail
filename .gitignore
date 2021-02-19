@@ -10,6 +10,9 @@ dist/
 docs/_build/
 local.py
 
-# Because pipenv is only used to manage a local development
-# environment, it's not helpful to track its lock file
+# Because pipenv was only used to manage a local development
+# environment, it was not helpful to track its lock file
 Pipfile.lock
+
+# Use pyenv-virtualenv to manage a venv for local development
+.python-version
