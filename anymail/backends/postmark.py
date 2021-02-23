@@ -301,6 +301,10 @@ class PostmarkPayload(RequestsPayload):
         except ValueError:
             self.data["TemplateAlias"] = template_id
 
+        # Postmark requires TemplateModel (empty ok) when TemplateId/TemplateAlias
+        # specified. (This may get overwritten by a real TemplateModel later.)
+        self.data.setdefault("TemplateModel", {})
+
         # Subject, TextBody, and HtmlBody aren't allowed with TemplateId;
         # delete Django default subject and body empty strings:
         for field in ("Subject", "TextBody", "HtmlBody"):

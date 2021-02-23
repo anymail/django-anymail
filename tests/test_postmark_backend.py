@@ -373,7 +373,6 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
             # Omit subject and body (Postmark prohibits them with templates)
             from_email='from@example.com', to=['to@example.com'],
             template_id=1234567,
-            # Postmark doesn't support per-recipient merge_data
             merge_global_data={'name': "Alice", 'group': "Developers"},
         )
         message.send()
@@ -396,6 +395,8 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
         self.assert_esp_called('/email/withTemplate/')
         data = self.get_api_call_json()
         self.assertEqual(data['TemplateAlias'], 'welcome-message')
+        # Postmark requires TemplateModel (can be empty) with TemplateId/TemplateAlias
+        self.assertEqual(data['TemplateModel'], {})
 
     _mock_batch_response = json.dumps([{
             "ErrorCode": 0,

@@ -25,6 +25,18 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*unreleased changes*
+
+Fixes
+~~~~~
+
+* **Postmark:** Fix Postmark API error when sending with a template that doesn't
+  require any merge data. (Thanks to `@Tobeyforce`_ for reporting it.)
+
+
 v8.2
 -----
 
@@ -1225,8 +1237,9 @@ Features
 .. _@sebbacon: https://github.com/sebbacon
 .. _@slinkymanbyday: https://github.com/slinkymanbyday
 .. _@swrobel: https://github.com/swrobel
-.. _@Thorbenl: https://github.com/Thorbenl
 .. _@tcourtqtm: https://github.com/tcourtqtm
+.. _@Thorbenl: https://github.com/Thorbenl
+.. _@Tobeyforce: https://github.com/Tobeyforce
 .. _@varche1: https://github.com/varche1
 .. _@vgrebenschikov: https://github.com/vgrebenschikov
 .. _@yourcelf: https://github.com/yourcelf
