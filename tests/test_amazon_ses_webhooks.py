@@ -441,7 +441,7 @@ class AmazonSESSubscriptionManagementTests(WebhookTestCase, AmazonSESWebhookTest
         response = self.post_from_sns('/anymail/amazon_ses/tracking/', self.SNS_SUBSCRIPTION_CONFIRMATION)
         self.assertEqual(response.status_code, 200)
         # auto-confirmed:
-        self.mock_client.assert_called_once_with('sns', config=ANY)
+        self.mock_client.assert_called_once_with('sns', config=ANY, region_name="us-west-2")
         self.mock_client_instance.confirm_subscription.assert_called_once_with(
             TopicArn="arn:aws:sns:us-west-2:123456789012:SES_Notifications",
             Token="EXAMPLE_TOKEN", AuthenticateOnUnsubscribe="true")
@@ -468,6 +468,13 @@ class AmazonSESSubscriptionManagementTests(WebhookTestCase, AmazonSESWebhookTest
         # didn't notify receivers:
         self.assertEqual(self.tracking_handler.call_count, 0)
         self.assertEqual(self.inbound_handler.call_count, 0)
+
+    @override_settings(ANYMAIL_AMAZON_SES_CLIENT_PARAMS={"region_name": "us-east-1"})
+    def test_sns_subscription_confirmation_different_region(self):
+        """Anymail confirms the subscription in the SNS Topic's own region, rather than any default region"""
+        # (The SNS_SUBSCRIPTION_CONFIRMATION above has a TopicArn in region us-west-2)
+        self.post_from_sns('/anymail/amazon_ses/tracking/', self.SNS_SUBSCRIPTION_CONFIRMATION)
+        self.mock_client.assert_called_once_with('sns', config=ANY, region_name="us-west-2")
 
     @override_settings(ANYMAIL={})  # clear WEBHOOK_SECRET setting from base WebhookTestCase
     def test_sns_subscription_confirmation_auth_disabled(self):

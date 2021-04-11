@@ -33,6 +33,11 @@ vNext
 Fixes
 ~~~~~
 
+* **Amazon SES:** Support receiving and tracking mail in non-default (or multiple)
+  AWS regions. Anymail now always confirms an SNS subscription in the region where
+  the SNS topic exists, which may be different from the boto3 default. (Thanks to
+  `@mark-mishyn`_ for reporting this.)
+
 * **Postmark:** Fix two different errors when sending with a template but no merge
   data. (Thanks to `@kareemcoding`_ and `@Tobeyforce`_ for reporting them.)
 
@@ -1230,6 +1235,7 @@ Features
 .. _@kika115: https://github.com/kika115
 .. _@Lekensteyn: https://github.com/Lekensteyn
 .. _@lewistaylor: https://github.com/lewistaylor
+.. _@mark-mishyn: https://github.com/mark-mishyn
 .. _@mbk-ok: https://github.com/mbk-ok
 .. _@mwheels: https://github.com/mwheels
 .. _@nuschk: https://github.com/nuschk
