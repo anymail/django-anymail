@@ -37,7 +37,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { tox: "lint,docs", python: "3.8" }
+          - { tox: "lint", python: "3.8" }
+          - { tox: "docs", python: "3.8" }
 
           # Anymail supports the same Python versions as Django, plus PyPy.
           # https://docs.djangoproject.com/en/dev/faq/install/#what-python-version-can-i-use-with-django
