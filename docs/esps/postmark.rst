@@ -70,7 +70,7 @@ Example:
     .. code-block:: python
 
         message.esp_extra = {
-            'HypotheticalFuturePostmarkParam': '2022',  # merged into send params
+            'MessageStream': 'marketing',  # send using specific message stream ID
             'server_token': '<API server token for just this message>',
         }
 

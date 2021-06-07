@@ -1,4 +1,4 @@
 # (Pygments defaulted "python" to Python 2 before v2.5.0; it doesn't use semver)
-Pygments~=2.6.1
-sphinx~=3.1
-sphinx-rtd-theme~=0.5.0
+Pygments~=2.9.0
+sphinx~=4.0
+sphinx-rtd-theme~=0.5.2

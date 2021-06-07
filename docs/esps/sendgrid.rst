@@ -237,6 +237,15 @@ Limitations and quirks
 
   (Noted June, 2019 and December, 2019)
 
+**Arbitrary alternative parts allowed**
+  SendGrid is one of the few ESPs that *does* support sending arbitrary alternative
+  message parts (beyond just a single text/plain and text/html part).
+
+**AMP for Email**
+  SendGrid supports sending AMPHTML email content. To include it, use
+  ``message.attach_alternative("...AMPHTML content...", "text/x-amp-html")``
+  (and be sure to also include regular HTML and text bodies, too).
+
 **No envelope sender overrides**
   SendGrid does not support overriding :attr:`~anymail.message.AnymailMessage.envelope_sender`
   on individual messages.

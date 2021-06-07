@@ -21,12 +21,22 @@ class RequestsBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
 
     class MockResponse(requests.Response):
         """requests.request return value mock sufficient for testing"""
-        def __init__(self, status_code=200, raw=b"RESPONSE", encoding='utf-8', reason=None):
+        def __init__(self, status_code=200, raw=b"RESPONSE", encoding='utf-8', reason=None, test_case=None):
             super().__init__()
             self.status_code = status_code
             self.encoding = encoding
             self.reason = reason or ("OK" if 200 <= status_code < 300 else "ERROR")
             self.raw = BytesIO(raw)
+            self.test_case = test_case
+
+        @property
+        def url(self):
+            return self.test_case.get_api_call_arg('url', required=False)
+
+        @url.setter
+        def url(self, url):
+            if url is not None:
+                raise ValueError("MockResponse can't handle url assignment")
 
     def setUp(self):
         super().setUp()
@@ -38,7 +48,7 @@ class RequestsBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
     def set_mock_response(self, status_code=DEFAULT_STATUS_CODE, raw=UNSET, encoding='utf-8', reason=None):
         if raw is UNSET:
             raw = self.DEFAULT_RAW_RESPONSE
-        mock_response = self.MockResponse(status_code, raw=raw, encoding=encoding, reason=reason)
+        mock_response = self.MockResponse(status_code, raw=raw, encoding=encoding, reason=reason, test_case=self)
         self.mock_request.return_value = mock_response
         return mock_response
 

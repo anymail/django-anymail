@@ -76,3 +76,11 @@ class AnymailStatusTests(AnymailTestMixin, SimpleTestCase):
         self.assertIsNone(status.status)
         self.assertIsNone(status.message_id)
         self.assertEqual(repr(status), "AnymailStatus<status=None>")
+
+    def test_invalid_message_id(self):
+        with self.assertRaisesMessage(TypeError, "Invalid message_id"):
+            AnymailRecipientStatus(["id-list", "is-not-valid"], "queued")
+
+    def test_invalid_status(self):
+        with self.assertRaisesMessage(ValueError, "Invalid status"):
+            AnymailRecipientStatus("12345", "not-a-known-status")

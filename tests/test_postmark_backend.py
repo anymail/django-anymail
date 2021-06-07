@@ -373,7 +373,6 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
             # Omit subject and body (Postmark prohibits them with templates)
             from_email='from@example.com', to=['to@example.com'],
             template_id=1234567,
-            # Postmark doesn't support per-recipient merge_data
             merge_global_data={'name': "Alice", 'group': "Developers"},
         )
         message.send()
@@ -396,6 +395,21 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
         self.assert_esp_called('/email/withTemplate/')
         data = self.get_api_call_json()
         self.assertEqual(data['TemplateAlias'], 'welcome-message')
+        # Postmark requires TemplateModel (can be empty) with TemplateId/TemplateAlias
+        self.assertEqual(data['TemplateModel'], {})
+
+    def test_template_multiple_recipients(self):
+        # This is a non-batch (no merge_data) template send
+        message = AnymailMessage(
+            from_email='from@example.com',
+            to=['to@example.com', "Also to <to2@example.com>"],
+            template_id=1234567,
+        )
+        message.send()
+        self.assert_esp_called('/email/withTemplate/')
+        data = self.get_api_call_json()
+        self.assertEqual(data['To'], 'to@example.com, Also to <to2@example.com>')
+        self.assertEqual(data['TemplateId'], 1234567)
 
     _mock_batch_response = json.dumps([{
             "ErrorCode": 0,
@@ -463,14 +477,17 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
         )
         message.send()
 
-        self.assert_esp_called('/email/withTemplate/')
+        # because merge_data is set, it's treated as a batch send
+        self.assert_esp_called('/email/batchWithTemplates')
         data = self.get_api_call_json()
 
         self.assertEqual(data, {
-            "From": "from@example.com",
-            "To": "alice@example.com",
-            "TemplateId": 1234567,
-            "TemplateModel": {"name": "Alice", "group": "Developers", "site": "ExampleCo"},
+            'Messages': [{
+                "From": "from@example.com",
+                "To": "alice@example.com",
+                "TemplateId": 1234567,
+                "TemplateModel": {"name": "Alice", "group": "Developers", "site": "ExampleCo"},
+            }]
         })
 
         recipients = message.anymail_status.recipients
@@ -692,6 +709,19 @@ class PostmarkBackendRecipientsRefusedTests(PostmarkBackendMockAPITestCase):
         status = msg.anymail_status
         self.assertEqual(status.recipients['Invalid@LocalHost'].status, 'invalid')
 
+    def test_recipients_parse_error(self):
+        self.set_mock_response(
+            status_code=422,
+            raw=b"""{
+              "ErrorCode": 300,
+              "Message": "Error parsing 'Cc': Illegal email domain '+' in address 'user@+'."
+            }""")
+        msg = mail.EmailMessage('Subject', 'Body', 'from@example.com', cc=["user@+"])
+        with self.assertRaises(AnymailRecipientsRefused):
+            msg.send()
+        status = msg.anymail_status
+        self.assertEqual(status.recipients['user@+'].status, 'invalid')
+
     def test_from_email_invalid(self):
         # Invalid 'From' address generates same Postmark ErrorCode 300 as invalid 'To',
         # but should raise a different Anymail error
@@ -701,6 +731,33 @@ class PostmarkBackendRecipientsRefusedTests(PostmarkBackendMockAPITestCase):
         )
         msg = mail.EmailMessage('Subject', 'Body', 'invalid@localhost', ['to@example.com'])
         with self.assertRaises(AnymailAPIError):
+            msg.send()
+
+    def test_reply_to_invalid(self):
+        # Make sure 'Reply-To' error doesn't get caught in invalid 'To' logic:
+        self.set_mock_response(
+            status_code=422,
+            raw=b"""{
+                "ErrorCode": 300,
+                "Message": "Error parsing 'Reply-To': Illegal email domain '+' in address 'invalid@+'."}
+            """)
+        msg = mail.EmailMessage('Subject', 'Body', 'from@example.com', ['to@example.com'],
+                                reply_to=["invalid@+"])
+        with self.assertRaisesMessage(AnymailAPIError, "Error parsing 'Reply-To'"):
+            msg.send()
+
+    def test_errorcode_300(self):
+        # Various other problems generate same Postmark ErrorCode 300 as invalid 'To',
+        # but should raise ordinary API errors
+        self.set_mock_response(
+            status_code=422,
+            raw=b"""{
+                "ErrorCode": 300,
+                "Message": "Invalid metadata content. Field names are limited to 20 characters..."
+            }""")
+        msg = mail.EmailMessage('Subject', 'Body', 'from@example.com', ['to@example.com'])
+        msg.metadata = {"this-key-name-is-too-long": "data"}
+        with self.assertRaisesMessage(AnymailAPIError, "Invalid metadata content"):
             msg.send()
 
     def test_fail_silently(self):

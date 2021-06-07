@@ -93,6 +93,11 @@ Limitations and quirks
   Amazon SES is one of the few ESPs that *does* support sending arbitrary alternative
   message parts (beyond just a single text/plain and text/html part).
 
+**AMP for Email**
+  Amazon SES supports sending AMPHTML email content. To include it, use
+  ``message.attach_alternative("...AMPHTML content...", "text/x-amp-html")``
+  (and be sure to also include regular HTML and text bodies, too).
+
 **Spoofed To header and multiple From emails allowed**
   Amazon SES is one of the few ESPs that supports spoofing the :mailheader:`To` header
   (see :ref:`message-headers`) and supplying multiple addresses in a message's `from_email`.
@@ -252,7 +257,7 @@ message attributes.
 Amazon's templated email APIs don't support several features available for regular email.
 When :attr:`~anymail.message.AnymailMessage.template_id` is used:
 
-* Attachments are not supported
+* Attachments and alternative parts (including AMPHTML) are not supported
 * Extra headers are not supported
 * Overriding the template's subject or body is not supported
 * Anymail's :attr:`~anymail.message.AnymailMessage.metadata` is not supported

@@ -130,9 +130,20 @@ class AmazonSESBaseWebhookView(AnymailBaseWebhookView):
 
         # WEBHOOK_SECRET *is* set, so the request's basic auth has been verified by now (in run_validators).
         # We're good to confirm...
-        sns_client = boto3.session.Session(**self.session_params).client('sns', **self.client_params)
+        topic_arn = sns_message["TopicArn"]
+        token = sns_message["Token"]
+
+        # Must confirm in TopicArn's own region (which may be different from the default)
+        try:
+            (_arn_tag, _partition, _service, region, _account, _resource) = topic_arn.split(":", maxsplit=6)
+        except (TypeError, ValueError):
+            raise ValueError("Invalid ARN format '{topic_arn!s}'".format(topic_arn=topic_arn))
+        client_params = self.client_params.copy()
+        client_params["region_name"] = region
+
+        sns_client = boto3.session.Session(**self.session_params).client('sns', **client_params)
         sns_client.confirm_subscription(
-            TopicArn=sns_message["TopicArn"], Token=sns_message["Token"], AuthenticateOnUnsubscribe='true')
+            TopicArn=topic_arn, Token=token, AuthenticateOnUnsubscribe='true')
 
 
 class AmazonSESTrackingWebhookView(AmazonSESBaseWebhookView):

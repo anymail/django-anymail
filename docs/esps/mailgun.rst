@@ -4,8 +4,16 @@ Mailgun
 =======
 
 Anymail integrates with the `Mailgun <https://mailgun.com>`_
-transactional email service from Rackspace, using their
-REST API.
+transactional email service, using their `messages REST API`_.
+
+.. note::
+
+    By default, Anymail connects to Mailgun's US-based API servers.
+    If you are using Mailgun's EU region, be sure to change the
+    :setting:`MAILGUN_API_URL <ANYMAIL_MAILGUN_API_URL>` Anymail setting
+    as shown below.
+
+.. _messages REST API: https://documentation.mailgun.com/en/latest/api-sending.html#sending
 
 
 Settings
@@ -41,6 +49,28 @@ root of the settings file if neither ``ANYMAIL["MAILGUN_API_KEY"]``
 nor ``ANYMAIL_MAILGUN_API_KEY`` is set.
 
 
+.. setting:: ANYMAIL_MAILGUN_API_URL
+
+.. rubric:: MAILGUN_API_URL
+
+The base url for calling the Mailgun API.
+
+The default is ``MAILGUN_API_URL = "https://api.mailgun.net/v3"``, which connects
+to Mailgun's US service. You must change this if you are using Mailgun's European
+region:
+
+  .. code-block:: python
+
+      ANYMAIL = {
+        "MAILGUN_API_KEY": "...",
+        "MAILGUN_API_URL": "https://api.eu.mailgun.net/v3",
+        # ...
+      }
+
+(Do not include your sender domain or "/messages" in the API URL. Anymail
+:ref:`figures this out <mailgun-sender-domain>` for you.)
+
+
 .. setting:: ANYMAIL_MAILGUN_SENDER_DOMAIN
 
 .. rubric:: MAILGUN_SENDER_DOMAIN
@@ -74,27 +104,6 @@ Mailgun `API security settings`_:
 If not provided, Anymail will attempt to validate webhooks using the
 :setting:`MAILGUN_API_KEY <ANYMAIL_MAILGUN_API_KEY>` setting instead. (These two keys have
 the same values for new Mailgun users, but will diverge if you ever rotate either key.)
-
-
-.. setting:: ANYMAIL_MAILGUN_API_URL
-
-.. rubric:: MAILGUN_API_URL
-
-The base url for calling the Mailgun API. It does not include
-the sender domain. (Anymail :ref:`figures this out <mailgun-sender-domain>`
-for you.)
-
-The default is ``MAILGUN_API_URL = "https://api.mailgun.net/v3"``, which connects
-to Mailgun's US service. You must override this if you are using Mailgun's European
-region:
-
-  .. code-block:: python
-
-      ANYMAIL = {
-        "MAILGUN_API_KEY": "...",
-        "MAILGUN_API_URL": "https://api.eu.mailgun.net/v3",
-        # ...
-      }
 
 
 .. _API security settings: https://app.mailgun.com/app/account/security/api_keys
@@ -154,10 +163,12 @@ values directly to Mailgun. You can use any of the (non-file) parameters listed 
 
       message = AnymailMessage(...)
       message.esp_extra = {
+          'o:deliverytime-optimize-period': '24h',  # use Mailgun Send Time Optimization
+          'o:time-zone-localize': '16:00',  # use Mailgun Timezone Optimization
           'o:testmode': 'yes',  # use Mailgun's test mode
       }
 
-.. _Mailgun sending docs: https://documentation.mailgun.com/api-sending.html#sending
+.. _Mailgun sending docs: https://documentation.mailgun.com/en/latest/api-sending.html#sending
 
 
 .. _mailgun-quirks:
@@ -225,6 +236,13 @@ Limitations and quirks
 
   Your tracking webhooks will receive metadata values (either that you provided or the
   default empty string) for *every* key used with *any* recipient in the send.
+
+**AMP for Email**
+  Mailgun supports sending AMPHTML email content. To include it, use
+  ``message.attach_alternative("...AMPHTML content...", "text/x-amp-html")``
+  (and be sure to also include regular HTML and/or text bodies, too).
+
+  .. versionadded:: 8.2
 
 
 .. _undocumented API requirement:
@@ -356,7 +374,7 @@ handlebars templates, and you're only sending to one recipient at a time, here's
       # This works only for a single recipient, and is not at all portable between ESPs.
       message = EmailMessage(
           from_email="shipping@example.com",
-          to=["alice@example.com"]  # single recipient *only* (no batch send)
+          to=["alice@example.com"],  # single recipient *only* (no batch send)
           subject="Your order has shipped",  # recipient variables *not* available
       )
       message.template_id = 'shipping-notification'  # name of template in our account
@@ -471,7 +489,7 @@ The *action* for your route will be either:
    :samp:`forward("https://{random}:{random}@{yoursite.example.com}/anymail/mailgun/inbound/")`
    :samp:`forward("https://{random}:{random}@{yoursite.example.com}/anymail/mailgun/inbound_mime/")`
 
-     * *forward* is required to select Mailgun's "forward" action 
+     * *forward* is required to select Mailgun's "forward" action
        (Anymail does not support using the "store" action)
      * *random:random* is an :setting:`ANYMAIL_WEBHOOK_SECRET` shared secret
      * *yoursite.example.com* is your Django site

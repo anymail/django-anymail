@@ -25,10 +25,38 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
-vNext
+v8.3
+----
+
+*2021-05-19*
+
+Fixes
+~~~~~
+
+* **Amazon SES:** Support receiving and tracking mail in non-default (or multiple)
+  AWS regions. Anymail now always confirms an SNS subscription in the region where
+  the SNS topic exists, which may be different from the boto3 default. (Thanks to
+  `@mark-mishyn`_ for reporting this.)
+
+* **Postmark:** Fix two different errors when sending with a template but no merge
+  data. (Thanks to `@kareemcoding`_ and `@Tobeyforce`_ for reporting them.)
+
+* **Postmark:** Fix silent failure when sending with long metadata keys and some
+  other errors Postmark detects at send time. Report invalid 'cc' and 'bcc' addresses
+  detected at send time the same as 'to' recipients. (Thanks to `@chrisgrande`_ for
+  reporting the problem.)
+
+
+v8.2
 -----
 
-*Unreleased changes*
+*2021-01-27*
+
+Features
+~~~~~~~~
+
+* **Mailgun:** Add support for AMP for Email
+  (via ``message.attach_alternative(..., "text/x-amp-html")``).
 
 Fixes
 ~~~~~
@@ -40,7 +68,16 @@ Fixes
 Other
 ~~~~~
 
+* **Mailgun:** Improve error messages for some common configuration issues.
+
+* Test against Django 3.2 prerelease (including support for Python 3.9)
+
+* Document how to send AMP for Email with Django, and note which ESPs support it.
+  (See `docs <https://anymail.readthedocs.io/en/stable/sending/django_email/#amp-email>`__.)
+
 * Move CI testing to GitHub Actions (and stop using Travis-CI).
+
+* Internal: catch invalid recipient status earlier in ESP response parsing
 
 
 
@@ -1190,6 +1227,7 @@ Features
 .. _@alee: https://github.com/alee
 .. _@anstosa: https://github.com/anstosa
 .. _@calvin: https://github.com/calvin
+.. _@chrisgrande: https://github.com/chrisgrande
 .. _@costela: https://github.com/costela
 .. _@decibyte: https://github.com/decibyte
 .. _@dominik-lekse: https://github.com/dominik-lekse
@@ -1199,9 +1237,11 @@ Features
 .. _@janneThoft: https://github.com/janneThoft
 .. _@jc-ee: https://github.com/jc-ee
 .. _@joshkersey: https://github.com/joshkersey
+.. _@kareemcoding: https://github.com/kareemcoding
 .. _@kika115: https://github.com/kika115
 .. _@Lekensteyn: https://github.com/Lekensteyn
 .. _@lewistaylor: https://github.com/lewistaylor
+.. _@mark-mishyn: https://github.com/mark-mishyn
 .. _@mbk-ok: https://github.com/mbk-ok
 .. _@mwheels: https://github.com/mwheels
 .. _@nuschk: https://github.com/nuschk
@@ -1210,8 +1250,9 @@ Features
 .. _@sebbacon: https://github.com/sebbacon
 .. _@slinkymanbyday: https://github.com/slinkymanbyday
 .. _@swrobel: https://github.com/swrobel
-.. _@Thorbenl: https://github.com/Thorbenl
 .. _@tcourtqtm: https://github.com/tcourtqtm
+.. _@Thorbenl: https://github.com/Thorbenl
+.. _@Tobeyforce: https://github.com/Tobeyforce
 .. _@varche1: https://github.com/varche1
 .. _@vgrebenschikov: https://github.com/vgrebenschikov
 .. _@yourcelf: https://github.com/yourcelf

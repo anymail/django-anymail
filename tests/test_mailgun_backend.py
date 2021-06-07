@@ -301,6 +301,15 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
         with self.assertRaises(AnymailUnsupportedFeature):
             self.message.send()
 
+    def test_amp_html_alternative(self):
+        # Mailgun *does* support text/x-amp-html alongside text/html
+        self.message.attach_alternative("<p>HTML</p>", "text/html")
+        self.message.attach_alternative("<p>And AMP HTML</p>", "text/x-amp-html")
+        self.message.send()
+        data = self.get_api_call_data()
+        self.assertEqual(data["html"], "<p>HTML</p>")
+        self.assertEqual(data["amp-html"], "<p>And AMP HTML</p>")
+
     def test_alternatives_fail_silently(self):
         # Make sure fail_silently is respected
         self.message.attach_alternative("{'not': 'allowed'}", "application/json")
@@ -666,6 +675,31 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
         # the problem (but must properly encode the domain in the API URL)
         self.message.send()
         self.assert_esp_called('/example.com%20%23%20oops/messages')
+
+    def test_unknown_sender_domain(self):
+        self.set_mock_response(raw=b"""{
+            "message": "Domain not found: example.com"
+        }""", status_code=404)
+        with self.assertRaisesMessage(
+            AnymailAPIError,
+            "Unknown sender domain 'example.com'.\n"
+            "Check the domain is verified with Mailgun, and that the ANYMAIL MAILGUN_API_URL"
+            " setting 'https://api.mailgun.net/v3/' is the correct region."
+        ):
+            self.message.send()
+
+    @override_settings(
+        # This is *not* a valid MAILGUN_API_URL setting (it should end at "...v3/"):
+        ANYMAIL_MAILGUN_API_URL='https://api.mailgun.net/v3/example.com/messages')
+    def test_magnificent_api(self):
+        # (Wouldn't a truly "magnificent API" just provide a helpful error message?)
+        self.set_mock_response(raw=b"Mailgun Magnificent API", status_code=200)
+        with self.assertRaisesMessage(
+            AnymailAPIError,
+            "Invalid Mailgun API endpoint 'https://api.mailgun.net/v3/example.com/messages/example.com/messages'.\n"
+            "Check your ANYMAIL MAILGUN_SENDER_DOMAIN and MAILGUN_API_URL settings."
+        ):
+            self.message.send()
 
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.

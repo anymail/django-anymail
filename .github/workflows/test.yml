@@ -3,6 +3,7 @@ name: test
 on:
   push:
   pull_request:
+  workflow_dispatch:
   schedule:
     # Weekly build (on branch main) every Thursday at 12:00 UTC.
     # (Used to monitor compatibility with ESP APIs and other dependencies.)
@@ -10,15 +11,34 @@ on:
 
 
 jobs:
+  skip_duplicate_runs:
+    # Avoid running the tests twice on the same code
+    # (particularly live integration tests that eat up ESP test quota)
+    runs-on: ubuntu-18.04
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        # uses: fkirc/skip-duplicate-actions@v3.3.0
+        uses: fkirc/skip-duplicate-actions@ea548f2a2a08c55dcb111418ca62181f7887e297
+        with:
+          concurrent_skipping: "same_content"
+          skip_after_successful_duplicate: "true"
+          cancel_others: "true"
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+
   test:
     name: ${{ matrix.config.tox }} ${{ matrix.config.options }}
     runs-on: ubuntu-18.04
+    needs: skip_duplicate_runs
+    if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         config:
-          - { tox: "lint,docs", python: 3.8 }
+          - { tox: "lint", python: "3.8" }
+          - { tox: "docs", python: "3.8" }
 
           # Anymail supports the same Python versions as Django, plus PyPy.
           # https://docs.djangoproject.com/en/dev/faq/install/#what-python-version-can-i-use-with-django
@@ -27,37 +47,50 @@ jobs:
           # combinations, to avoid rapidly consuming the testing accounts' entire send allotments.
 
           # Django 2.0: Python 3.5+
-          - { tox: django20-py35-all, python: 3.5 }
-          - { tox: django20-py36-all, python: 3.6 }
-          - { tox: django20-pypy3-all, python: pypy3 }
+          - { tox: django20-py35-all, python: "3.5" }
+          - { tox: django20-py36-all, python: "3.6" }
+          - { tox: django20-pypy3-all, python: "pypy3" }
           # Django 2.1: Python 3.5, 3.6, or 3.7
-          - { tox: django21-py35-all, python: 3.5 }
-          - { tox: django21-py36-all, python: 3.6 }
-          - { tox: django21-py37-all, python: 3.7 }
+          - { tox: django21-py35-all, python: "3.5" }
+          - { tox: django21-py36-all, python: "3.6" }
+          - { tox: django21-py37-all, python: "3.7" }
           - { tox: django21-pypy3-all, python: pypy3 }
-          # Django 2.2: Python 3.5, 3.6, or 3.7
-          - { tox: django22-py35-all, python: 3.5 }
-          - { tox: django22-py36-all, python: 3.6 }
-          - { tox: django22-py37-all, python: 3.7 }
-          - { tox: django22-pypy3-all, python: pypy3 }
-          # Django 3.0: Python 3.6, 3.7, or 3.8
-          - { tox: django30-py36-all, python: 3.6 }
-          - { tox: django30-py37-all, python: 3.7 }
-          - { tox: django30-py38-all, python: 3.8 }
-          - { tox: django30-pypy3-all, python: pypy3 }
-          # Django 3.1: Python 3.6, 3.7, or 3.8
-          - { tox: django31-py36-all, python: 3.6 }
-          - { tox: django31-py37-all, python: 3.7 }
-          - { tox: django31-py38-all, python: 3.8, options: run-live-tests }
-          - { tox: django31-pypy3-all, python: pypy3 }
+          # Django 2.2: Python 3.5, 3.6, 3.7, 3.8 (added in 2.2.8), 3.9 (added in 2.2.17)
+          - { tox: django22-py35-all, python: "3.5" }
+          - { tox: django22-py36-all, python: "3.6" }
+          - { tox: django22-py37-all, python: "3.7" }
+          - { tox: django22-py38-all, python: "3.8" }
+          - { tox: django22-py39-all, python: "3.9" }
+          - { tox: django22-pypy3-all, python: "pypy3" }
+          # Django 3.0: Python 3.6, 3.7, 3.8, 3.9 (added in 3.0.11)
+          - { tox: django30-py36-all, python: "3.6" }
+          - { tox: django30-py37-all, python: "3.7" }
+          - { tox: django30-py38-all, python: "3.8" }
+          - { tox: django30-py39-all, python: "3.9" }
+          - { tox: django30-pypy3-all, python: "pypy3" }
+          # Django 3.1: Python 3.6, 3.7, 3.8, 3.9 (added in 3.1.3)
+          - { tox: django31-py36-all, python: "3.6" }
+          - { tox: django31-py37-all, python: "3.7" }
+          - { tox: django31-py38-all, python: "3.8", options: run-live-tests }
+          - { tox: django31-py39-all, python: "3.9" }
+          - { tox: django31-pypy3-all, python: "pypy3" }
+          # Django 3.2: Python 3.6, 3.7, 3.8, 3.9
+          - { tox: django32-py36-all, python: "3.6" }
+          - { tox: django32-py37-all, python: "3.7" }
+          - { tox: django32-py38-all, python: "3.8" }
+          - { tox: django32-py39-all, python: "3.9" }
+          - { tox: django32-pypy3-all, python: "pypy3" }
+          # Django 4.0: Python 3.8, 3.9, 3.10
           # Django current development (direct from GitHub source)
-          - { tox: djangoDev-py37-all, python: 3.7, options: allow-failures }
+          - { tox: djangoDev-py38-all, python: "3.8", options: allow-failures }
+          - { tox: djangoDev-py39-all, python: "3.9", options: allow-failures }
+          - { tox: djangoDev-py310-all, python: "3.10.0-alpha - 3.10", options: allow-failures }
           # Install without optional extras (don't need to cover entire matrix)
-          - { tox: django31-py37-none, python: 3.7 }
-          - { tox: django31-py37-amazon_ses, python: 3.7 }
-          - { tox: django31-py37-postal, python: 3.7 }
+          - { tox: django31-py37-none, python: "3.7" }
+          - { tox: django31-py37-amazon_ses, python: "3.7" }
+          - { tox: django31-py37-postal, python: "3.7" }
           # Test some specific older package versions
-          - { tox: django22-py37-all-old_urllib3, python: 3.7 }
+          - { tox: django22-py37-all-old_urllib3, python: "3.7" }
 
     steps:
       - name: Get code

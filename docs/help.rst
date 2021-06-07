@@ -3,6 +3,74 @@
 Help
 ====
 
+.. _contact:
+.. _support:
+
+Getting support
+---------------
+
+Anymail is supported and maintained by the people who use it---like you!
+Our contributors volunteer their time (and most are not employees of any ESP).
+
+Here's how to contact the Anymail community:
+
+**"How do I...?"**
+
+  .. raw:: html
+
+        <div class="anymail-inline-search-form" role="search">
+          <form class="wy-form" action="../search/" method="get">
+            <input type="search" name="q" placeholder="Search docs">
+            <input type="hidden" name="check_keywords" value="yes">
+            <input type="hidden" name="area" value="default">
+          </form>
+        </div>
+
+  If searching the docs doesn't find an answer,
+  ask a question in the GitHub `Anymail discussions`_ forum.
+
+**"I'm getting an error or unexpected behavior..."**
+
+  First, try the :ref:`troubleshooting tips <troubleshooting>` in the next section.
+  If those don't help, ask a question in the GitHub `Anymail discussions`_ forum.
+  Be sure to include:
+
+  * which ESP you're using (Mailgun, SendGrid, etc.)
+  * what versions of Anymail, Django, and Python you're running
+  * the relevant portions of your code and settings
+  * the text of any error messages
+  * any exception stack traces
+  * the results of your :ref:`troubleshooting <troubleshooting>` (e.g., any relevant
+    info from your ESP's activity log)
+  * if it's something that was working before, when it last worked,
+    and what (if anything) changed since then
+
+  ... plus anything else you think might help someone understand what you're seeing.
+
+**"I found a bug..."**
+
+  Open a `GitHub issue`_. Be sure to include the versions and other information listed above.
+  (And if you know what the problem is, we always welcome
+  :ref:`contributions <contributing>` with a fix!)
+
+**"I found a security issue!"**
+
+  Contact the Anymail maintainers by emailing *security<AT>anymail<DOT>info.*
+  (Please don't open a GitHub issue or post publicly about potential security problems.)
+
+**"Could Anymail support this ESP or feature...?"**
+
+  If the idea has already been suggested in the GitHub `Anymail discussions`_ forum,
+  express your support using GitHub's `thumbs up reaction`_. If not, add the idea
+  as a new discussion topic. And either way, if you'd be able to help with development
+  or testing, please add a comment saying so.
+
+
+.. _Anymail discussions: https://github.com/anymail/django-anymail/discussions
+.. _GitHub issue: https://github.com/anymail/django-anymail/issues
+.. _thumbs up reaction:
+    https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/
+
 
 .. _troubleshooting:
 
@@ -52,63 +120,3 @@ often help you pinpoint the problem...
   :setting:`DEBUG_API_REQUESTS <ANYMAIL_DEBUG_API_REQUESTS>`
   to show the raw HTTP requests and responses from (most) ESP APIs. (This is not
   recommended in production, as it can leak sensitive data into your logs.)
-
-
-.. _contact:
-.. _support:
-
-Support
--------
-
-If you've gone through the troubleshooting above and still aren't sure what's wrong,
-the Anymail community is happy to help. Anymail is supported and maintained by the
-people who use it---like you! (Anymail contributors volunteer their time, and are
-not employees of any ESP.)
-
-Here's how to contact the Anymail community:
-
-**"How do I...?"**
-
-  If the *Search docs* box on the left doesn't find an answer,
-  ask a `question on Stack Overflow`_ and tag it "django-anymail".
-
-**"I'm getting an error or unexpected behavior..."**
-
-  Either ask a `question on Stack Overflow`_ tagged "django-anymail"
-  or open a `GitHub issue`_. (But please don't raise the same issue
-  in both places.)
-
-  Be sure to include:
-
-  * which ESP you're using (Mailgun, SendGrid, etc.)
-  * what versions of Anymail, Django, and Python you're running
-  * the relevant portions of your code and settings
-  * the text of any error messages
-  * any exception stack traces
-
-  and any other info you obtained from :ref:`troubleshooting <troubleshooting>`,
-  such as what you found in your ESP's activity log.
-
-**"I found a bug..."**
-
-  Open a `GitHub issue`_. Be sure to include the information listed above.
-  (And if you know what the problem is, we always welcome
-  :ref:`contributions <contributing>` with a fix!)
-
-**"I found a security issue!"**
-
-  Contact the Anymail maintainers by emailing *security<AT>anymail<DOT>info.*
-  (Please don't open a GitHub issue or post publicly about potential security problems.)
-
-**"Could Anymail support this ESP or feature...?"**
-
-  If there's already a `GitHub issue`_ open, express your support using GitHub's
-  `thumbs up reaction`_. If not, open a new issue. Either way, be sure to add a comment
-  if you're able to help with development or testing.
-
-
-.. _GitHub issue: https://github.com/anymail/django-anymail/issues
-.. _question on Stack Overflow:
-    https://stackoverflow.com/questions/ask?tags=django-anymail
-.. _thumbs up reaction:
-    https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/

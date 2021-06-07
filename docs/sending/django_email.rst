@@ -58,6 +58,34 @@ It's good practice to send equivalent content in your plain-text body
 and the html version.
 
 
+.. _amp-email:
+
+.. rubric:: AMP Email
+
+Django's :class:`~django.core.mail.EmailMultiAlternatives` also supports sending
+`AMP for email`_ content. Attach the AMP alternative with the MIME type
+:mimetype:`text/x-amp-html`. Add the AMPHTML first, before the regular html alternative,
+to keep the parts in the recommended order:
+
+    .. code-block:: python
+        :emphasize-lines: 5-6
+
+        from django.core.mail import EmailMultiAlternatives
+
+        msg = EmailMultiAlternatives("Subject", "text body",
+                                     "from@example.com", ["to@example.com"])
+        msg.attach_alternative("<!doctype html><html amp4email data-css-strict>...",
+                               "text/x-amp-html")
+        msg.attach_alternative("<!doctype html><html>...", "text/html")
+        msg.send()
+
+Not all ESPs allow AMPHTML (check the chart under :ref:`supported-esps`).
+If yours doesn't, trying to send AMP content will raise an
+:ref:`unsupported feature <unsupported-features>` error.
+
+.. _AMP for Email: https://amp.dev/about/email/
+
+
 .. _sending-attachments:
 
 Attachments

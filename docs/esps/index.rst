@@ -43,7 +43,8 @@ Email Service Provider                        |Amazon SES|  |Mailgun|    |Mailje
 :attr:`~AnymailMessage.send_at`               No            Yes          No          Yes          No          No          Yes         No            Yes
 :attr:`~AnymailMessage.tags`                  Yes           Yes          Max 1 tag   Yes          Max 1 tag   Max 1 tag   Yes         Yes           Max 1 tag
 :attr:`~AnymailMessage.track_clicks`          No            Yes          Yes         Yes          No          Yes         Yes         No            Yes
-:attr:`~AnymailMessage.track_opens`           No            Yes          Yes         Yes          No          Yes         No          Yes
+:attr:`~AnymailMessage.track_opens`           No            Yes          Yes         Yes          No          Yes         Yes         No            Yes
+:ref:`amp-email`                              Yes           Yes          No          No           No          No          Yes         No            Yes
 
 .. rubric:: :ref:`templates-and-merge`
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
