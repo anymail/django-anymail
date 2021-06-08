@@ -25,6 +25,17 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes on main branch*
+
+Features
+~~~~~~~~
+
+* **Postal:** New ESP! See `docs <https://anymail.readthedocs.io/en/latest/esps/postal>`__.
+  (Thanks to `@tiltec`_ for researching, implementing, testing and documenting Postal support.)
+
 v8.3
 ----
 
@@ -1252,6 +1263,7 @@ Features
 .. _@swrobel: https://github.com/swrobel
 .. _@tcourtqtm: https://github.com/tcourtqtm
 .. _@Thorbenl: https://github.com/Thorbenl
+.. _@tiltec:  https://github.com/tiltec
 .. _@Tobeyforce: https://github.com/Tobeyforce
 .. _@varche1: https://github.com/varche1
 .. _@vgrebenschikov: https://github.com/vgrebenschikov
