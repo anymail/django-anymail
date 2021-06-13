@@ -1,12 +1,12 @@
 import json
 from datetime import datetime
+from unittest.mock import ANY
 
 import hashlib
 import hmac
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings, tag
 from django.utils.timezone import utc
-from mock import ANY
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent

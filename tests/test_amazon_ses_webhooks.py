@@ -1,10 +1,10 @@
 import json
 import warnings
 from datetime import datetime
+from unittest.mock import ANY, patch
 
 from django.test import SimpleTestCase, override_settings, tag
 from django.utils.timezone import utc
-from mock import ANY, patch
 
 from anymail.exceptions import AnymailConfigurationError, AnymailInsecureWebhookWarning
 from anymail.signals import AnymailTrackingEvent

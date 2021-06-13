@@ -1,7 +1,7 @@
 import base64
+from unittest.mock import create_autospec, ANY
 
 from django.test import override_settings, SimpleTestCase
-from mock import create_autospec, ANY
 
 from anymail.exceptions import AnymailInsecureWebhookWarning
 from anymail.signals import tracking, inbound

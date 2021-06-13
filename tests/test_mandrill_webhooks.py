@@ -3,12 +3,12 @@ import hmac
 import json
 from base64 import b64encode
 from datetime import datetime
+from unittest.mock import ANY
 from urllib.parse import urljoin
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings, tag
 from django.utils.timezone import utc
-from mock import ANY
 
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.mandrill import MandrillCombinedWebhookView, MandrillTrackingWebhookView

@@ -1,9 +1,9 @@
 import json
 from io import BytesIO
 from textwrap import dedent
+from unittest.mock import ANY
 
 from django.test import tag
-from mock import ANY
 
 from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent

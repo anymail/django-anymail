@@ -1,9 +1,9 @@
 import json
 from datetime import datetime
+from unittest.mock import ANY
 
 from django.test import tag
 from django.utils.timezone import utc
-from mock import ANY
 
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.sendinblue import SendinBlueTrackingWebhookView

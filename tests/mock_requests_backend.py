@@ -1,10 +1,10 @@
 import json
 from io import BytesIO
+from unittest.mock import patch
 
 from django.core import mail
 from django.test import SimpleTestCase
 import requests
-from mock import patch
 
 from anymail.exceptions import AnymailAPIError
 

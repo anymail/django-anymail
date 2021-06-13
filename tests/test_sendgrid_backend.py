@@ -4,11 +4,11 @@ from datetime import date, datetime
 from decimal import Decimal
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
+from unittest.mock import patch
 
 from django.core import mail
 from django.test import SimpleTestCase, override_settings, tag
 from django.utils.timezone import get_fixed_timezone, override as override_current_timezone
-from mock import patch
 
 from anymail.exceptions import (AnymailAPIError, AnymailConfigurationError, AnymailSerializationError,
                                 AnymailUnsupportedFeature, AnymailWarning)

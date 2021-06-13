@@ -1,8 +1,8 @@
 import json
 from base64 import b64encode
+from unittest.mock import ANY
 
 from django.test import tag
-from mock import ANY
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage

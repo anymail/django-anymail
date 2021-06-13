@@ -1,11 +1,11 @@
 import json
 from datetime import datetime
 from email.mime.application import MIMEApplication
+from unittest.mock import ANY, patch
 
 from django.core import mail
 from django.core.mail import BadHeaderError
 from django.test import SimpleTestCase, override_settings, tag
-from mock import ANY, patch
 
 from anymail.exceptions import AnymailAPIError, AnymailUnsupportedFeature
 from anymail.inbound import AnymailInboundMessage

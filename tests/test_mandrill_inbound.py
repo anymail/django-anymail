@@ -1,7 +1,7 @@
 from textwrap import dedent
+from unittest.mock import ANY
 
 from django.test import override_settings, tag
-from mock import ANY
 
 from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent

@@ -2,10 +2,10 @@ import json
 from base64 import b64encode
 from datetime import datetime
 from textwrap import dedent
+from unittest.mock import ANY, patch
 
 from django.test import tag
 from django.utils.timezone import utc
-from mock import ANY, patch
 
 from anymail.exceptions import AnymailAPIError, AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage

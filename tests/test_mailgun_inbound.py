@@ -2,10 +2,10 @@ import json
 from datetime import datetime
 from io import BytesIO
 from textwrap import dedent
+from unittest.mock import ANY
 
 from django.test import override_settings, tag
 from django.utils.timezone import utc
-from mock import ANY
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage

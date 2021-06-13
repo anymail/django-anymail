@@ -1,9 +1,9 @@
 import json
 from datetime import datetime
+from unittest.mock import ANY
 
 from django.test import tag
 from django.utils.timezone import get_fixed_timezone, utc
-from mock import ANY
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent

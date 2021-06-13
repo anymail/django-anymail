@@ -2,9 +2,9 @@ import json
 import unittest
 from base64 import b64encode
 from textwrap import dedent
+from unittest.mock import ANY
 
 from django.test import tag
-from mock import ANY
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage

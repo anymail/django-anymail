@@ -1,6 +1,7 @@
+from unittest.mock import patch
+
 from django.core.mail import EmailMultiAlternatives
 from django.test import SimpleTestCase
-from mock import patch
 
 from anymail.message import AnymailRecipientStatus, AnymailStatus, attach_inline_image
 
