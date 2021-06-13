@@ -36,6 +36,7 @@ requirements_dev = [
     "sphinx-rtd-theme",
     "tox",
     "twine",
+    "wheel",
 ]
 
 requirements_test = ["mock", "boto3", "cryptography"]
