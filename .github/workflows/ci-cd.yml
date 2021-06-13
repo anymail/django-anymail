@@ -1,26 +1,26 @@
-name: test
+name: ci-cd
 
 on:
   push:
   pull_request:
   workflow_dispatch:
   schedule:
-    # Weekly build (on branch main) every Thursday at 12:00 UTC.
+    # Weekly test (on branch main) every Thursday at 12:00 UTC.
     # (Used to monitor compatibility with ESP APIs and other dependencies.)
     - cron: '0 12 * * 4'
 
 
 jobs:
   skip_duplicate_runs:
-    # Avoid running the tests twice on the same code
-    # (particularly live integration tests that eat up ESP test quota)
-    runs-on: ubuntu-18.04
+    # Avoid running the live integration tests twice on the same code
+    # (to conserve limited sending quotas in the live ESP test accounts)
+    runs-on: ubuntu-20.04
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
       - id: skip_check
-        # uses: fkirc/skip-duplicate-actions@v3.3.0
-        uses: fkirc/skip-duplicate-actions@ea548f2a2a08c55dcb111418ca62181f7887e297
+        # uses: fkirc/skip-duplicate-actions@v3.4.0
+        uses: fkirc/skip-duplicate-actions@4c656bbdb6906310fa6213604828008bc28fe55d
         with:
           concurrent_skipping: "same_content"
           skip_after_successful_duplicate: "true"
@@ -29,9 +29,8 @@ jobs:
 
   test:
     name: ${{ matrix.config.tox }} ${{ matrix.config.options }}
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: skip_duplicate_runs
-    if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -105,7 +104,7 @@ jobs:
         # for installing/running tox
         uses: actions/setup-python@v2
         with:
-          python-version: 3.8
+          python-version: 3.9
       - name: Install tox
         run: |
           set -x
@@ -114,13 +113,16 @@ jobs:
           tox --version
       - name: Test ${{ matrix.config.tox }}
         run: |
-          tox --version
           tox -e ${{ matrix.config.tox }}
         continue-on-error: ${{ contains( matrix.config.options, 'allow-failures' ) }}
         env:
           CONTINUOUS_INTEGRATION: true
           TOX_FORCE_IGNORE_OUTCOME: false
-          ANYMAIL_RUN_LIVE_TESTS: ${{ contains( matrix.config.options, 'run-live-tests' ) }}
+          ANYMAIL_RUN_LIVE_TESTS: >-
+            ${{
+            contains( matrix.config.options, 'run-live-tests' )
+            && needs.skip_duplicate_runs.outputs.should_skip != 'true'
+            }}
           ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID: ${{ secrets.ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID }}
           ANYMAIL_TEST_AMAZON_SES_REGION_NAME: ${{ secrets.ANYMAIL_TEST_AMAZON_SES_REGION_NAME }}
           ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY: ${{ secrets.ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY }}
@@ -135,3 +137,79 @@ jobs:
           ANYMAIL_TEST_SENDGRID_TEMPLATE_ID: ${{ secrets.ANYMAIL_TEST_SENDGRID_TEMPLATE_ID }}
           ANYMAIL_TEST_SENDINBLUE_API_KEY: ${{ secrets.ANYMAIL_TEST_SENDINBLUE_API_KEY }}
           ANYMAIL_TEST_SPARKPOST_API_KEY: ${{ secrets.ANYMAIL_TEST_SPARKPOST_API_KEY }}
+
+  identify_tag:
+    # If the (exact) ref on which this workflow is running is tagged,
+    # set outputs.tag to the tag; otherwise set it to an empty string
+    runs-on: ubuntu-20.04
+    outputs:
+      tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Get code
+        uses: actions/checkout@v2
+      - name: Identify git tag
+        id: get_tag
+        run: |
+          TAG=$(git describe --tags --exact-match "$GITHUB_REF" 2>/dev/null || echo "")
+          echo "::set-output name=tag::$TAG"
+          echo "github ref: $GITHUB_REF"
+          echo "tag: ${TAG:-(no tag)}"
+
+  release:
+    # Release on push or manual trigger of ref that is a v* tag
+    runs-on: ubuntu-20.04
+    needs:
+      - identify_tag
+      - test
+    if: >-
+      startsWith(needs.identify_tag.outputs.tag, 'v')
+      && (github.event_name == 'push'
+          || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Get code
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - name: Check package version
+        id: version
+        env:
+          TAG: ${{ needs.identify_tag.outputs.tag }}
+        run: |
+          VERSION="v$(python setup.py --version)"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "::error ::package version '$VERSION' does not match git tag '$TAG'"
+            exit 1
+          fi
+          echo "::set-output name=version::$VERSION"
+          echo "::set-output name=anchor::${VERSION//[^[:alnum:]]/-}"
+      - name: Install build requirements
+        run: |
+          pip install twine wheel
+      - name: Build
+        run: |
+          rm -rf build dist django_anymail.egg-info
+          python setup.py sdist bdist_wheel
+          twine check dist/*
+      - name: Publish package to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          twine upload dist/*
+      - name: Publish release to GitHub
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.version }}
+          TITLE: ${{ steps.version.outputs.version }}
+          NOTES: |
+            [Changelog](https://anymail.readthedocs.io/en/stable/changelog/#${{ steps.version.outputs.anchor }})
+        run: |
+          # gh release create-or-edit "$TAG" --title "$TITLE" --notes "$NOTES" ./dist/*
+          # (gh release doesn't support edit - 6/2021)
+          # (hub requires separate --attach=FILE arg for each file)
+          FILES=(./dist/*)
+          if ! hub release edit --message "$TITLE" --message "$NOTES" "${FILES[@]/#/--attach=}" "$TAG"; then
+            hub release create --message "$TITLE" --message "$NOTES" "${FILES[@]/#/--attach=}" "$TAG"
+          fi
