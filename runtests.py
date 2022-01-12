@@ -5,7 +5,6 @@
 # runtests.py [tests.test_x tests.test_y.SomeTestCase ...]
 
 import sys
-from distutils.util import strtobool
 
 import django
 import os
@@ -51,14 +50,19 @@ def runtests(test_labels=None):
 def envbool(var, default=False):
     """Returns value of environment variable var as a bool, or default if not set/empty.
 
-    Converts `'true'` to `True`, and `'false'` to `False`.
-    See :func:`~distutils.util.strtobool` for full list of allowable values.
+    Converts `'true'` and similar string representations to `True`,
+    and `'false'` and similar string representations to `False`.
     """
-    val = os.getenv(var, '')
+    # Adapted from the old :func:`~distutils.util.strtobool`
+    val = os.getenv(var, '').strip().lower()
     if val == '':
         return default
+    elif val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return True
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return False
     else:
-        return strtobool(val)
+        raise ValueError("invalid boolean value env[%r]=%r" % (var, val))
 
 
 def envlist(var):
@@ -66,7 +70,7 @@ def envlist(var):
 
     Returns an empty list if variable is empty or not set.
     """
-    val = os.getenv(var, "").split(',')
+    val = [item.strip() for item in os.getenv(var, '').split(',')]
     if val == ['']:
         # "Splitting an empty string with a specified separator returns ['']"
         val = []
