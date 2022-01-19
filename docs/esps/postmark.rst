@@ -116,6 +116,28 @@ see :ref:`unsupported-features`.
 .. _several link-tracking options:
    https://postmarkapp.com/developer/user-guide/tracking-links#enabling-link-tracking
 
+**Open-tracking**
+  To control :attr:`~anymail.message.AnymailMessage.track_opens` on individual messages,
+  you must *disable* Postmark's server-level default and then set ``track_opens = True``
+  on all messages that should have open tracking. (A message-level ``track_opens = False``
+  `cannot override open tracking`_ if enabled in Postmark's server defaults.)
+
+  If most of your messages should be sent with open tracking, you can use Anymail's
+  :ref:`global send defaults <send-defaults>` (rather than Postmark's server-level setting):
+
+  .. code-block:: python
+
+    # settings.py
+    ANYMAIL = {
+        # ...
+        "SEND_DEFAULTS": { "track_opens": True },
+    }
+
+  Individual messages *can* then use ``track_opens = False`` to override Anymail's default.
+
+.. _cannot override open tracking:
+   https://postmarkapp.com/developer/user-guide/tracking-opens/tracking-opens-per-email
+
 **No envelope sender overrides**
   Postmark does not support overriding :attr:`~anymail.message.AnymailMessage.envelope_sender`
   on individual messages. (You can configure custom return paths for each sending domain in

@@ -49,6 +49,10 @@ Fixes
 Other
 ~~~~~
 
+* **Postmark:** Document limitation on `track_opens` overriding Postmark's
+  server-level setting. (See
+  `docs <https://anymail.readthedocs.io/en/latest/esps/postmark/#limitations-and-quirks>`__.)
+
 * In Anymail's test EmailBackend, add `is_batch_send` boolean to `anymail_test_params`
   to help tests check whether a sent message would fall under Anymail's batch-send logic.
 
