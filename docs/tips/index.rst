@@ -11,5 +11,5 @@ done with Anymail:
    multiple_backends
    django_templates
    securing_webhooks
-   test_backend
+   testing
    performance

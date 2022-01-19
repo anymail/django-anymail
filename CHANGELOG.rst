@@ -53,6 +53,9 @@ Other
   server-level setting. (See
   `docs <https://anymail.readthedocs.io/en/latest/esps/postmark/#limitations-and-quirks>`__.)
 
+* Expand `testing documentation <https://anymail.readthedocs.io/en/latest/tips/testing/>`__
+  to cover tracking events and inbound handling, and to clarify test EmailBackend behavior.
+
 * In Anymail's test EmailBackend, add `is_batch_send` boolean to `anymail_test_params`
   to help tests check whether a sent message would fall under Anymail's batch-send logic.
 
