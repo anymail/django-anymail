@@ -13,6 +13,7 @@ from .utils import AnymailTestMixin, sample_image_path
 # But to test template sends, a real Postmark server token and template id are needed:
 ANYMAIL_TEST_POSTMARK_SERVER_TOKEN = os.getenv('ANYMAIL_TEST_POSTMARK_SERVER_TOKEN')
 ANYMAIL_TEST_POSTMARK_TEMPLATE_ID = os.getenv('ANYMAIL_TEST_POSTMARK_TEMPLATE_ID')
+ANYMAIL_TEST_POSTMARK_DOMAIN = os.getenv('ANYMAIL_TEST_POSTMARK_DOMAIN')
 
 
 @tag('postmark', 'live')
@@ -28,7 +29,7 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     def setUp(self):
         super().setUp()
         self.message = AnymailMessage('Anymail Postmark integration test', 'Text content',
-                                      'from@example.com', ['test+to1@anymail.info'])
+                                      'from@example.com', ['test+to1@anymail.dev'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -37,8 +38,8 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(sent_count, 1)
 
         anymail_status = self.message.anymail_status
-        sent_status = anymail_status.recipients['test+to1@anymail.info'].status
-        message_id = anymail_status.recipients['test+to1@anymail.info'].message_id
+        sent_status = anymail_status.recipients['test+to1@anymail.dev'].status
+        message_id = anymail_status.recipients['test+to1@anymail.dev'].message_id
 
         self.assertEqual(sent_status, 'sent')
         self.assertGreater(len(message_id), 0)  # non-empty string
@@ -51,9 +52,9 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             body="This is the text body",
             # Postmark accepts multiple from_email addresses, but truncates to the first on their end
             from_email="Test From <from@example.com>, also-from@example.com",
-            to=["test+to1@anymail.info", "Recipient 2 <test+to2@anymail.info>"],
-            cc=["test+cc1@anymail.info", "Copy 2 <test+cc2@anymail.info>"],
-            bcc=["test+bcc1@anymail.info", "Blind Copy 2 <test+bcc2@anymail.info>"],
+            to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
+            cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
+            bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
             reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
             headers={"X-Anymail-Test": "value"},
 
@@ -74,11 +75,11 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
         message.send()
         self.assertEqual(message.anymail_status.status, {'sent'})
-        self.assertEqual(message.anymail_status.recipients['test+to1@anymail.info'].status, 'sent')
-        self.assertEqual(message.anymail_status.recipients['test+to2@anymail.info'].status, 'sent')
+        self.assertEqual(message.anymail_status.recipients['test+to1@anymail.dev'].status, 'sent')
+        self.assertEqual(message.anymail_status.recipients['test+to2@anymail.dev'].status, 'sent')
         # distinct messages should have different message_ids:
-        self.assertNotEqual(message.anymail_status.recipients['test+to1@anymail.info'].message_id,
-                            message.anymail_status.recipients['test+to2@anymail.info'].message_id)
+        self.assertNotEqual(message.anymail_status.recipients['test+to1@anymail.dev'].message_id,
+                            message.anymail_status.recipients['test+to2@anymail.dev'].message_id)
 
     def test_invalid_from(self):
         self.message.from_email = 'webmaster@localhost'  # Django's default From
@@ -88,18 +89,21 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(err.status_code, 422)
         self.assertIn("Invalid 'From' address", str(err))
 
-    @unittest.skipUnless(ANYMAIL_TEST_POSTMARK_SERVER_TOKEN and ANYMAIL_TEST_POSTMARK_TEMPLATE_ID,
-                         "Set ANYMAIL_TEST_POSTMARK_SERVER_TOKEN and ANYMAIL_TEST_POSTMARK_TEMPLATE_ID "
-                         "environment variables to run Postmark template integration tests")
+    @unittest.skipUnless(
+        ANYMAIL_TEST_POSTMARK_SERVER_TOKEN
+        and ANYMAIL_TEST_POSTMARK_TEMPLATE_ID
+        and ANYMAIL_TEST_POSTMARK_DOMAIN,
+        "Set ANYMAIL_TEST_POSTMARK_SERVER_TOKEN and ANYMAIL_TEST_POSTMARK_TEMPLATE_ID "
+        "and ANYMAIL_TEST_POSTMARK_DOMAIN environment variables to run Postmark template integration tests")
     @override_settings(ANYMAIL_POSTMARK_SERVER_TOKEN=ANYMAIL_TEST_POSTMARK_SERVER_TOKEN)
     def test_template(self):
         message = AnymailMessage(
-            from_email="from@test-pm.anymail.info",
-            to=["test+to1@anymail.info", "Second Recipient <test+to2@anymail.info>"],
+            from_email="from@%s" % ANYMAIL_TEST_POSTMARK_DOMAIN,
+            to=["test+to1@anymail.dev", "Second Recipient <test+to2@anymail.dev>"],
             template_id=ANYMAIL_TEST_POSTMARK_TEMPLATE_ID,
             merge_data={
-                "test+to1@anymail.info": {"name": "Recipient 1", "order_no": "12345"},
-                "test+to2@anymail.info": {"order_no": "6789"},
+                "test+to1@anymail.dev": {"name": "Recipient 1", "order_no": "12345"},
+                "test+to2@anymail.dev": {"order_no": "6789"},
             },
             merge_global_data={"name": "Valued Customer"},
         )
