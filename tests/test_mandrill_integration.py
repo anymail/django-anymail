@@ -1,5 +1,6 @@
 import os
 import unittest
+from email.utils import formataddr
 
 from django.core import mail
 from django.test import SimpleTestCase, override_settings, tag
@@ -10,11 +11,13 @@ from anymail.message import AnymailMessage
 from .utils import AnymailTestMixin, sample_image_path
 
 ANYMAIL_TEST_MANDRILL_API_KEY = os.getenv('ANYMAIL_TEST_MANDRILL_API_KEY')
+ANYMAIL_TEST_MANDRILL_DOMAIN = os.getenv('ANYMAIL_TEST_MANDRILL_DOMAIN')
 
 
 @tag('mandrill', 'live')
-@unittest.skipUnless(ANYMAIL_TEST_MANDRILL_API_KEY,
-                     "Set ANYMAIL_TEST_MANDRILL_API_KEY environment variable to run integration tests")
+@unittest.skipUnless(ANYMAIL_TEST_MANDRILL_API_KEY and ANYMAIL_TEST_MANDRILL_DOMAIN,
+                     "Set ANYMAIL_TEST_MANDRILL_API_KEY and ANYMAIL_TEST_MANDRILL_DOMAIN "
+                     "environment variables to run integration tests")
 @override_settings(MANDRILL_API_KEY=ANYMAIL_TEST_MANDRILL_API_KEY,
                    EMAIL_BACKEND="anymail.backends.mandrill.EmailBackend")
 class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
@@ -26,13 +29,13 @@ class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     See https://mandrill.zendesk.com/hc/en-us/articles/205582447
     for info on Mandrill test keys.
-
     """
 
     def setUp(self):
         super().setUp()
+        self.from_email = 'from@%s' % ANYMAIL_TEST_MANDRILL_DOMAIN
         self.message = mail.EmailMultiAlternatives('Anymail Mandrill integration test', 'Text content',
-                                                   'from@example.com', ['test+to1@anymail.dev'])
+                                                   self.from_email, ['test+to1@anymail.dev'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -55,7 +58,7 @@ class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail Mandrill all-options integration test",
             body="This is the text body",
-            from_email="Test From <from@example.com>",
+            from_email=formataddr(("Test From, with comma", self.from_email)),
             to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
             cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
             bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],

@@ -1,5 +1,6 @@
 import os
 import unittest
+from email.utils import formataddr
 
 from django.test import SimpleTestCase, override_settings, tag
 
@@ -11,12 +12,14 @@ from .utils import AnymailTestMixin
 
 ANYMAIL_TEST_POSTAL_API_KEY = os.getenv('ANYMAIL_TEST_POSTAL_API_KEY')
 ANYMAIL_TEST_POSTAL_API_URL = os.getenv('ANYMAIL_TEST_POSTAL_API_URL')
+ANYMAIL_TEST_POSTAL_DOMAIN = os.getenv('ANYMAIL_TEST_POSTAL_DOMAIN')
 
 
 @tag('postal', 'live')
-@unittest.skipUnless(ANYMAIL_TEST_POSTAL_API_KEY and ANYMAIL_TEST_POSTAL_API_URL,
-                     "Set ANYMAIL_TEST_POSTAL_API_KEY and ANYMAIL_TEST_POSTAL_API_URL "
-                     "environment variables to run Postal integration tests")
+@unittest.skipUnless(
+    ANYMAIL_TEST_POSTAL_API_KEY and ANYMAIL_TEST_POSTAL_API_URL and ANYMAIL_TEST_POSTAL_DOMAIN,
+    "Set ANYMAIL_TEST_POSTAL_API_KEY and ANYMAIL_TEST_POSTAL_API_URL and ANYMAIL_TEST_POSTAL_DOMAIN "
+    "environment variables to run Postal integration tests")
 @override_settings(ANYMAIL_POSTAL_API_KEY=ANYMAIL_TEST_POSTAL_API_KEY,
                    ANYMAIL_POSTAL_API_URL=ANYMAIL_TEST_POSTAL_API_URL,
                    EMAIL_BACKEND="anymail.backends.postal.EmailBackend")
@@ -31,8 +34,9 @@ class PostalBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     def setUp(self):
         super().setUp()
+        self.from_email = 'from@%s' % ANYMAIL_TEST_POSTAL_DOMAIN
         self.message = AnymailMessage('Anymail Postal integration test', 'Text content',
-                                      'from@example.com', ['test+to1@anymail.dev'])
+                                      self.from_email, ['test+to1@anymail.dev'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -53,8 +57,8 @@ class PostalBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail Postal all-options integration test",
             body="This is the text body",
-            from_email="Test From <from@example.com>",
-            envelope_sender="bounces@example.com",
+            from_email=formataddr(("Test From, with comma", self.from_email)),
+            envelope_sender="bounces@%s" % ANYMAIL_TEST_POSTAL_DOMAIN,
             to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
             cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
             bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],

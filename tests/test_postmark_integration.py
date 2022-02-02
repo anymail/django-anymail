@@ -1,5 +1,6 @@
 import os
 import unittest
+from email.utils import formataddr
 
 from django.test import SimpleTestCase, override_settings, tag
 
@@ -28,8 +29,9 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     def setUp(self):
         super().setUp()
+        self.from_email = 'from@%s' % ANYMAIL_TEST_POSTMARK_DOMAIN
         self.message = AnymailMessage('Anymail Postmark integration test', 'Text content',
-                                      'from@example.com', ['test+to1@anymail.dev'])
+                                      self.from_email, ['test+to1@anymail.dev'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -50,8 +52,7 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail Postmark all-options integration test",
             body="This is the text body",
-            # Postmark accepts multiple from_email addresses, but truncates to the first on their end
-            from_email="Test From <from@example.com>, also-from@example.com",
+            from_email=formataddr(("Test From, with comma", self.from_email)),
             to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
             cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
             bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
@@ -98,7 +99,7 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     @override_settings(ANYMAIL_POSTMARK_SERVER_TOKEN=ANYMAIL_TEST_POSTMARK_SERVER_TOKEN)
     def test_template(self):
         message = AnymailMessage(
-            from_email="from@%s" % ANYMAIL_TEST_POSTMARK_DOMAIN,
+            from_email=self.from_email,
             to=["test+to1@anymail.dev", "Second Recipient <test+to2@anymail.dev>"],
             template_id=ANYMAIL_TEST_POSTMARK_TEMPLATE_ID,
             merge_data={

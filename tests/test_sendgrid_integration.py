@@ -1,6 +1,7 @@
 import os
 import unittest
 from datetime import datetime, timedelta
+from email.utils import formataddr
 
 from django.test import SimpleTestCase, override_settings, tag
 
@@ -11,12 +12,13 @@ from .utils import AnymailTestMixin, sample_image_path
 
 ANYMAIL_TEST_SENDGRID_API_KEY = os.getenv('ANYMAIL_TEST_SENDGRID_API_KEY')
 ANYMAIL_TEST_SENDGRID_TEMPLATE_ID = os.getenv('ANYMAIL_TEST_SENDGRID_TEMPLATE_ID')
+ANYMAIL_TEST_SENDGRID_DOMAIN = os.getenv('ANYMAIL_TEST_SENDGRID_DOMAIN')
 
 
 @tag('sendgrid', 'live')
-@unittest.skipUnless(ANYMAIL_TEST_SENDGRID_API_KEY,
-                     "Set ANYMAIL_TEST_SENDGRID_API_KEY environment variable "
-                     "to run SendGrid integration tests")
+@unittest.skipUnless(ANYMAIL_TEST_SENDGRID_API_KEY and ANYMAIL_TEST_SENDGRID_DOMAIN,
+                     "Set ANYMAIL_TEST_SENDGRID_API_KEY and ANYMAIL_TEST_SENDGRID_DOMAIN "
+                     "environment variables to run SendGrid integration tests")
 @override_settings(ANYMAIL_SENDGRID_API_KEY=ANYMAIL_TEST_SENDGRID_API_KEY,
                    ANYMAIL_SENDGRID_SEND_DEFAULTS={"esp_extra": {
                        "mail_settings": {"sandbox_mode": {"enable": True}},
@@ -34,13 +36,13 @@ class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     The tests also use SendGrid's "sink domain" @sink.sendgrid.net for recipient addresses.
     https://support.sendgrid.com/hc/en-us/articles/201995663-Safely-Test-Your-Sending-Speed
-
     """
 
     def setUp(self):
         super().setUp()
+        self.from_email = 'from@%s' % ANYMAIL_TEST_SENDGRID_DOMAIN
         self.message = AnymailMessage('Anymail SendGrid integration test', 'Text content',
-                                      'from@example.com', ['to@sink.sendgrid.net'])
+                                      self.from_email, ['to@sink.sendgrid.net'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -62,7 +64,7 @@ class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail all-options integration test",
             body="This is the text body",
-            from_email='"Test From, with comma" <from@example.com>',
+            from_email=formataddr(("Test From, with comma", self.from_email)),
             to=["to1@sink.sendgrid.net", '"Recipient 2, OK?" <to2@sink.sendgrid.net>'],
             cc=["cc1@sink.sendgrid.net", "Copy 2 <cc2@sink.sendgrid.net>"],
             bcc=["bcc1@sink.sendgrid.net", "Blind Copy 2 <bcc2@sink.sendgrid.net>"],
@@ -91,7 +93,7 @@ class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail merge_data test: %field%",
             body="This body includes merge data: %field%",
-            from_email="Test From <from@example.com>",
+            from_email=formataddr(("Test From", self.from_email)),
             to=["to1@sink.sendgrid.net", "Recipient 2 <to2@sink.sendgrid.net>"],
             reply_to=['"Merge data in reply name: %field%" <reply@example.com>'],
             merge_data={
@@ -112,7 +114,7 @@ class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
                          "to a template in your SendGrid account to test stored templates")
     def test_stored_template(self):
         message = AnymailMessage(
-            from_email="Test From <from@example.com>",
+            from_email=formataddr(("Test From", self.from_email)),
             to=["to@sink.sendgrid.net"],
             # Anymail's live test template has merge fields "name", "order_no", and "dept"...
             template_id=ANYMAIL_TEST_SENDGRID_TEMPLATE_ID,
