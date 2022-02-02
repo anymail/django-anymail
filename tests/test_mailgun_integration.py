@@ -100,7 +100,7 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     def test_all_options(self):
         send_at = datetime.now().replace(microsecond=0) + timedelta(minutes=2)
         send_at_timestamp = send_at.timestamp()
-        from_email=formataddr(("Test From, with comma", self.from_email))
+        from_email = formataddr(("Test From, with comma", self.from_email))
         message = AnymailMessage(
             subject="Anymail Mailgun all-options integration test",
             body="This is the text body",
