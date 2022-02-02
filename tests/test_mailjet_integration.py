@@ -1,5 +1,6 @@
 import os
 import unittest
+from email.utils import formataddr
 
 from django.test import SimpleTestCase, override_settings, tag
 
@@ -10,6 +11,7 @@ from .utils import AnymailTestMixin, sample_image_path
 
 ANYMAIL_TEST_MAILJET_API_KEY = os.getenv('ANYMAIL_TEST_MAILJET_API_KEY')
 ANYMAIL_TEST_MAILJET_SECRET_KEY = os.getenv('ANYMAIL_TEST_MAILJET_SECRET_KEY')
+ANYMAIL_TEST_MAILJET_DOMAIN = os.getenv('ANYMAIL_TEST_MAILJET_DOMAIN')
 
 
 @tag('mailjet', 'live')
@@ -26,20 +28,18 @@ class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     These tests run against the **live** Mailjet API, using the
     environment variables `ANYMAIL_TEST_MAILJET_API_KEY` and `ANYMAIL_TEST_MAILJET_SECRET_KEY`
-    as the API key and API secret key, respectively.
-    If those variables are not set, these tests won't run.
+    as the API key and API secret key, respectively, and `ANYMAIL_TEST_MAILJET_DOMAIN` as
+    a validated Mailjet sending domain. If those variables are not set, these tests won't run.
 
     These tests enable Mailjet's SandboxMode to avoid sending any email;
     remove the esp_extra setting above if you are trying to actually send test messages.
-
-    Mailjet also doesn't support unverified senders (so no from@example.com).
-    We've set up @test-mj.anymail.info as a validated sending domain for these tests.
     """
 
     def setUp(self):
         super().setUp()
+        self.from_email = 'test@%s' % ANYMAIL_TEST_MAILJET_DOMAIN
         self.message = AnymailMessage('Anymail Mailjet integration test', 'Text content',
-                                      'test@test-mj.anymail.info', ['test+to1@anymail.info'])
+                                      self.from_email, ['test+to1@anymail.dev'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -48,8 +48,8 @@ class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(sent_count, 1)
 
         anymail_status = self.message.anymail_status
-        sent_status = anymail_status.recipients['test+to1@anymail.info'].status
-        message_id = anymail_status.recipients['test+to1@anymail.info'].message_id
+        sent_status = anymail_status.recipients['test+to1@anymail.dev'].status
+        message_id = anymail_status.recipients['test+to1@anymail.dev'].message_id
 
         self.assertEqual(sent_status, 'sent')
         self.assertRegex(message_id, r'.+')
@@ -60,10 +60,10 @@ class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail Mailjet all-options integration test",
             body="This is the text body",
-            from_email='"Test Sender, Inc." <test@test-mj.anymail.info>',
-            to=['test+to1@anymail.info', '"Recipient, 2nd" <test+to2@anymail.info>'],
-            cc=['test+cc1@anymail.info', 'Copy 2 <test+cc1@anymail.info>'],
-            bcc=['test+bcc1@anymail.info', 'Blind Copy 2 <test+bcc2@anymail.info>'],
+            from_email=formataddr(("Test Sender, Inc.", self.from_email)),
+            to=['test+to1@anymail.dev', '"Recipient, 2nd" <test+to2@anymail.dev>'],
+            cc=['test+cc1@anymail.dev', 'Copy 2 <test+cc1@anymail.dev>'],
+            bcc=['test+bcc1@anymail.dev', 'Blind Copy 2 <test+bcc2@anymail.dev>'],
             reply_to=['"Reply, To" <reply2@example.com>'],  # Mailjet only supports single reply_to
             headers={"X-Anymail-Test": "value"},
 
@@ -88,11 +88,11 @@ class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             subject="Anymail Mailjet merge_data test",  # Mailjet doesn't support merge fields in the subject
             body="This body includes merge data: [[var:value]]\n"
                  "And global merge data: [[var:global]]",
-            from_email="Test From <test@test-mj.anymail.info>",
-            to=["test+to1@anymail.info", "Recipient 2 <test+to2@anymail.info>"],
+            from_email=formataddr(("Test From", self.from_email)),
+            to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
             merge_data={
-                'test+to1@anymail.info': {'value': 'one'},
-                'test+to2@anymail.info': {'value': 'two'},
+                'test+to1@anymail.dev': {'value': 'one'},
+                'test+to2@anymail.dev': {'value': 'two'},
             },
             merge_global_data={
                 'global': 'global_value'
@@ -100,15 +100,15 @@ class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         )
         message.send()
         recipient_status = message.anymail_status.recipients
-        self.assertEqual(recipient_status['test+to1@anymail.info'].status, 'sent')
-        self.assertEqual(recipient_status['test+to2@anymail.info'].status, 'sent')
+        self.assertEqual(recipient_status['test+to1@anymail.dev'].status, 'sent')
+        self.assertEqual(recipient_status['test+to2@anymail.dev'].status, 'sent')
 
     def test_stored_template(self):
         message = AnymailMessage(
             template_id='176375',  # ID of the real template named 'test-template' in our Mailjet test account
-            to=["test+to1@anymail.info"],
+            to=["test+to1@anymail.dev"],
             merge_data={
-                'test+to1@anymail.info': {
+                'test+to1@anymail.dev': {
                     'name': "Test Recipient",
                 }
             },
@@ -119,7 +119,7 @@ class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message.from_email = None  # use the template's sender email/name
         message.send()
         recipient_status = message.anymail_status.recipients
-        self.assertEqual(recipient_status['test+to1@anymail.info'].status, 'sent')
+        self.assertEqual(recipient_status['test+to1@anymail.dev'].status, 'sent')
 
     @override_settings(ANYMAIL={"MAILJET_API_KEY": "Hey, that's not an API key!",
                                 "MAILJET_SECRET_KEY": "and this isn't the secret for it"})
