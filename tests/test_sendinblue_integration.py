@@ -1,5 +1,6 @@
 import os
 import unittest
+from email.utils import formataddr
 
 from django.test import SimpleTestCase, override_settings, tag
 
@@ -9,12 +10,13 @@ from anymail.message import AnymailMessage
 from .utils import AnymailTestMixin
 
 ANYMAIL_TEST_SENDINBLUE_API_KEY = os.getenv('ANYMAIL_TEST_SENDINBLUE_API_KEY')
+ANYMAIL_TEST_SENDINBLUE_DOMAIN = os.getenv('ANYMAIL_TEST_SENDINBLUE_DOMAIN')
 
 
 @tag('sendinblue', 'live')
-@unittest.skipUnless(ANYMAIL_TEST_SENDINBLUE_API_KEY,
-                     "Set ANYMAIL_TEST_SENDINBLUE_API_KEY environment variable "
-                     "to run SendinBlue integration tests")
+@unittest.skipUnless(ANYMAIL_TEST_SENDINBLUE_API_KEY and ANYMAIL_TEST_SENDINBLUE_DOMAIN,
+                     "Set ANYMAIL_TEST_SENDINBLUE_API_KEY and ANYMAIL_TEST_SENDINBLUE_DOMAIN "
+                     "environment variables to run SendinBlue integration tests")
 @override_settings(ANYMAIL_SENDINBLUE_API_KEY=ANYMAIL_TEST_SENDINBLUE_API_KEY,
                    ANYMAIL_SENDINBLUE_SEND_DEFAULTS=dict(),
                    EMAIL_BACKEND="anymail.backends.sendinblue.EmailBackend")
@@ -23,7 +25,8 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     SendinBlue doesn't have sandbox so these tests run
     against the **live** SendinBlue API, using the
-    environment variable `ANYMAIL_TEST_SENDINBLUE_API_KEY` as the API key
+    environment variable `ANYMAIL_TEST_SENDINBLUE_API_KEY` as the API key,
+    and `ANYMAIL_TEST_SENDINBLUE_DOMAIN` to construct sender addresses.
     If those variables are not set, these tests won't run.
 
     https://developers.sendinblue.com/docs/faq#section-how-can-i-test-the-api-
@@ -32,9 +35,9 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     def setUp(self):
         super().setUp()
-
+        self.from_email = 'from@%s' % ANYMAIL_TEST_SENDINBLUE_DOMAIN
         self.message = AnymailMessage('Anymail SendinBlue integration test', 'Text content',
-                                      'from@test-sb.anymail.info', ['test+to1@anymail.info'])
+                                      self.from_email, ['test+to1@anymail.dev'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -43,8 +46,8 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(sent_count, 1)
 
         anymail_status = self.message.anymail_status
-        sent_status = anymail_status.recipients['test+to1@anymail.info'].status
-        message_id = anymail_status.recipients['test+to1@anymail.info'].message_id
+        sent_status = anymail_status.recipients['test+to1@anymail.dev'].status
+        message_id = anymail_status.recipients['test+to1@anymail.dev'].message_id
 
         self.assertEqual(sent_status, 'queued')  # SendinBlue always queues
         self.assertRegex(message_id, r'\<.+@.+\>')  # Message-ID can be ...@smtp-relay.mail.fr or .sendinblue.com
@@ -55,10 +58,10 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail SendinBlue all-options integration test",
             body="This is the text body",
-            from_email='"Test From, with comma" <from@test-sb.anymail.info>',
-            to=["test+to1@anymail.info", '"Recipient 2, OK?" <test+to2@anymail.info>'],
-            cc=["test+cc1@anymail.info", "Copy 2 <test+cc2@anymail.info>"],
-            bcc=["test+bcc1@anymail.info", "Blind Copy 2 <test+bcc2@anymail.info>"],
+            from_email=formataddr(("Test From, with comma", self.from_email)),
+            to=["test+to1@anymail.dev", '"Recipient 2, OK?" <test+to2@anymail.dev>'],
+            cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
+            bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
             reply_to=['"Reply, with comma" <reply@example.com>'],  # SendinBlue API v3 only supports single reply-to
             headers={"X-Anymail-Test": "value", "X-Anymail-Count": 3},
 
@@ -77,9 +80,9 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     def test_template(self):
         message = AnymailMessage(
             template_id=5,  # There is a *new-style* template with this id in the Anymail test account
-            from_email='Sender <from@test-sb.anymail.info>',  # Override template sender
-            to=["Recipient <test+to1@anymail.info>"],  # No batch send (so max one recipient suggested)
-            reply_to=["Do not reply <reply@example.com>"],
+            from_email=formataddr(('Sender', self.from_email)),  # Override template sender
+            to=["Recipient <test+to1@anymail.dev>"],  # No batch send (so max one recipient suggested)
+            reply_to=["Do not reply <reply@example.dev>"],
             tags=["using-template"],
             headers={"X-Anymail-Test": "group: A, variation: C"},
             merge_global_data={
