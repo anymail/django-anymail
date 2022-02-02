@@ -1,6 +1,7 @@
 import os
 import unittest
 import warnings
+from email.utils import formataddr
 
 from django.test import SimpleTestCase, override_settings, tag
 
@@ -13,11 +14,15 @@ from .utils import AnymailTestMixin, sample_image_path
 ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID = os.getenv("ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID")
 ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY = os.getenv("ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY")
 ANYMAIL_TEST_AMAZON_SES_REGION_NAME = os.getenv("ANYMAIL_TEST_AMAZON_SES_REGION_NAME", "us-east-1")
+ANYMAIL_TEST_AMAZON_SES_DOMAIN = os.getenv("ANYMAIL_TEST_AMAZON_SES_DOMAIN")
 
 
-@unittest.skipUnless(ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID and ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY,
-                     "Set ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID and ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY "
-                     "environment variables to run Amazon SES integration tests")
+@unittest.skipUnless(
+    ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID
+    and ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY
+    and ANYMAIL_TEST_AMAZON_SES_DOMAIN,
+    "Set ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID and ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY "
+    "and ANYMAIL_TEST_AMAZON_SES_DOMAIN environment variables to run Amazon SES integration tests")
 @override_settings(
     EMAIL_BACKEND="anymail.backends.amazon_ses.EmailBackend",
     ANYMAIL={
@@ -47,17 +52,13 @@ class AmazonSESBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     To avoid stacking up a pile of undeliverable @example.com
     emails, the tests use Amazon's @simulator.amazonses.com addresses.
     https://docs.aws.amazon.com/ses/latest/DeveloperGuide/mailbox-simulator.html
-
-    Amazon SES also doesn't support arbitrary senders (so no from@example.com).
-    We've set up @test-ses.anymail.info as a validated sending domain for these tests.
-    You may need to change the from_email to your own address when testing.
-
     """
 
     def setUp(self):
         super().setUp()
+        self.from_email = 'test@%s' % ANYMAIL_TEST_AMAZON_SES_DOMAIN
         self.message = AnymailMessage('Anymail Amazon SES integration test', 'Text content',
-                                      'test@test-ses.anymail.info', ['success@simulator.amazonses.com'])
+                                      self.from_email, ['success@simulator.amazonses.com'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
         # boto3 relies on GC to close connections. Python 3 warns about unclosed ssl.SSLSocket during cleanup.
@@ -85,7 +86,7 @@ class AmazonSESBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail Amazon SES all-options integration test",
             body="This is the text body",
-            from_email='"Test From" <test@test-ses.anymail.info>',
+            from_email=formataddr(("Test From, with comma", self.from_email)),
             to=["success+to1@simulator.amazonses.com", "Recipient 2 <success+to2@simulator.amazonses.com>"],
             cc=["success+cc1@simulator.amazonses.com", "Copy 2 <success+cc2@simulator.amazonses.com>"],
             bcc=["success+bcc1@simulator.amazonses.com", "Blind Copy 2 <success+bcc2@simulator.amazonses.com>"],
@@ -119,7 +120,7 @@ class AmazonSESBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         # })
         message = AnymailMessage(
             template_id='TestTemplate',
-            from_email='"Test From" <test@test-ses.anymail.info>',
+            from_email=formataddr(("Test From", self.from_email)),
             to=["First Recipient <success+to1@simulator.amazonses.com>",
                 "success+to2@simulator.amazonses.com"],
             merge_data={
