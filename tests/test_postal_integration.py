@@ -32,7 +32,7 @@ class PostalBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     def setUp(self):
         super().setUp()
         self.message = AnymailMessage('Anymail Postal integration test', 'Text content',
-                                      'from@example.com', ['test+to1@anymail.info'])
+                                      'from@example.com', ['test+to1@anymail.dev'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -41,8 +41,8 @@ class PostalBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(sent_count, 1)
 
         anymail_status = self.message.anymail_status
-        sent_status = anymail_status.recipients['test+to1@anymail.info'].status
-        message_id = anymail_status.recipients['test+to1@anymail.info'].message_id
+        sent_status = anymail_status.recipients['test+to1@anymail.dev'].status
+        message_id = anymail_status.recipients['test+to1@anymail.dev'].message_id
 
         self.assertEqual(sent_status, 'queued')
         self.assertGreater(len(message_id), 0)  # non-empty string
@@ -55,9 +55,9 @@ class PostalBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             body="This is the text body",
             from_email="Test From <from@example.com>",
             envelope_sender="bounces@example.com",
-            to=["test+to1@anymail.info", "Recipient 2 <test+to2@anymail.info>"],
-            cc=["test+cc1@anymail.info", "Copy 2 <test+cc2@anymail.info>"],
-            bcc=["test+bcc1@anymail.info", "Blind Copy 2 <test+bcc2@anymail.info>"],
+            to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
+            cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
+            bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
             reply_to=["reply1@example.com"],
             headers={"X-Anymail-Test": "value"},
             tags=["tag 1"],  # max one tag
@@ -67,11 +67,11 @@ class PostalBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
         message.send()
         self.assertEqual(message.anymail_status.status, {'queued'})
-        self.assertEqual(message.anymail_status.recipients['test+to1@anymail.info'].status, 'queued')
-        self.assertEqual(message.anymail_status.recipients['test+to2@anymail.info'].status, 'queued')
+        self.assertEqual(message.anymail_status.recipients['test+to1@anymail.dev'].status, 'queued')
+        self.assertEqual(message.anymail_status.recipients['test+to2@anymail.dev'].status, 'queued')
         # distinct messages should have different message_ids:
-        self.assertNotEqual(message.anymail_status.recipients['test+to1@anymail.info'].message_id,
-                            message.anymail_status.recipients['teset+to2@anymail.info'].message_id)
+        self.assertNotEqual(message.anymail_status.recipients['test+to1@anymail.dev'].message_id,
+                            message.anymail_status.recipients['teset+to2@anymail.dev'].message_id)
 
     def test_invalid_from(self):
         self.message.from_email = 'webmaster@localhost'  # Django's default From
