@@ -1,6 +1,7 @@
 import os
 import unittest
 from datetime import datetime, timedelta
+from email.utils import formataddr
 
 from django.test import SimpleTestCase, override_settings, tag
 
@@ -10,12 +11,13 @@ from anymail.message import AnymailMessage
 from .utils import AnymailTestMixin, sample_image_path
 
 ANYMAIL_TEST_SPARKPOST_API_KEY = os.getenv('ANYMAIL_TEST_SPARKPOST_API_KEY')
+ANYMAIL_TEST_SPARKPOST_DOMAIN = os.getenv('ANYMAIL_TEST_SPARKPOST_DOMAIN')
 
 
 @tag('sparkpost', 'live')
-@unittest.skipUnless(ANYMAIL_TEST_SPARKPOST_API_KEY,
-                     "Set ANYMAIL_TEST_SPARKPOST_API_KEY environment variable "
-                     "to run SparkPost integration tests")
+@unittest.skipUnless(ANYMAIL_TEST_SPARKPOST_API_KEY and ANYMAIL_TEST_SPARKPOST_DOMAIN,
+                     "Set ANYMAIL_TEST_SPARKPOST_API_KEY and ANYMAIL_TEST_SPARKPOST_DOMAIN "
+                     "environment variables to run SparkPost integration tests")
 @override_settings(ANYMAIL_SPARKPOST_API_KEY=ANYMAIL_TEST_SPARKPOST_API_KEY,
                    EMAIL_BACKEND="anymail.backends.sparkpost.EmailBackend")
 class SparkPostBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
@@ -29,15 +31,13 @@ class SparkPostBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     you ask. To avoid stacking up a pile of undeliverable @example.com
     emails, the tests use SparkPost's "sink domain" @*.sink.sparkpostmail.com.
     https://www.sparkpost.com/docs/faq/using-sink-server/
-
-    SparkPost also doesn't support arbitrary senders (so no from@example.com).
-    We've set up @test-sp.anymail.info as a validated sending domain for these tests.
     """
 
     def setUp(self):
         super().setUp()
+        self.from_email = 'test@%s' % ANYMAIL_TEST_SPARKPOST_DOMAIN
         self.message = AnymailMessage('Anymail SparkPost integration test', 'Text content',
-                                      'test@test-sp.anymail.info', ['to@test.sink.sparkpostmail.com'])
+                                      self.from_email, ['to@test.sink.sparkpostmail.com'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -59,7 +59,7 @@ class SparkPostBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail all-options integration test",
             body="This is the text body",
-            from_email="Test From <test@test-sp.anymail.info>",
+            from_email=formataddr(("Test From, with comma", self.from_email)),
             to=["to1@test.sink.sparkpostmail.com", "Recipient 2 <to2@test.sink.sparkpostmail.com>"],
             # Limit the live b/cc's to avoid running through our small monthly allowance:
             # cc=["cc1@test.sink.sparkpostmail.com", "Copy 2 <cc2@test.sink.sparkpostmail.com>"],
@@ -90,7 +90,7 @@ class SparkPostBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             subject="Anymail merge_data test: {{ value }}",
             body="This body includes merge data: {{ value }}\n"
                  "And global merge data: {{ global }}",
-            from_email="Test From <test@test-sp.anymail.info>",
+            from_email=formataddr(("Test From", self.from_email)),
             to=["to1@test.sink.sparkpostmail.com", "Recipient 2 <to2@test.sink.sparkpostmail.com>"],
             merge_data={
                 'to1@test.sink.sparkpostmail.com': {'value': 'one'},
