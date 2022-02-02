@@ -37,7 +37,7 @@ analytics tracking, see the "Information for Visitors of Sites and Apps Using
 Google Analytics" section of Google's `Safeguarding your data`_ document.
 
 Questions about privacy and information practices related to this Anymail
-documentation site can be emailed to *privacy\<at>anymail\<dot>info*.
+documentation site can be emailed to *privacy\<at>anymail\<dot>dev*.
 (This is not an appropriate contact for questions about *using* Anymail;
 see :ref:`help` if you need assistance with your code.)
 

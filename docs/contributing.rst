@@ -38,7 +38,7 @@ Bugs
 
 You can report problems or request features in `Anymail's GitHub issue tracker`_.
 (For a security-related issue that should not be disclosed publicly, instead email
-Anymail's maintainers at security<AT>anymail<DOT>info.)
+Anymail's maintainers at *security\<at>anymail\<dot>dev*.)
 
 We also have some :ref:`troubleshooting` information that may be helpful.
 

@@ -55,7 +55,7 @@ Here's how to contact the Anymail community:
 
 **"I found a security issue!"**
 
-  Contact the Anymail maintainers by emailing *security<AT>anymail<DOT>info.*
+  Contact the Anymail maintainers by emailing *security\<at>anymail\<dot>dev.*
   (Please don't open a GitHub issue or post publicly about potential security problems.)
 
 **"Could Anymail support this ESP or feature...?"**
