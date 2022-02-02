@@ -32,7 +32,7 @@ class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     def setUp(self):
         super().setUp()
         self.message = mail.EmailMultiAlternatives('Anymail Mandrill integration test', 'Text content',
-                                                   'from@example.com', ['test+to1@anymail.info'])
+                                                   'from@example.com', ['test+to1@anymail.dev'])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
 
     def test_simple_send(self):
@@ -42,8 +42,8 @@ class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
         # noinspection PyUnresolvedReferences
         anymail_status = self.message.anymail_status
-        sent_status = anymail_status.recipients['test+to1@anymail.info'].status
-        message_id = anymail_status.recipients['test+to1@anymail.info'].message_id
+        sent_status = anymail_status.recipients['test+to1@anymail.dev'].status
+        message_id = anymail_status.recipients['test+to1@anymail.dev'].message_id
 
         self.assertIn(sent_status, ['sent', 'queued'])  # successful send (could still bounce later)
         self.assertGreater(len(message_id), 0)  # don't know what it'll be, but it should exist
@@ -56,9 +56,9 @@ class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             subject="Anymail Mandrill all-options integration test",
             body="This is the text body",
             from_email="Test From <from@example.com>",
-            to=["test+to1@anymail.info", "Recipient 2 <test+to2@anymail.info>"],
-            cc=["test+cc1@anymail.info", "Copy 2 <test+cc2@anymail.info>"],
-            bcc=["test+bcc1@anymail.info", "Blind Copy 2 <test+bcc2@anymail.info>"],
+            to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
+            cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
+            bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
             reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
             headers={"X-Anymail-Test": "value"},
 
