@@ -15,9 +15,10 @@ ANYMAIL_TEST_MAILJET_DOMAIN = os.getenv('ANYMAIL_TEST_MAILJET_DOMAIN')
 
 
 @tag('mailjet', 'live')
-@unittest.skipUnless(ANYMAIL_TEST_MAILJET_API_KEY and ANYMAIL_TEST_MAILJET_SECRET_KEY,
-                     "Set ANYMAIL_TEST_MAILJET_API_KEY and ANYMAIL_TEST_MAILJET_SECRET_KEY "
-                     "environment variables to run Mailjet integration tests")
+@unittest.skipUnless(
+    ANYMAIL_TEST_MAILJET_API_KEY and ANYMAIL_TEST_MAILJET_SECRET_KEY and ANYMAIL_TEST_MAILJET_DOMAIN,
+    "Set ANYMAIL_TEST_MAILJET_API_KEY and ANYMAIL_TEST_MAILJET_SECRET_KEY and ANYMAIL_TEST_MAILJET_DOMAIN "
+    "environment variables to run Mailjet integration tests")
 @override_settings(ANYMAIL={"MAILJET_API_KEY": ANYMAIL_TEST_MAILJET_API_KEY,
                             "MAILJET_SECRET_KEY": ANYMAIL_TEST_MAILJET_SECRET_KEY,
                             "MAILJET_SEND_DEFAULTS": {"esp_extra": {"SandboxMode": True}},  # don't actually send mail

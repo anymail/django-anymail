@@ -18,6 +18,9 @@ ANYMAIL_TEST_POSTMARK_DOMAIN = os.getenv('ANYMAIL_TEST_POSTMARK_DOMAIN')
 
 
 @tag('postmark', 'live')
+@unittest.skipUnless(ANYMAIL_TEST_POSTMARK_DOMAIN,
+                     "Set ANYMAIL_TEST_POSTMARK_DOMAIN environment variable "
+                     "to run Postmark template integration tests")
 @override_settings(ANYMAIL_POSTMARK_SERVER_TOKEN="POSTMARK_API_TEST",
                    EMAIL_BACKEND="anymail.backends.postmark.EmailBackend")
 class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
