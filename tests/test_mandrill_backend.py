@@ -47,7 +47,7 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
         self.assertEqual(data['message']['text'], "Here is the message.")
         self.assertNotIn('from_name', data['message'])
         self.assertEqual(data['message']['from_email'], "from@example.com")
-        self.assertEqual(data['message']['to'], [{'email': 'to@example.com', 'name': '', 'type': 'to'}])
+        self.assertEqual(data['message']['to'], [{'email': 'to@example.com', 'type': 'to'}])
 
     def test_name_addr(self):
         """Make sure RFC2822 name-addr format (with display-name) is allowed
@@ -66,11 +66,11 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
         self.assertEqual(data['message']['from_email'], "from@example.com")
         self.assertEqual(data['message']['to'], [
             {'email': 'to1@example.com', 'name': 'Recipient #1', 'type': 'to'},
-            {'email': 'to2@example.com', 'name': '', 'type': 'to'},
+            {'email': 'to2@example.com', 'type': 'to'},
             {'email': 'cc1@example.com', 'name': 'Carbon Copy', 'type': 'cc'},
-            {'email': 'cc2@example.com', 'name': '', 'type': 'cc'},
+            {'email': 'cc2@example.com', 'type': 'cc'},
             {'email': 'bcc1@example.com', 'name': 'Blind Copy', 'type': 'bcc'},
-            {'email': 'bcc2@example.com', 'name': '', 'type': 'bcc'},
+            {'email': 'bcc2@example.com', 'type': 'bcc'},
         ])
 
     def test_email_message(self):
@@ -94,11 +94,11 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
                           'Message-ID': 'mycustommsgid@example.com'})
         # Verify recipients correctly identified as "to", "cc", or "bcc"
         self.assertEqual(data['message']['to'], [
-            {'email': 'to1@example.com', 'name': '', 'type': 'to'},
+            {'email': 'to1@example.com', 'type': 'to'},
             {'email': 'to2@example.com', 'name': 'Also To', 'type': 'to'},
-            {'email': 'cc1@example.com', 'name': '', 'type': 'cc'},
+            {'email': 'cc1@example.com', 'type': 'cc'},
             {'email': 'cc2@example.com', 'name': 'Also CC', 'type': 'cc'},
-            {'email': 'bcc1@example.com', 'name': '', 'type': 'bcc'},
+            {'email': 'bcc1@example.com', 'type': 'bcc'},
             {'email': 'bcc2@example.com', 'name': 'Also BCC', 'type': 'bcc'},
         ])
         # Don't use Mandrill's bcc_address "logging" feature for bcc's:
@@ -550,6 +550,21 @@ class MandrillBackendAnymailFeatureTests(MandrillBackendMockAPITestCase):
         self.assertIsInstance(err, TypeError)  # compatibility with json.dumps
         self.assertIn("Don't know how to send this data to Mandrill", str(err))  # our added context
         self.assertRegex(str(err), r"Decimal.*is not JSON serializable")  # original message
+
+    def test_no_extraneous_fields(self):
+        """Don't send empty fields that have no effect on sending"""
+        mail.send_mail("Subject", "Body", "from@example.com", ["to@example.com"])
+        data = self.get_api_call_json()
+        # Simple send should contain exactly this, nothing more:
+        self.assertEqual(data, {
+            "key": "test_api_key",
+            "message": {
+                "from_email": "from@example.com",
+                "to": [{"email": "to@example.com", "type": "to"}],
+                "subject": "Subject",
+                "text": "Body",
+            },
+        })
 
 
 @tag('mandrill')

@@ -104,8 +104,11 @@ class MandrillPayload(RequestsPayload):
 
     def add_recipient(self, recipient_type, email):
         assert recipient_type in ["to", "cc", "bcc"]
+        recipient_data = {"email": email.addr_spec, "type": recipient_type}
+        if email.display_name:
+            recipient_data["name"] = email.display_name
         to_list = self.data["message"].setdefault("to", [])
-        to_list.append({"email": email.addr_spec, "name": email.display_name, "type": recipient_type})
+        to_list.append(recipient_data)
 
     def set_subject(self, subject):
         if getattr(self.message, "use_template_subject", False):
@@ -114,8 +117,9 @@ class MandrillPayload(RequestsPayload):
             self.data["message"]["subject"] = subject
 
     def set_reply_to(self, emails):
-        reply_to = ", ".join([str(email) for email in emails])
-        self.data["message"].setdefault("headers", {})["Reply-To"] = reply_to
+        if emails:
+            reply_to = ", ".join([str(email) for email in emails])
+            self.data["message"].setdefault("headers", {})["Reply-To"] = reply_to
 
     def set_extra_headers(self, headers):
         self.data["message"].setdefault("headers", {}).update(headers)
