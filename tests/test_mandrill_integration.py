@@ -27,16 +27,27 @@ class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     environment variable `ANYMAIL_TEST_MANDRILL_API_KEY` as the API key.
     If that variable is not set, these tests won't run.
 
-    See https://mandrill.zendesk.com/hc/en-us/articles/205582447
+    See https://mailchimp.com/developer/transactional/docs/fundamentals/#test-mode
     for info on Mandrill test keys.
     """
 
     def setUp(self):
         super().setUp()
-        self.from_email = 'from@%s' % ANYMAIL_TEST_MANDRILL_DOMAIN
+        self.from_email = self.addr('from')
         self.message = mail.EmailMultiAlternatives('Anymail Mandrill integration test', 'Text content',
-                                                   self.from_email, ['test+to1@anymail.dev'])
+                                                   self.from_email, [self.addr('test+to1')])
         self.message.attach_alternative('<p>HTML content</p>', "text/html")
+
+    def addr(self, username, display_name=None):
+        """Construct test email address within our test domain"""
+        # Because integration tests run within a Mandrill trial account,
+        # both sender and recipient addresses must be within the test domain.
+        # (Other recipient addresses will be rejected with 'recipient-domain-mismatch'.)
+        email = '{username}@{domain}'.format(username=username, domain=ANYMAIL_TEST_MANDRILL_DOMAIN)
+        if display_name is not None:
+            return formataddr((display_name, email))
+        else:
+            return email
 
     def test_simple_send(self):
         # Example of getting the Mandrill send status and _id from the message
@@ -45,8 +56,9 @@ class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
         # noinspection PyUnresolvedReferences
         anymail_status = self.message.anymail_status
-        sent_status = anymail_status.recipients['test+to1@anymail.dev'].status
-        message_id = anymail_status.recipients['test+to1@anymail.dev'].message_id
+        to_email = self.message.to[0]  # test+to1@{ANYMAIL_TEST_MANDRILL_DOMAIN}
+        sent_status = anymail_status.recipients[to_email].status
+        message_id = anymail_status.recipients[to_email].message_id
 
         self.assertIn(sent_status, ['sent', 'queued'])  # successful send (could still bounce later)
         self.assertGreater(len(message_id), 0)  # don't know what it'll be, but it should exist
@@ -58,10 +70,10 @@ class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail Mandrill all-options integration test",
             body="This is the text body",
-            from_email=formataddr(("Test From, with comma", self.from_email)),
-            to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
-            cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
-            bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
+            from_email=self.addr("from", "Test From, with comma"),
+            to=[self.addr("test+to1"), self.addr("test+to2", "Recipient 2")],
+            cc=[self.addr("test+cc1"), self.addr("test+cc2", "Copy 2")],
+            bcc=[self.addr("test+bcc1"), self.addr("test+bcc2", "Blind Copy 2")],
             reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
             headers={"X-Anymail-Test": "value"},
 
