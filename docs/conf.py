@@ -276,6 +276,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3.10', None),
     'django': ('https://docs.djangoproject.com/en/stable/', 'https://docs.djangoproject.com/en/stable/_objects/'),
     'requests': ('https://requests.readthedocs.io/en/stable/', None),
+    'urllib3': ('https://urllib3.readthedocs.io/en/stable/', None),
 }
 
 
