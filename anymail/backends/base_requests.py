@@ -25,17 +25,12 @@ class AnymailRequestsBackend(AnymailBaseBackend):
             return False  # already exists
 
         try:
-            self.session = requests.Session()
-        except requests.RequestException:
+            self.session = self.create_session()
+        except Exception:
             if not self.fail_silently:
                 raise
-        else:
-            self.session.headers["User-Agent"] = "django-anymail/{version}-{esp} {orig}".format(
-                esp=self.esp_name.lower(), version=__version__,
-                orig=self.session.headers.get("User-Agent", ""))
-            if self.debug_api_requests:
-                self.session.hooks['response'].append(self._dump_api_request)
-            return True
+
+        return True
 
     def close(self):
         if self.session is None:
@@ -56,6 +51,23 @@ class AnymailRequestsBackend(AnymailBaseBackend):
                 "(This is either an implementation error in {class_name}, "
                 "or you are incorrectly calling _send directly.)".format(class_name=class_name))
         return super()._send(message)
+
+    def create_session(self):
+        """Create the requests.Session object used by this instance of the backend.
+        If subclassed, you can modify the Session returned from super() to give
+        it your own configuration.
+
+        This must return an instance of requests.Session."""
+        session = requests.Session()
+
+        session.headers["User-Agent"] = "django-anymail/{version}-{esp} {orig}".format(
+            esp=self.esp_name.lower(), version=__version__,
+            orig=session.headers.get("User-Agent", ""))
+
+        if self.debug_api_requests:
+            session.hooks['response'].append(self._dump_api_request)
+
+        return session
 
     def post_to_esp(self, payload, message):
         """Post payload to ESP send API endpoint, and return the raw response.
