@@ -30,6 +30,13 @@ vNext
 
 *Unreleased changes*
 
+Features
+~~~~~~~~
+
+* Support customizing the requests.Session for requests-based backends,
+  and document how this can be used to mount an adapter that simplifies
+  automatic retry logic. (Thanks to `@dgilmanAIDENTIFIED`_.)
+
 Fixes
 ~~~~~
 
@@ -1340,6 +1347,7 @@ Features
 .. _@costela: https://github.com/costela
 .. _@coupa-anya: https://github.com/coupa-anya
 .. _@decibyte: https://github.com/decibyte
+.. _@dgilmanAIDENTIFIED: https://github.com/dgilmanAIDENTIFIED
 .. _@dominik-lekse: https://github.com/dominik-lekse
 .. _@erikdrums: https://github.com/erikdrums
 .. _@ewingrj: https://github.com/ewingrj
