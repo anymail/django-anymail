@@ -36,6 +36,8 @@ Features
 * Support customizing the requests.Session for requests-based backends,
   and document how this can be used to mount an adapter that simplifies
   automatic retry logic. (Thanks to `@dgilmanAIDENTIFIED`_.)
+* Confirm support for Django 4.1 and resolve deprecation warning regarding
+  ``django.utils.timezone.utc``.
 
 Fixes
 ~~~~~
