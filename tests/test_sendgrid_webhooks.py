@@ -3,9 +3,9 @@ from datetime import datetime
 from unittest.mock import ANY
 
 from django.test import tag
-from django.utils.timezone import utc
 
 from anymail.signals import AnymailTrackingEvent
+from anymail.utils import utc
 from anymail.webhooks.sendgrid import SendGridTrackingWebhookView
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 

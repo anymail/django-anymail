@@ -214,10 +214,9 @@ an :ref:`unsupported feature <unsupported-features>` error.
 
         .. code-block:: python
 
-            from datetime import datetime, timedelta
-            from django.utils.timezone import utc
+            from datetime import datetime, timedelta, timezone
 
-            message.send_at = datetime.now(utc) + timedelta(hours=1)
+            message.send_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
         To avoid confusion, it's best to provide either an *aware*
         `~datetime.datetime` (one that has its tzinfo set), or an

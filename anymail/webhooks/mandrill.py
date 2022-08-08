@@ -5,13 +5,12 @@ import hashlib
 import hmac
 from base64 import b64encode
 from django.utils.crypto import constant_time_compare
-from django.utils.timezone import utc
 
 from .base import AnymailBaseWebhookView, AnymailCoreWebhookView
 from ..exceptions import AnymailWebhookValidationFailure
 from ..inbound import AnymailInboundMessage
 from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType
-from ..utils import get_anymail_setting, getfirst, get_request_uri
+from ..utils import get_anymail_setting, getfirst, get_request_uri, utc
 
 
 class MandrillSignatureMixin(AnymailCoreWebhookView):

@@ -7,13 +7,12 @@ from django.core.mail import get_connection, send_mail
 from django.test import SimpleTestCase
 from django.test.utils import override_settings
 from django.utils.functional import Promise
-from django.utils.timezone import utc
 from django.utils.translation import gettext_lazy
 
 from anymail.backends.test import EmailBackend as TestBackend, TestPayload
 from anymail.exceptions import AnymailConfigurationError, AnymailError, AnymailInvalidAddress, AnymailUnsupportedFeature
 from anymail.message import AnymailMessage
-from anymail.utils import get_anymail_setting
+from anymail.utils import get_anymail_setting, utc
 
 from .utils import AnymailTestMixin
 

@@ -4,10 +4,10 @@ from datetime import datetime
 from unittest.mock import ANY, patch
 
 from django.test import SimpleTestCase, override_settings, tag
-from django.utils.timezone import utc
 
 from anymail.exceptions import AnymailConfigurationError, AnymailInsecureWebhookWarning
 from anymail.signals import AnymailTrackingEvent
+from anymail.utils import utc
 from anymail.webhooks.amazon_ses import AmazonSESTrackingWebhookView
 
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase

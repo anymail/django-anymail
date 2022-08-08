@@ -7,12 +7,13 @@ from email.mime.text import MIMEText
 
 from django.core import mail
 from django.test import override_settings, tag
-from django.utils.timezone import get_fixed_timezone, override as override_current_timezone, utc
+from django.utils.timezone import get_fixed_timezone, override as override_current_timezone
 
 from anymail.exceptions import (
     AnymailAPIError, AnymailConfigurationError, AnymailRecipientsRefused,
     AnymailSerializationError, AnymailUnsupportedFeature)
 from anymail.message import attach_inline_image_file
+from anymail.utils import utc
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase
 from .utils import SAMPLE_IMAGE_FILENAME, decode_att, sample_image_content, sample_image_path

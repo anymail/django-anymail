@@ -2,13 +2,11 @@ import json
 from base64 import b64decode
 from datetime import datetime
 
-from django.utils.timezone import utc
-
 from .base import AnymailBaseWebhookView
 from ..exceptions import AnymailConfigurationError
 from ..inbound import AnymailInboundMessage
 from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason
-from ..utils import get_anymail_setting
+from ..utils import get_anymail_setting, utc
 
 
 class SparkPostBaseWebhookView(AnymailBaseWebhookView):

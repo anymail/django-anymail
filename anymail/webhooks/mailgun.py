@@ -4,13 +4,12 @@ from datetime import datetime
 import hashlib
 import hmac
 from django.utils.crypto import constant_time_compare
-from django.utils.timezone import utc
 
 from .base import AnymailBaseWebhookView
 from ..exceptions import AnymailConfigurationError, AnymailWebhookValidationFailure, AnymailInvalidAddress
 from ..inbound import AnymailInboundMessage
 from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason
-from ..utils import get_anymail_setting, combine, querydict_getfirst, parse_single_address, UNSET
+from ..utils import get_anymail_setting, combine, querydict_getfirst, parse_single_address, utc, UNSET
 
 
 class MailgunBaseWebhookView(AnymailBaseWebhookView):

@@ -3,10 +3,11 @@ from datetime import datetime
 from unittest.mock import ANY
 
 from django.test import tag
-from django.utils.timezone import get_fixed_timezone, utc
+from django.utils.timezone import get_fixed_timezone
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent
+from anymail.utils import utc
 from anymail.webhooks.postmark import PostmarkTrackingWebhookView
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 

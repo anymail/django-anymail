@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
-from django.utils.timezone import is_naive, get_current_timezone, make_aware, utc
+from django.utils.timezone import is_naive, get_current_timezone, make_aware
 from requests.structures import CaseInsensitiveDict
 
 from ..exceptions import (
@@ -13,7 +13,7 @@ from ..message import AnymailStatus
 from ..signals import pre_send, post_send
 from ..utils import (
     Attachment, UNSET, combine, last, get_anymail_setting, parse_address_list, parse_single_address,
-    force_non_lazy, force_non_lazy_list, force_non_lazy_dict, is_lazy)
+    force_non_lazy, force_non_lazy_list, force_non_lazy_dict, is_lazy, utc)
 
 
 class AnymailBaseBackend(BaseEmailBackend):

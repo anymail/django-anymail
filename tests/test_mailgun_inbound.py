@@ -5,11 +5,11 @@ from textwrap import dedent
 from unittest.mock import ANY
 
 from django.test import override_settings, tag
-from django.utils.timezone import utc
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent
+from anymail.utils import utc
 from anymail.webhooks.mailgun import MailgunInboundWebhookView
 
 from .test_mailgun_webhooks import (

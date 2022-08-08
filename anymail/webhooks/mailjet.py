@@ -1,11 +1,11 @@
 import json
 from datetime import datetime
 
-from django.utils.timezone import utc
 
 from .base import AnymailBaseWebhookView
 from ..inbound import AnymailInboundMessage
 from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason
+from ..utils import utc
 
 
 class MailjetTrackingWebhookView(AnymailBaseWebhookView):

@@ -4,8 +4,6 @@ from base64 import b64decode
 from datetime import datetime
 
 
-from django.utils.timezone import utc
-
 from .base import AnymailBaseWebhookView
 from ..exceptions import (
     AnymailInvalidAddress,
@@ -23,7 +21,7 @@ from ..signals import (
     EventType,
     RejectReason,
 )
-from ..utils import parse_single_address, get_anymail_setting
+from ..utils import parse_single_address, get_anymail_setting, utc
 
 try:
     from cryptography.hazmat.primitives import serialization, hashes

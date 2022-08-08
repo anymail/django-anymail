@@ -8,9 +8,9 @@ from urllib.parse import urljoin
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings, tag
-from django.utils.timezone import utc
 
 from anymail.signals import AnymailTrackingEvent
+from anymail.utils import utc
 from anymail.webhooks.mandrill import MandrillCombinedWebhookView, MandrillTrackingWebhookView
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 

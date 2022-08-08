@@ -3,11 +3,11 @@ from datetime import datetime
 from email.parser import BytesParser
 from email.policy import default as default_policy
 
-from django.utils.timezone import utc
 
 from .base import AnymailBaseWebhookView
 from ..inbound import AnymailInboundMessage
 from ..signals import AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason, inbound, tracking
+from ..utils import utc
 
 
 class SendGridTrackingWebhookView(AnymailBaseWebhookView):

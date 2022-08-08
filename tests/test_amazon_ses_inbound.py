@@ -5,11 +5,11 @@ from textwrap import dedent
 from unittest.mock import ANY, patch
 
 from django.test import tag
-from django.utils.timezone import utc
 
 from anymail.exceptions import AnymailAPIError, AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent
+from anymail.utils import utc
 from anymail.webhooks.amazon_ses import AmazonSESInboundWebhookView
 
 from .test_amazon_ses_webhooks import AmazonSESWebhookTestsMixin
