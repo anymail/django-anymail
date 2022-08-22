@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import ANY
 
 import hashlib
@@ -9,7 +9,6 @@ from django.test import override_settings, tag
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent
-from anymail.utils import utc
 from anymail.webhooks.mailgun import MailgunTrackingWebhookView
 
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
@@ -197,7 +196,7 @@ class MailgunTestCase(WebhookTestCase):
         event = kwargs['event']
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "delivered")
-        self.assertEqual(event.timestamp, datetime(2018, 8, 12, 21, 17, 17, microsecond=153125, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2018, 8, 12, 21, 17, 17, microsecond=153125, tzinfo=timezone.utc))
         self.assertEqual(event.message_id, "<20180812211713.1.DF5966851B4BAA99@example.org>")
         # Note that Anymail uses the "token" as its normalized event_id:
         self.assertEqual(event.event_id, "651869375b9df3c98fc15c4889b102119add1235c38fc92824")
@@ -513,7 +512,7 @@ class MailgunLegacyTestCase(WebhookTestCase):
         event = kwargs['event']
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "delivered")
-        self.assertEqual(event.timestamp, datetime(2016, 4, 21, 17, 55, 30, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2016, 4, 21, 17, 55, 30, tzinfo=timezone.utc))
         self.assertEqual(event.message_id, "<20160421175529.19495.89030.B3AE3728@example.com>")
         self.assertEqual(event.event_id, "06c96bafc3f42a66b9edd546347a2fe18dc23461fe80dc52f0")
         self.assertEqual(event.recipient, "recipient@example.com")
@@ -552,7 +551,7 @@ class MailgunLegacyTestCase(WebhookTestCase):
         event = kwargs['event']
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "rejected")
-        self.assertEqual(event.timestamp, datetime(2016, 4, 21, 17, 55, 30, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2016, 4, 21, 17, 55, 30, tzinfo=timezone.utc))
         self.assertEqual(event.message_id, "<20160421180324.70521.79375.96884DDB@example.com>")
         self.assertEqual(event.event_id, "a3fe1fa1640349ac552b84ddde373014b4c41645830c8dd3fc")
         self.assertEqual(event.recipient, "bounce@example.com")

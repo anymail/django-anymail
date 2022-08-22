@@ -1,9 +1,8 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import AnymailBaseWebhookView
 from ..signals import AnymailTrackingEvent, EventType, RejectReason, tracking
-from ..utils import utc
 
 
 class SendinBlueTrackingWebhookView(AnymailBaseWebhookView):
@@ -44,7 +43,7 @@ class SendinBlueTrackingWebhookView(AnymailBaseWebhookView):
             # SendinBlue supplies "ts", "ts_event" and "date" fields, which seem to be based on the
             # timezone set in the account preferences (and possibly with inconsistent DST adjustment).
             # "ts_epoch" is the only field that seems to be consistently UTC; it's in milliseconds
-            timestamp = datetime.fromtimestamp(esp_event["ts_epoch"] / 1000.0, tz=utc)
+            timestamp = datetime.fromtimestamp(esp_event["ts_epoch"] / 1000.0, tz=timezone.utc)
         except (KeyError, ValueError):
             timestamp = None
 

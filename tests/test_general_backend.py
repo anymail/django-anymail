@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from email.mime.text import MIMEText
 
 from django.core import mail
@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy
 from anymail.backends.test import EmailBackend as TestBackend, TestPayload
 from anymail.exceptions import AnymailConfigurationError, AnymailError, AnymailInvalidAddress, AnymailUnsupportedFeature
 from anymail.message import AnymailMessage
-from anymail.utils import get_anymail_setting, utc
+from anymail.utils import get_anymail_setting
 
 from .utils import AnymailTestMixin
 
@@ -133,7 +133,7 @@ class SendDefaultsTests(TestBackendTestCase):
         'SEND_DEFAULTS': {
             # This isn't an exhaustive list of Anymail message attrs; just one of each type
             'metadata': {'global': 'globalvalue'},
-            'send_at': datetime(2016, 5, 12, 4, 17, 0, tzinfo=utc),
+            'send_at': datetime(2016, 5, 12, 4, 17, 0, tzinfo=timezone.utc),
             'tags': ['globaltag'],
             'template_id': 'my-template',
             'track_clicks': True,
@@ -146,7 +146,7 @@ class SendDefaultsTests(TestBackendTestCase):
         params = self.get_send_params()
         # All these values came from ANYMAIL_SEND_DEFAULTS:
         self.assertEqual(params['metadata'], {'global': 'globalvalue'})
-        self.assertEqual(params['send_at'], datetime(2016, 5, 12, 4, 17, 0, tzinfo=utc))
+        self.assertEqual(params['send_at'], datetime(2016, 5, 12, 4, 17, 0, tzinfo=timezone.utc))
         self.assertEqual(params['tags'], ['globaltag'])
         self.assertEqual(params['template_id'], 'my-template')
         self.assertEqual(params['track_clicks'], True)

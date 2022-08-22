@@ -1,11 +1,10 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 from .base import AnymailBaseWebhookView
 from ..inbound import AnymailInboundMessage
 from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason
-from ..utils import utc
 
 
 class MailjetTrackingWebhookView(AnymailBaseWebhookView):
@@ -68,7 +67,7 @@ class MailjetTrackingWebhookView(AnymailBaseWebhookView):
             event_type = EventType.DEFERRED
 
         try:
-            timestamp = datetime.fromtimestamp(esp_event['time'], tz=utc)
+            timestamp = datetime.fromtimestamp(esp_event['time'], tz=timezone.utc)
         except (KeyError, ValueError):
             timestamp = None
 

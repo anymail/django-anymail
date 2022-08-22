@@ -1,7 +1,7 @@
 import binascii
 import json
 from base64 import b64decode
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 from .base import AnymailBaseWebhookView
@@ -21,7 +21,7 @@ from ..signals import (
     EventType,
     RejectReason,
 )
-from ..utils import parse_single_address, get_anymail_setting, utc
+from ..utils import parse_single_address, get_anymail_setting
 
 try:
     from cryptography.hazmat.primitives import serialization, hashes
@@ -92,7 +92,7 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
 
         raw_timestamp = esp_event.get("timestamp")
         timestamp = (
-            datetime.fromtimestamp(int(raw_timestamp), tz=utc)
+            datetime.fromtimestamp(int(raw_timestamp), tz=timezone.utc)
             if raw_timestamp
             else None
         )

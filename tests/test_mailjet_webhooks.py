@@ -1,11 +1,10 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import ANY
 
 from django.test import tag
 
 from anymail.signals import AnymailTrackingEvent
-from anymail.utils import utc
 from anymail.webhooks.mailjet import MailjetTrackingWebhookView
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 
@@ -44,7 +43,7 @@ class MailjetDeliveryTestCase(WebhookTestCase):
         event = kwargs['event']
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "delivered")
-        self.assertEqual(event.timestamp, datetime(2017, 6, 22, 1, 5, 27, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2017, 6, 22, 1, 5, 27, tzinfo=timezone.utc))
         self.assertEqual(event.esp_event, raw_events[0])
         self.assertEqual(event.mta_response, "sent (250 2.0.0 OK 1498093527 a67bc12345def.22 - gsmtp)")
         self.assertEqual(event.message_id, "12345678901234567")  # converted to str (matching backend status)
@@ -251,7 +250,7 @@ class MailjetDeliveryTestCase(WebhookTestCase):
         event = kwargs['event']
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "delivered")
-        self.assertEqual(event.timestamp, datetime(2017, 6, 22, 1, 5, 27, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2017, 6, 22, 1, 5, 27, tzinfo=timezone.utc))
         self.assertEqual(event.esp_event, raw_event)
         self.assertEqual(event.mta_response, "sent (250 2.0.0 OK 1498093527 a67bc12345def.22 - gsmtp)")
         self.assertEqual(event.message_id, "12345678901234567")  # converted to str (matching backend status)

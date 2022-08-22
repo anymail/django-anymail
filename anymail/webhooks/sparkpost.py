@@ -1,12 +1,12 @@
 import json
 from base64 import b64decode
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import AnymailBaseWebhookView
 from ..exceptions import AnymailConfigurationError
 from ..inbound import AnymailInboundMessage
 from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason
-from ..utils import get_anymail_setting, utc
+from ..utils import get_anymail_setting
 
 
 class SparkPostBaseWebhookView(AnymailBaseWebhookView):
@@ -126,7 +126,7 @@ class SparkPostTrackingWebhookView(SparkPostBaseWebhookView):
 
         event_type = self.event_types.get(event['type'], EventType.UNKNOWN)
         try:
-            timestamp = datetime.fromtimestamp(int(event['timestamp']), tz=utc)
+            timestamp = datetime.fromtimestamp(int(event['timestamp']), tz=timezone.utc)
         except (KeyError, TypeError, ValueError):
             timestamp = None
 

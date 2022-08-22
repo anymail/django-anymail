@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 import hashlib
 import hmac
@@ -10,7 +10,7 @@ from .base import AnymailBaseWebhookView, AnymailCoreWebhookView
 from ..exceptions import AnymailWebhookValidationFailure
 from ..inbound import AnymailInboundMessage
 from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType
-from ..utils import get_anymail_setting, getfirst, get_request_uri, utc
+from ..utils import get_anymail_setting, getfirst, get_request_uri
 
 
 class MandrillSignatureMixin(AnymailCoreWebhookView):
@@ -108,7 +108,7 @@ class MandrillCombinedWebhookView(MandrillSignatureMixin, AnymailBaseWebhookView
         event_type = self.event_types.get(esp_type, EventType.UNKNOWN)
 
         try:
-            timestamp = datetime.fromtimestamp(esp_event['ts'], tz=utc)
+            timestamp = datetime.fromtimestamp(esp_event['ts'], tz=timezone.utc)
         except (KeyError, ValueError):
             timestamp = None
 
@@ -169,7 +169,7 @@ class MandrillCombinedWebhookView(MandrillSignatureMixin, AnymailBaseWebhookView
         message.spam_score = esp_event['msg'].get('spam_report', {}).get('score', None)
 
         try:
-            timestamp = datetime.fromtimestamp(esp_event['ts'], tz=utc)
+            timestamp = datetime.fromtimestamp(esp_event['ts'], tz=timezone.utc)
         except (KeyError, ValueError):
             timestamp = None
 

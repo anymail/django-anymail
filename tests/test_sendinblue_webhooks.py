@@ -1,11 +1,10 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import ANY
 
 from django.test import tag
 
 from anymail.signals import AnymailTrackingEvent
-from anymail.utils import utc
 from anymail.webhooks.sendinblue import SendinBlueTrackingWebhookView
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 
@@ -60,7 +59,7 @@ class SendinBlueDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "queued")
         self.assertEqual(event.esp_event, raw_event)
-        self.assertEqual(event.timestamp, datetime(2018, 3, 6, 19, 10, 23, microsecond=0, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2018, 3, 6, 19, 10, 23, microsecond=0, tzinfo=timezone.utc))
         self.assertEqual(event.message_id, "<201803062010.27287306012@smtp-relay.mailin.fr>")
         self.assertIsNone(event.event_id)  # SendinBlue does not provide a unique event id
         self.assertEqual(event.recipient, "recipient@example.com")

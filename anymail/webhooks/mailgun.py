@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 import hashlib
 import hmac
@@ -9,7 +9,7 @@ from .base import AnymailBaseWebhookView
 from ..exceptions import AnymailConfigurationError, AnymailWebhookValidationFailure, AnymailInvalidAddress
 from ..inbound import AnymailInboundMessage
 from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason
-from ..utils import get_anymail_setting, combine, querydict_getfirst, parse_single_address, utc, UNSET
+from ..utils import get_anymail_setting, combine, querydict_getfirst, parse_single_address, UNSET
 
 
 class MailgunBaseWebhookView(AnymailBaseWebhookView):
@@ -114,7 +114,7 @@ class MailgunTrackingWebhookView(MailgunBaseWebhookView):
         recipient = event_data.get('recipient')
 
         try:
-            timestamp = datetime.fromtimestamp(float(event_data['timestamp']), tz=utc)
+            timestamp = datetime.fromtimestamp(float(event_data['timestamp']), tz=timezone.utc)
         except KeyError:
             timestamp = None
 
@@ -212,7 +212,8 @@ class MailgunTrackingWebhookView(MailgunBaseWebhookView):
                 "to Anymail's Mailgun *tracking* webhook URL.")
 
         event_type = self.legacy_event_types.get(esp_event.getfirst('event'), EventType.UNKNOWN)
-        timestamp = datetime.fromtimestamp(int(esp_event['timestamp']), tz=utc)  # use *last* value of timestamp
+        timestamp = datetime.fromtimestamp(
+            int(esp_event['timestamp']), tz=timezone.utc)  # use *last* value of timestamp
         # Message-Id is not documented for every event, but seems to always be included.
         # (It's sometimes spelled as 'message-id', lowercase, and missing the <angle-brackets>.)
         message_id = esp_event.getfirst('Message-Id', None) or esp_event.getfirst('message-id', None)
@@ -380,7 +381,7 @@ class MailgunInboundWebhookView(MailgunBaseWebhookView):
 
         return AnymailInboundEvent(
             event_type=EventType.INBOUND,
-            timestamp=datetime.fromtimestamp(int(request.POST['timestamp']), tz=utc),
+            timestamp=datetime.fromtimestamp(int(request.POST['timestamp']), tz=timezone.utc),
             event_id=request.POST.get('token', None),
             esp_event=esp_event,
             message=message,

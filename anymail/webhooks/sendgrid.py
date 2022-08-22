@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from email.parser import BytesParser
 from email.policy import default as default_policy
 
@@ -7,7 +7,6 @@ from email.policy import default as default_policy
 from .base import AnymailBaseWebhookView
 from ..inbound import AnymailInboundMessage
 from ..signals import AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason, inbound, tracking
-from ..utils import utc
 
 
 class SendGridTrackingWebhookView(AnymailBaseWebhookView):
@@ -47,7 +46,7 @@ class SendGridTrackingWebhookView(AnymailBaseWebhookView):
     def esp_to_anymail_event(self, esp_event):
         event_type = self.event_types.get(esp_event['event'], EventType.UNKNOWN)
         try:
-            timestamp = datetime.fromtimestamp(esp_event['timestamp'], tz=utc)
+            timestamp = datetime.fromtimestamp(esp_event['timestamp'], tz=timezone.utc)
         except (KeyError, ValueError):
             timestamp = None
 

@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import json
 from base64 import b64encode
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import ANY
 from urllib.parse import urljoin
 
@@ -10,7 +10,6 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings, tag
 
 from anymail.signals import AnymailTrackingEvent
-from anymail.utils import utc
 from anymail.webhooks.mandrill import MandrillCombinedWebhookView, MandrillTrackingWebhookView
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 
@@ -166,7 +165,7 @@ class MandrillTrackingTestCase(WebhookTestCase):
         event = kwargs['event']
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "sent")
-        self.assertEqual(event.timestamp, datetime(2016, 4, 19, 19, 47, 26, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2016, 4, 19, 19, 47, 26, tzinfo=timezone.utc))
         self.assertEqual(event.esp_event, raw_events[0])
         self.assertEqual(event.message_id, "abcdef012345789abcdef012345789")
         self.assertEqual(event.recipient, "recipient@example.com")

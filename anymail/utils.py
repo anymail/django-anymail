@@ -1,5 +1,4 @@
 import base64
-import datetime
 import mimetypes
 from base64 import b64encode
 from collections.abc import Mapping, MutableMapping
@@ -7,12 +6,10 @@ from email.mime.base import MIMEBase
 from email.utils import formatdate, getaddresses, parsedate_to_datetime, unquote
 from urllib.parse import urlsplit, urlunsplit
 
-from django import VERSION as DJANGO_VERSION
 from django.conf import settings
 from django.core.mail.message import DEFAULT_ATTACHMENT_MIME_TYPE, sanitize_address
 from django.utils.encoding import force_str
 from django.utils.functional import Promise
-from django.utils import timezone
 from requests.structures import CaseInsensitiveDict
 
 from .exceptions import AnymailConfigurationError, AnymailInvalidAddress
@@ -21,9 +18,6 @@ BASIC_NUMERIC_TYPES = (int, float)
 
 
 UNSET = type('UNSET', (object,), {})  # Used as non-None default value
-
-# Django 4.1 deprecated aliasing django.utils.timezone.utc
-utc = timezone.utc if DJANGO_VERSION < (3, 2, 0) else datetime.timezone.utc
 
 
 def combine(*args):

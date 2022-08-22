@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import ANY
 
 from django.test import tag
@@ -7,7 +7,6 @@ from django.utils.timezone import get_fixed_timezone
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent
-from anymail.utils import utc
 from anymail.webhooks.postmark import PostmarkTrackingWebhookView
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 
@@ -166,7 +165,7 @@ class PostmarkDeliveryTestCase(WebhookTestCase):
         self.assertEqual(event.event_type, "clicked")
         self.assertEqual(event.esp_event, raw_event)
         self.assertEqual(event.timestamp, datetime(2017, 10, 25, 15, 21, 11, microsecond=906561,
-                                                   tzinfo=utc))
+                                                   tzinfo=timezone.utc))
         self.assertEqual(event.message_id, "f4830d10-9c35-4f0c-bca3-3d9b459821f8")
         self.assertEqual(event.recipient, "recipient@example.com")
         self.assertEqual(event.user_agent, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) etc.")
@@ -248,7 +247,7 @@ class PostmarkDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "unsubscribed")
         self.assertEqual(event.esp_event, raw_event)
-        self.assertEqual(event.timestamp, datetime(2022, 6, 5, 17, 17, 32, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2022, 6, 5, 17, 17, 32, tzinfo=timezone.utc))
         self.assertEqual(event.message_id, "a4909a96-73d7-4c49-b148-a54522d3f7ac")
         self.assertEqual(event.recipient, "john@example.com",)
         self.assertEqual(event.reject_reason, "unsubscribed")
@@ -279,7 +278,7 @@ class PostmarkDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "subscribed")
         self.assertEqual(event.esp_event, raw_event)
-        self.assertEqual(event.timestamp, datetime(2022, 6, 5, 17, 17, 32, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2022, 6, 5, 17, 17, 32, tzinfo=timezone.utc))
         self.assertEqual(event.message_id, "a4909a96-73d7-4c49-b148-a54522d3f7ac")
         self.assertEqual(event.recipient, "john@example.com",)
         self.assertEqual(event.reject_reason, None)
@@ -310,7 +309,7 @@ class PostmarkDeliveryTestCase(WebhookTestCase):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "bounced")
         self.assertEqual(event.esp_event, raw_event)
-        self.assertEqual(event.timestamp, datetime(2022, 6, 5, 17, 17, 32,  tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2022, 6, 5, 17, 17, 32,  tzinfo=timezone.utc))
         self.assertEqual(event.message_id, "b4cb783d-78ed-43f2-983b-63f55c712dc8")
         self.assertEqual(event.recipient, "john@example.com",)
         self.assertEqual(event.reject_reason, "bounced")

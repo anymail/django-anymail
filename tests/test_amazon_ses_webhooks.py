@@ -1,13 +1,12 @@
 import json
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import ANY, patch
 
 from django.test import SimpleTestCase, override_settings, tag
 
 from anymail.exceptions import AnymailConfigurationError, AnymailInsecureWebhookWarning
 from anymail.signals import AnymailTrackingEvent
-from anymail.utils import utc
 from anymail.webhooks.amazon_ses import AmazonSESTrackingWebhookView
 
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
@@ -116,7 +115,10 @@ class AmazonSESNotificationsTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "bounced")
         self.assertEqual(event.esp_event, raw_ses_event)
-        self.assertEqual(event.timestamp, datetime(2018, 3, 26, 17, 58, 59, microsecond=675000, tzinfo=utc))  # SNS
+        self.assertEqual(
+            event.timestamp,
+            datetime(2018, 3, 26, 17, 58, 59, microsecond=675000, tzinfo=timezone.utc)
+        )  # SNS
         self.assertEqual(event.message_id, "00000138111222aa-33322211-cccc-cccc-cccc-ddddaaaa0680-000000")
         self.assertEqual(event.event_id, "19ba9823-d7f2-53c1-860e-cb10e0d13dfc")
         self.assertEqual(event.recipient, "jane@example.com")
@@ -264,7 +266,10 @@ class AmazonSESNotificationsTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "sent")
         self.assertEqual(event.esp_event, raw_ses_event)
-        self.assertEqual(event.timestamp, datetime(2018, 3, 26, 17, 58, 59, microsecond=675000, tzinfo=utc))  # SNS
+        self.assertEqual(
+            event.timestamp,
+            datetime(2018, 3, 26, 17, 58, 59, microsecond=675000, tzinfo=timezone.utc)
+        )  # SNS
         self.assertEqual(event.message_id, "7c191be45-e9aedb9a-02f9-4d12-a87d-dd0099a07f8a-000000")
         self.assertEqual(event.event_id, "19ba9823-d7f2-53c1-860e-cb10e0d13dfc")
         self.assertEqual(event.recipient, "recipient@example.com")

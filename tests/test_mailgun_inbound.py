@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from textwrap import dedent
 from unittest.mock import ANY
@@ -9,7 +9,6 @@ from django.test import override_settings, tag
 from anymail.exceptions import AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent
-from anymail.utils import utc
 from anymail.webhooks.mailgun import MailgunInboundWebhookView
 
 from .test_mailgun_webhooks import (
@@ -62,7 +61,7 @@ class MailgunInboundTestCase(WebhookTestCase):
         event = kwargs['event']
         self.assertIsInstance(event, AnymailInboundEvent)
         self.assertEqual(event.event_type, 'inbound')
-        self.assertEqual(event.timestamp, datetime(2016, 4, 21, 17, 55, 30, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2016, 4, 21, 17, 55, 30, tzinfo=timezone.utc))
         self.assertEqual(event.event_id, "06c96bafc3f42a66b9edd546347a2fe18dc23461fe80dc52f0")
         self.assertIsInstance(event.message, AnymailInboundMessage)
         self.assertEqual(querydict_to_postdict(event.esp_event.POST), raw_event)

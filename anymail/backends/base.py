@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
@@ -13,7 +13,7 @@ from ..message import AnymailStatus
 from ..signals import pre_send, post_send
 from ..utils import (
     Attachment, UNSET, combine, last, get_anymail_setting, parse_address_list, parse_single_address,
-    force_non_lazy, force_non_lazy_list, force_non_lazy_dict, is_lazy, utc)
+    force_non_lazy, force_non_lazy_list, force_non_lazy_dict, is_lazy)
 
 
 class AnymailBaseBackend(BaseEmailBackend):
@@ -394,7 +394,7 @@ class BasePayload:
                 dt = datetime(value.year, value.month, value.day)  # naive, midnight
             else:
                 try:
-                    dt = datetime.utcfromtimestamp(value).replace(tzinfo=utc)
+                    dt = datetime.utcfromtimestamp(value).replace(tzinfo=timezone.utc)
                 except (TypeError, ValueError):
                     return value
         if is_naive(dt):

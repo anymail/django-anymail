@@ -1,11 +1,10 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import ANY
 
 from django.test import override_settings, tag
 
 from anymail.signals import AnymailTrackingEvent
-from anymail.utils import utc
 from anymail.webhooks.sparkpost import SparkPostTrackingWebhookView
 
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
@@ -73,7 +72,7 @@ class SparkPostDeliveryTestCase(WebhookTestCase):
         event = kwargs['event']
         self.assertIsInstance(event, AnymailTrackingEvent)
         self.assertEqual(event.event_type, "queued")
-        self.assertEqual(event.timestamp, datetime(2016, 2, 2, 19, 50, 00, tzinfo=utc))
+        self.assertEqual(event.timestamp, datetime(2016, 2, 2, 19, 50, 00, tzinfo=timezone.utc))
         self.assertEqual(event.esp_event, raw_events[0])
         self.assertEqual(event.message_id, "65832150921904138")  # actually transmission_id
         self.assertEqual(event.event_id, "92356927693813856")

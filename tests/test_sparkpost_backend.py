@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
@@ -13,7 +13,6 @@ from anymail.exceptions import (
     AnymailAPIError, AnymailConfigurationError, AnymailRecipientsRefused,
     AnymailSerializationError, AnymailUnsupportedFeature)
 from anymail.message import attach_inline_image_file
-from anymail.utils import utc
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase
 from .utils import SAMPLE_IMAGE_FILENAME, decode_att, sample_image_content, sample_image_path
@@ -371,7 +370,7 @@ class SparkPostBackendAnymailFeatureTests(SparkPostBackendMockAPITestCase):
             self.assertEqual(data["options"]["start_time"], "2016-03-04T05:06:07-08:00")
 
             # Explicit UTC:
-            self.message.send_at = datetime(2016, 3, 4, 5, 6, 7, tzinfo=utc)
+            self.message.send_at = datetime(2016, 3, 4, 5, 6, 7, tzinfo=timezone.utc)
             self.message.send()
             data = self.get_api_call_json()
             self.assertEqual(data["options"]["start_time"], "2016-03-04T05:06:07+00:00")
