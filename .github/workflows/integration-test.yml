@@ -39,15 +39,15 @@ jobs:
         # Live API integration tests are run on only one representative Python/Django version
         # combination, to avoid rapidly consuming the testing accounts' entire send allotments.
         config:
-          - { tox: django40-py310-amazon_ses, python: "3.10" }
-          - { tox: django40-py310-mailgun, python: "3.10" }
-          - { tox: django40-py310-mailjet, python: "3.10" }
-          - { tox: django40-py310-mandrill, python: "3.10" }
-          - { tox: django40-py310-postal, python: "3.10" }
-          - { tox: django40-py310-postmark, python: "3.10" }
-          - { tox: django40-py310-sendgrid, python: "3.10" }
-          - { tox: django40-py310-sendinblue, python: "3.10" }
-          - { tox: django40-py310-sparkpost, python: "3.10" }
+          - { tox: django41-py310-amazon_ses, python: "3.10" }
+          - { tox: django41-py310-mailgun, python: "3.10" }
+          - { tox: django41-py310-mailjet, python: "3.10" }
+          - { tox: django41-py310-mandrill, python: "3.10" }
+          - { tox: django41-py310-postal, python: "3.10" }
+          - { tox: django41-py310-postmark, python: "3.10" }
+          - { tox: django41-py310-sendgrid, python: "3.10" }
+          - { tox: django41-py310-sendinblue, python: "3.10" }
+          - { tox: django41-py310-sparkpost, python: "3.10" }
 
     steps:
       - name: Get code
