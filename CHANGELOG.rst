@@ -28,7 +28,14 @@ Release history
 vNext
 -----
 
-*Unreleased changes*
+*Unreleased v9.0 changes*
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+* Require **Django 3.0 or later** and Python 3.6 or later. (For compatibility
+  with Django 2.x or Python 3.5, stay on the Anymail `v8.6 LTS`_ extended support
+  branch by setting your requirements to `django-anymail~=8.6`.)
 
 Features
 ~~~~~~~~
@@ -45,6 +52,11 @@ Fixes
 * **Postmark:** Handle Postmark's SubscriptionChange events as Anymail
   unsubscribe, subscribe, or bounce tracking events, rather than "unknown".
   (Thanks to `@puru02`_ for the fix.)
+
+Other
+~~~~~
+
+* Test on Python 3.11 with Django development (Django 4.2) branch.
 
 
 v8.6 LTS

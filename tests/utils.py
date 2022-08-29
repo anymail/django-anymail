@@ -36,10 +36,7 @@ SAMPLE_EMAIL_FILENAME = "sample_email.txt"
 
 def test_file_path(filename):
     """Returns path to a test file"""
-    # Must convert to a plain str while we support Python 3.5,
-    # because django.core.mail uses os.path functions that don't
-    # accept pathlib.Path until Python 3.6.
-    return str(TEST_FILES_DIR.joinpath(filename))
+    return TEST_FILES_DIR.joinpath(filename)
 
 
 def test_file_content(filename):
