@@ -52,6 +52,10 @@ Fixes
 * **Postmark:** Handle Postmark's SubscriptionChange events as Anymail
   unsubscribe, subscribe, or bounce tracking events, rather than "unknown".
   (Thanks to `@puru02`_ for the fix.)
+* **Sendinblue:** Work around recent (unannounced) Sendinblue API change
+  that caused "Invalid headers" API error with non-string custom header
+  values. Anymail now converts int and float header values to strings.
+
 
 Other
 ~~~~~

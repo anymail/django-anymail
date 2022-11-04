@@ -3,7 +3,7 @@ from requests.structures import CaseInsensitiveDict
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
-from ..utils import get_anymail_setting
+from ..utils import get_anymail_setting, BASIC_NUMERIC_TYPES
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -112,7 +112,12 @@ class SendinBluePayload(RequestsPayload):
             self.data['replyTo'] = self.email_object(emails[0])
 
     def set_extra_headers(self, headers):
-        self.data['headers'].update(headers)
+        # SendinBlue requires header values to be strings -- not integers -- as of 11/2022.
+        # We'll stringify ints and floats; anything else is the caller's responsibility.
+        self.data["headers"].update({
+            k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
+            for k, v in headers.items()
+        })
 
     def set_tags(self, tags):
         if len(tags) > 0:

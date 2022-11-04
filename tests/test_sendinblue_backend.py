@@ -118,7 +118,8 @@ class SendinBlueBackendStandardEmailTests(SendinBlueBackendMockAPITestCase):
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(data['headers']['X-Custom'], 'string')
-        self.assertEqual(data['headers']['X-Num'], 123)
+        # Header values must be strings (changed 11/2022)
+        self.assertEqual(data['headers']['X-Num'], "123")
         # Reply-To must be moved to separate param
         self.assertNotIn('Reply-To', data['headers'])
         self.assertEqual(data['replyTo'], {'name': "Do Not Reply", 'email': "noreply@example.com"})
