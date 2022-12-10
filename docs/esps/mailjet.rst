@@ -55,7 +55,7 @@ Anymail will also look for ``MAILJET_API_KEY`` and ``MAILJET_SECRET_KEY`` at the
 root of the settings file if neither ``ANYMAIL["MAILJET_API_KEY"]``
 nor ``ANYMAIL_MAILJET_API_KEY`` is set.
 
-.. _API Key Management: https://app.mailjet.com/account/api_keys
+.. _API Key Management: https://app.mailjet.com/account/apikeys
 
 
 .. setting:: ANYMAIL_MAILJET_API_URL
