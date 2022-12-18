@@ -40,7 +40,7 @@ Email Service Provider                        |Amazon SES|  |Mailgun|    |Mailje
 :attr:`~AnymailMessage.envelope_sender`       Yes           Domain only  Yes         Domain only  Yes         No          No          No            Yes
 :attr:`~AnymailMessage.metadata`              Yes           Yes          Yes         Yes          No          Yes         Yes         Yes           Yes
 :attr:`~AnymailMessage.merge_metadata`        No            Yes          Yes         Yes          No          Yes         Yes         No            Yes
-:attr:`~AnymailMessage.send_at`               No            Yes          No          Yes          No          No          Yes         No            Yes
+:attr:`~AnymailMessage.send_at`               No            Yes          No          Yes          No          No          Yes         Yes           Yes
 :attr:`~AnymailMessage.tags`                  Yes           Yes          Max 1 tag   Yes          Max 1 tag   Max 1 tag   Yes         Yes           Max 1 tag
 :attr:`~AnymailMessage.track_clicks`          No            Yes          Yes         Yes          No          Yes         Yes         No            Yes
 :attr:`~AnymailMessage.track_opens`           No            Yes          Yes         Yes          No          Yes         Yes         No            Yes

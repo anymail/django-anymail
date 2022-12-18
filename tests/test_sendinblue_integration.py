@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import datetime, timedelta
 from email.utils import formataddr
 
 from django.test import SimpleTestCase, override_settings, tag
@@ -55,6 +56,7 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(anymail_status.message_id, message_id)
 
     def test_all_options(self):
+        send_at = datetime.now() + timedelta(minutes=2)
         message = AnymailMessage(
             subject="Anymail SendinBlue all-options integration test",
             body="This is the text body",
@@ -66,6 +68,7 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             headers={"X-Anymail-Test": "value", "X-Anymail-Count": 3},
 
             metadata={"meta1": "simple string", "meta2": 2},
+            send_at=send_at,
             tags=["tag 1", "tag 2"],
         )
         message.attach_alternative('<p>HTML content</p>', "text/html")  # SendinBlue requires an HTML body

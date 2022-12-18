@@ -1,6 +1,6 @@
 import json
 from base64 import b64encode, b64decode
-from datetime import datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
@@ -294,10 +294,41 @@ class SendinBlueBackendAnymailFeatureTests(SendinBlueBackendMockAPITestCase):
 
         with override_current_timezone(utc_plus_6):
             # Timezone-aware datetime converted to UTC:
-            self.message.send_at = datetime(2016, 3, 4, 5, 6, 7, tzinfo=utc_minus_8)
+            self.message.send_at = datetime(2016, 3, 4, 5, 6, 7, 8000, tzinfo=utc_minus_8)
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data['scheduledAt'], "2016-03-04T05:06:07.008-08:00")
 
-            with self.assertRaises(AnymailUnsupportedFeature):
-                self.message.send()
+            # Explicit UTC:
+            self.message.send_at = datetime(2016, 3, 4, 5, 6, 7, tzinfo=timezone.utc)
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data['scheduledAt'], "2016-03-04T05:06:07.000+00:00")
+
+            # Timezone-naive datetime assumed to be Django current_timezone
+            # (also checks stripping microseconds)
+            self.message.send_at = datetime(2022, 10, 11, 12, 13, 14, 567)
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data['scheduledAt'], "2022-10-11T12:13:14.000+06:00")
+
+            # Date-only treated as midnight in current timezone
+            self.message.send_at = date(2022, 10, 22)
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data['scheduledAt'], "2022-10-22T00:00:00.000+06:00")
+
+            # POSIX timestamp
+            self.message.send_at = 1651820889  # 2022-05-06 07:08:09 UTC
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data['scheduledAt'], "2022-05-06T07:08:09.000+00:00")
+
+            # String passed unchanged (this is *not* portable between ESPs)
+            self.message.send_at = "2022-10-13T18:02:00.123-11:30"
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data['scheduledAt'], "2022-10-13T18:02:00.123-11:30")
 
     def test_tag(self):
         self.message.tags = ["receipt", "multiple"]

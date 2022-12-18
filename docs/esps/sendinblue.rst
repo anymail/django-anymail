@@ -78,18 +78,20 @@ set a message's :attr:`~anymail.message.AnymailMessage.esp_extra` to
 a `dict` that will be merged into the json sent to Sendinblue's
 `smtp/email API`_.
 
-Example:
+For example, you could set Sendinblue's *batchId* for use with
+their `batched scheduled sending`_:
 
     .. code-block:: python
 
         message.esp_extra = {
-            'hypotheticalFutureSendinblueParam': '2022',  # merged into send params
+            'batchId': '275d3289-d5cb-4768-9460-a990054b6c81',  # merged into send params
         }
 
 
 (You can also set `"esp_extra"` in Anymail's :ref:`global send defaults <send-defaults>`
 to apply it to all messages.)
 
+.. _batched scheduled sending: https://developers.sendinblue.com/docs/schedule-batch-sendings
 .. _smtp/email API: https://developers.sendinblue.com/v3.0/reference#sendtransacemail
 
 
@@ -141,8 +143,10 @@ Sendinblue can handle.
   as a JSON-encoded string using their :mailheader:`X-Mailin-custom` email header.
   The metadata is available in tracking webhooks.
 
-**No delayed sending**
-  Sendinblue does not support :attr:`~anymail.message.AnymailMessage.send_at`.
+**Delayed sending**
+  .. versionadded:: 9.0
+     Earlier versions of Anymail did not support :attr:`~anymail.message.AnymailMessage.send_at`
+     with Sendinblue.
 
 **No click-tracking or open-tracking options**
   Sendinblue does not provide a way to control open or click tracking for individual

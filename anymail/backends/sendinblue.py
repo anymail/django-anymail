@@ -162,3 +162,10 @@ class SendinBluePayload(RequestsPayload):
     def set_metadata(self, metadata):
         # SendinBlue expects a single string payload
         self.data['headers']["X-Mailin-custom"] = self.serialize_json(metadata)
+
+    def set_send_at(self, send_at):
+        try:
+            start_time_iso = send_at.isoformat(timespec="milliseconds")
+        except (AttributeError, TypeError):
+            start_time_iso = send_at  # assume user already formatted
+        self.data['scheduledAt'] = start_time_iso
