@@ -19,7 +19,7 @@ jobs:
       envlist: ${{ steps.generate-envlist.outputs.envlist }}
     steps:
       - name: Get code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install tox-gh-matrix
         run: |
           python -m pip install 'tox<4' 'tox-gh-matrix<0.2'
@@ -47,16 +47,16 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Get code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup Python ${{ matrix.tox.python.version }}
         # Ensure matrix Python version is installed and available for tox
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.tox.python.spec }}
       - name: Setup default Python
         # Change default Python version back to something consistent
         # for installing/running tox
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: "3.8"
       - name: Install tox

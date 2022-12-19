@@ -17,12 +17,13 @@ jobs:
     # Avoid running the live integration tests twice on the same code
     # (to conserve limited sending quotas in the live ESP test accounts)
     runs-on: ubuntu-20.04
+    continue-on-error: true
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
       - id: skip_check
-        # uses: fkirc/skip-duplicate-actions@v3.4.1
-        uses: fkirc/skip-duplicate-actions@f75dd6564bb646f95277dc8c3b80612e46a4a1ea
+        # uses: fkirc/skip-duplicate-actions@v5.3.0
+        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281
         with:
           concurrent_skipping: "same_content_newer"
           cancel_others: "true"
@@ -51,9 +52,9 @@ jobs:
 
     steps:
       - name: Get code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup Python ${{ matrix.config.python }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.config.python }}
       - name: Install tox
