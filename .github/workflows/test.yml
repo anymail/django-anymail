@@ -26,14 +26,9 @@ jobs:
           python -m tox --version
       - name: Generate tox envlist
         id: generate-envlist
-        # Ugh. pypy-3.8-v7.3.8 accidentally includes an ancient sqlite unusable by Django,
-        # so change "pypy-3.8" to specific (older) version "pypy-3.8-v7.3.7".
-        # (Remove these `sed` commands after pypy-3.8-v7.3.9 is released.)
-        # https://foss.heptapod.net/pypy/pypy/-/issues/3690
-        # https://github.com/actions/setup-python/issues/339
         run: |
-          python -m tox --gh-matrix | sed -e 's/"pypy-3\.8"/"pypy-3.8-v7.3.7"/g'
-          python -m tox --gh-matrix-dump | sed -e 's/"pypy-3\.8"/"pypy-3.8-v7.3.7"/g'  # for debugging
+          python -m tox --gh-matrix
+          python -m tox --gh-matrix-dump  # for debugging
 
   test:
     runs-on: ubuntu-20.04
