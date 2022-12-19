@@ -34,4 +34,4 @@ Documentation
    contributing
    changelog
    Docs privacy <docs_privacy>
-
+   Source code (on GitHub) <https://github.com/anymail/django-anymail>
