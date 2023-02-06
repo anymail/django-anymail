@@ -1,18 +1,20 @@
-from email.charset import Charset, QP
+from email.charset import QP, Charset
 from email.mime.text import MIMEText
 
-from .base import AnymailBaseBackend, BasePayload
 from .._version import __version__
 from ..exceptions import AnymailAPIError, AnymailImproperlyInstalled
 from ..message import AnymailRecipientStatus
-from ..utils import get_anymail_setting, UNSET
+from ..utils import UNSET, get_anymail_setting
+from .base import AnymailBaseBackend, BasePayload
 
 try:
     import boto3
     from botocore.client import Config
     from botocore.exceptions import BotoCoreError, ClientError, ConnectionError
 except ImportError as err:
-    raise AnymailImproperlyInstalled(missing_package='boto3', backend='amazon_ses') from err
+    raise AnymailImproperlyInstalled(
+        missing_package="boto3", backend="amazon_ses"
+    ) from err
 
 
 # boto3 has several root exception classes; this is meant to cover all of them
@@ -29,19 +31,34 @@ class EmailBackend(AnymailBaseBackend):
     def __init__(self, **kwargs):
         """Init options from Django settings"""
         super().__init__(**kwargs)
-        # AMAZON_SES_CLIENT_PARAMS is optional - boto3 can find credentials several other ways
-        self.session_params, self.client_params = _get_anymail_boto3_params(kwargs=kwargs)
-        self.configuration_set_name = get_anymail_setting("configuration_set_name", esp_name=self.esp_name,
-                                                          kwargs=kwargs, allow_bare=False, default=None)
-        self.message_tag_name = get_anymail_setting("message_tag_name", esp_name=self.esp_name,
-                                                    kwargs=kwargs, allow_bare=False, default=None)
+        # AMAZON_SES_CLIENT_PARAMS is optional
+        # (boto3 can find credentials several other ways)
+        self.session_params, self.client_params = _get_anymail_boto3_params(
+            kwargs=kwargs
+        )
+        self.configuration_set_name = get_anymail_setting(
+            "configuration_set_name",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            allow_bare=False,
+            default=None,
+        )
+        self.message_tag_name = get_anymail_setting(
+            "message_tag_name",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            allow_bare=False,
+            default=None,
+        )
         self.client = None
 
     def open(self):
         if self.client:
             return False  # already exists
         try:
-            self.client = boto3.session.Session(**self.session_params).client("ses", **self.client_params)
+            self.client = boto3.session.Session(**self.session_params).client(
+                "ses", **self.client_params
+            )
         except BOTO_BASE_ERRORS:
             if not self.fail_silently:
                 raise
@@ -51,7 +68,7 @@ class EmailBackend(AnymailBaseBackend):
     def close(self):
         if self.client is None:
             return
-        # self.client.close()  # boto3 doesn't currently seem to support (or require) this
+        # self.client.close()  # boto3 doesn't support (or require) client shutdown
         self.client = None
 
     def build_message_payload(self, message, defaults):
@@ -66,9 +83,15 @@ class EmailBackend(AnymailBaseBackend):
         try:
             response = payload.call_send_api(self.client)
         except BOTO_BASE_ERRORS as err:
-            # ClientError has a response attr with parsed json error response (other errors don't)
-            raise AnymailAPIError(str(err), backend=self, email_message=message, payload=payload,
-                                  response=getattr(err, 'response', None)) from err
+            # ClientError has a response attr with parsed json error response
+            # (other errors don't)
+            raise AnymailAPIError(
+                str(err),
+                backend=self,
+                email_message=message,
+                payload=payload,
+                response=getattr(err, "response", None),
+            ) from err
         return response
 
     def parse_recipient_status(self, response, payload, message):
@@ -105,15 +128,19 @@ class AmazonSESSendRawEmailPayload(AmazonSESBasePayload):
         #     (which is Django email's default for most non-ASCII bodies)
         #   - you are using an SES ConfigurationSet with open or click tracking enabled
         # then SES replaces the non-ASCII characters with question marks as it rewrites
-        # the message to add tracking. Forcing `CTE: quoted-printable` avoids the problem.
-        # (https://forums.aws.amazon.com/thread.jspa?threadID=287048)
+        # the message to add tracking. Forcing `CTE: quoted-printable` avoids the
+        # problem. (https://forums.aws.amazon.com/thread.jspa?threadID=287048)
         for part in self.mime_message.walk():
-            if part.get_content_maintype() == "text" and part["Content-Transfer-Encoding"] == "8bit":
+            if (
+                part.get_content_maintype() == "text"
+                and part["Content-Transfer-Encoding"] == "8bit"
+            ):
                 content = part.get_payload()
                 del part["Content-Transfer-Encoding"]
                 qp_charset = Charset(part.get_content_charset("us-ascii"))
                 qp_charset.body_encoding = QP
-                # (can't use part.set_payload, because SafeMIMEText can undo this workaround)
+                # (can't use part.set_payload, because SafeMIMEText can undo
+                # this workaround)
                 MIMEText.set_payload(part, content, charset=qp_charset)
 
     def call_send_api(self, ses_client):
@@ -121,9 +148,7 @@ class AmazonSESSendRawEmailPayload(AmazonSESBasePayload):
         # Any non-ASCII characters in recipient domains must be encoded with Punycode.
         # (Amazon SES doesn't support non-ASCII recipient usernames.)
         self.params["Destinations"] = [email.address for email in self.all_recipients]
-        self.params["RawMessage"] = {
-            "Data": self.mime_message.as_bytes()
-        }
+        self.params["RawMessage"] = {"Data": self.mime_message.as_bytes()}
         return ses_client.send_raw_email(**self.params)
 
     def parse_recipient_status(self, response):
@@ -132,23 +157,34 @@ class AmazonSESSendRawEmailPayload(AmazonSESBasePayload):
         except (KeyError, TypeError) as err:
             raise AnymailAPIError(
                 "%s parsing Amazon SES send result %r" % (str(err), response),
-                backend=self.backend, email_message=self.message, payload=self) from None
+                backend=self.backend,
+                email_message=self.message,
+                payload=self,
+            ) from None
 
-        recipient_status = AnymailRecipientStatus(message_id=message_id, status="queued")
-        return {recipient.addr_spec: recipient_status for recipient in self.all_recipients}
+        recipient_status = AnymailRecipientStatus(
+            message_id=message_id, status="queued"
+        )
+        return {
+            recipient.addr_spec: recipient_status for recipient in self.all_recipients
+        }
 
     # Standard EmailMessage attrs...
-    # These all get rolled into the RFC-5322 raw mime directly via EmailMessage.message()
+    # These all get rolled into the RFC-5322 raw mime directly via
+    # EmailMessage.message()
 
     def _no_send_defaults(self, attr):
         # Anymail global send defaults don't work for standard attrs, because the
         # merged/computed value isn't forced back into the EmailMessage.
         if attr in self.defaults:
-            self.unsupported_feature("Anymail send defaults for '%s' with Amazon SES" % attr)
+            self.unsupported_feature(
+                "Anymail send defaults for '%s' with Amazon SES" % attr
+            )
 
     def set_from_email_list(self, emails):
-        # Although Amazon SES will send messages with any From header, it can only parse Source
-        # if the From header is a single email. Explicit Source avoids an "Illegal address" error:
+        # Although Amazon SES will send messages with any From header, it can only parse
+        # Source if the From header is a single email. Explicit Source avoids an
+        # "Illegal address" error:
         if len(emails) > 1:
             self.params["Source"] = emails[0].addr_spec
         # (else SES will look at the (single) address in the From header)
@@ -212,29 +248,38 @@ class AmazonSESSendRawEmailPayload(AmazonSESBasePayload):
         #   notifications for SES *events* but not SES *notifications*. (Got that?)
         #   Message Tags also allow *very* limited characters in both name and value.
         #   Message Tags can be sent with any SES send call.
-        # (See "How do message tags work?" in https://aws.amazon.com/blogs/ses/introducing-sending-metrics/
+        # (See "How do message tags work?" in
+        # https://aws.amazon.com/blogs/ses/introducing-sending-metrics/
         # and https://forums.aws.amazon.com/thread.jspa?messageID=782922.)
-        # To support reliable retrieval in webhooks, just use custom headers for metadata.
+        # To support reliable retrieval in webhooks, just use custom headers for
+        # metadata.
         self.mime_message["X-Metadata"] = self.serialize_json(metadata)
 
     def set_tags(self, tags):
-        # See note about Amazon SES Message Tags and custom headers in set_metadata above.
-        # To support reliable retrieval in webhooks, use custom headers for tags.
+        # See note about Amazon SES Message Tags and custom headers in set_metadata
+        # above. To support reliable retrieval in webhooks, use custom headers for tags.
         # (There are no restrictions on number or content for custom header tags.)
         for tag in tags:
-            self.mime_message.add_header("X-Tag", tag)  # creates multiple X-Tag headers, one per tag
+            # creates multiple X-Tag headers, one per tag:
+            self.mime_message.add_header("X-Tag", tag)
 
         # Also *optionally* pass a single Message Tag if the AMAZON_SES_MESSAGE_TAG_NAME
-        # Anymail setting is set (default no). The AWS API restricts tag content in this case.
-        # (This is useful for dashboard segmentation; use esp_extra["Tags"] for anything more complex.)
+        # Anymail setting is set (default no). The AWS API restricts tag content in this
+        # case. (This is useful for dashboard segmentation; use esp_extra["Tags"] for
+        # anything more complex.)
         if tags and self.backend.message_tag_name is not None:
             if len(tags) > 1:
-                self.unsupported_feature("multiple tags with the AMAZON_SES_MESSAGE_TAG_NAME setting")
+                self.unsupported_feature(
+                    "multiple tags with the AMAZON_SES_MESSAGE_TAG_NAME setting"
+                )
             self.params.setdefault("Tags", []).append(
-                {"Name": self.backend.message_tag_name, "Value": tags[0]})
+                {"Name": self.backend.message_tag_name, "Value": tags[0]}
+            )
 
     def set_template_id(self, template_id):
-        raise NotImplementedError("AmazonSESSendRawEmailPayload should not have been used with template_id")
+        raise NotImplementedError(
+            "AmazonSESSendRawEmailPayload should not have been used with template_id"
+        )
 
     def set_merge_data(self, merge_data):
         self.unsupported_feature("merge_data without template_id")
@@ -254,15 +299,24 @@ class AmazonSESSendBulkTemplatedEmailPayload(AmazonSESBasePayload):
         # include any 'cc' or 'bcc' in every destination
         cc_and_bcc_addresses = {}
         if self.recipients["cc"]:
-            cc_and_bcc_addresses["CcAddresses"] = [cc.address for cc in self.recipients["cc"]]
+            cc_and_bcc_addresses["CcAddresses"] = [
+                cc.address for cc in self.recipients["cc"]
+            ]
         if self.recipients["bcc"]:
-            cc_and_bcc_addresses["BccAddresses"] = [bcc.address for bcc in self.recipients["bcc"]]
+            cc_and_bcc_addresses["BccAddresses"] = [
+                bcc.address for bcc in self.recipients["bcc"]
+            ]
 
         # set up destination and data for each 'to'
-        self.params["Destinations"] = [{
-            "Destination": dict(ToAddresses=[to.address], **cc_and_bcc_addresses),
-            "ReplacementTemplateData": self.serialize_json(self.merge_data.get(to.addr_spec, {}))
-        } for to in self.recipients["to"]]
+        self.params["Destinations"] = [
+            {
+                "Destination": dict(ToAddresses=[to.address], **cc_and_bcc_addresses),
+                "ReplacementTemplateData": self.serialize_json(
+                    self.merge_data.get(to.addr_spec, {})
+                ),
+            }
+            for to in self.recipients["to"]
+        ]
 
         return ses_client.send_bulk_templated_email(**self.params)
 
@@ -272,25 +326,33 @@ class AmazonSESSendBulkTemplatedEmailPayload(AmazonSESBasePayload):
             anymail_statuses = [
                 AnymailRecipientStatus(
                     message_id=status.get("MessageId", None),
-                    status='queued' if status.get("Status") == "Success" else 'failed')
+                    status="queued" if status.get("Status") == "Success" else "failed",
+                )
                 for status in response["Status"]
             ]
         except (KeyError, TypeError) as err:
             raise AnymailAPIError(
                 "%s parsing Amazon SES send result %r" % (str(err), response),
-                backend=self.backend, email_message=self.message, payload=self) from None
+                backend=self.backend,
+                email_message=self.message,
+                payload=self,
+            ) from None
 
         to_addrs = [to.addr_spec for to in self.recipients["to"]]
         if len(anymail_statuses) != len(to_addrs):
             raise AnymailAPIError(
-                "Sent to %d destinations, but only %d statuses in Amazon SES send result %r"
-                % (len(to_addrs), len(anymail_statuses), response),
-                backend=self.backend, email_message=self.message, payload=self)
+                "Sent to %d destinations, but only %d statuses in Amazon SES"
+                " send result %r" % (len(to_addrs), len(anymail_statuses), response),
+                backend=self.backend,
+                email_message=self.message,
+                payload=self,
+            )
 
         return dict(zip(to_addrs, anymail_statuses))
 
     def set_from_email(self, email):
-        self.params["Source"] = email.address  # this will RFC2047-encode display_name if needed
+        # this will RFC2047-encode display_name if needed:
+        self.params["Source"] = email.address
 
     def set_recipients(self, recipient_type, emails):
         # late-bound in call_send_api
@@ -330,16 +392,23 @@ class AmazonSESSendBulkTemplatedEmailPayload(AmazonSESBasePayload):
         self.unsupported_feature("metadata with template")
 
     def set_tags(self, tags):
-        # no custom headers with SendBulkTemplatedEmail, but support AMAZON_SES_MESSAGE_TAG_NAME if used
-        # (see tags/metadata in AmazonSESSendRawEmailPayload for more info)
+        # no custom headers with SendBulkTemplatedEmail, but support
+        # AMAZON_SES_MESSAGE_TAG_NAME if used (see tags/metadata in
+        # AmazonSESSendRawEmailPayload for more info)
         if tags:
             if self.backend.message_tag_name is not None:
                 if len(tags) > 1:
-                    self.unsupported_feature("multiple tags with the AMAZON_SES_MESSAGE_TAG_NAME setting")
-                self.params["DefaultTags"] = [{"Name": self.backend.message_tag_name, "Value": tags[0]}]
+                    self.unsupported_feature(
+                        "multiple tags with the AMAZON_SES_MESSAGE_TAG_NAME setting"
+                    )
+                self.params["DefaultTags"] = [
+                    {"Name": self.backend.message_tag_name, "Value": tags[0]}
+                ]
             else:
                 self.unsupported_feature(
-                    "tags with template (unless using the AMAZON_SES_MESSAGE_TAG_NAME setting)")
+                    "tags with template (unless using the"
+                    " AMAZON_SES_MESSAGE_TAG_NAME setting)"
+                )
 
     def set_template_id(self, template_id):
         self.params["Template"] = template_id
@@ -363,13 +432,20 @@ def _get_anymail_boto3_params(esp_name=EmailBackend.esp_name, kwargs=None):
     May remove keys from kwargs, but won't modify original settings
     """
     # (shared with ..webhooks.amazon_ses)
-    session_params = get_anymail_setting("session_params", esp_name=esp_name, kwargs=kwargs, default={})
-    client_params = get_anymail_setting("client_params", esp_name=esp_name, kwargs=kwargs, default={})
+    session_params = get_anymail_setting(
+        "session_params", esp_name=esp_name, kwargs=kwargs, default={}
+    )
+    client_params = get_anymail_setting(
+        "client_params", esp_name=esp_name, kwargs=kwargs, default={}
+    )
 
     # Add Anymail user-agent, and convert config dict to botocore.client.Config
     client_params = client_params.copy()  # don't modify source
-    config = Config(user_agent_extra="django-anymail/{version}-{esp}".format(
-        esp=esp_name.lower().replace(" ", "-"), version=__version__))
+    config = Config(
+        user_agent_extra="django-anymail/{version}-{esp}".format(
+            esp=esp_name.lower().replace(" ", "-"), version=__version__
+        )
+    )
     if "config" in client_params:
         # convert config dict to botocore.client.Config if needed
         client_params_config = client_params["config"]

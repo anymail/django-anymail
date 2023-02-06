@@ -16,42 +16,63 @@ SAMPLE_IMAGE_CONTENT = sample_image_content()
 class AnymailInboundMessageConstructionTests(SimpleTestCase):
     def test_construct_params(self):
         msg = AnymailInboundMessage.construct(
-            from_email="from@example.com", to="to@example.com", cc="cc@example.com",
-            subject="test subject")
-        self.assertEqual(msg['From'], "from@example.com")
-        self.assertEqual(msg['To'], "to@example.com")
-        self.assertEqual(msg['Cc'], "cc@example.com")
-        self.assertEqual(msg['Subject'], "test subject")
+            from_email="from@example.com",
+            to="to@example.com",
+            cc="cc@example.com",
+            subject="test subject",
+        )
+        self.assertEqual(msg["From"], "from@example.com")
+        self.assertEqual(msg["To"], "to@example.com")
+        self.assertEqual(msg["Cc"], "cc@example.com")
+        self.assertEqual(msg["Subject"], "test subject")
 
-        self.assertEqual(msg.defects, [])  # ensures email.message.Message.__init__ ran
-        self.assertIsNone(msg.envelope_recipient)  # ensures AnymailInboundMessage.__init__ ran
+        # ensures email.message.Message.__init__ ran:
+        self.assertEqual(msg.defects, [])
+        # ensures AnymailInboundMessage.__init__ ran:
+        self.assertIsNone(msg.envelope_recipient)
 
     def test_construct_headers_from_mapping(self):
         msg = AnymailInboundMessage.construct(
-            headers={'Reply-To': "reply@example.com", 'X-Test': "anything"})
-        self.assertEqual(msg['reply-to'], "reply@example.com")  # headers are case-insensitive
-        self.assertEqual(msg['X-TEST'], "anything")
+            headers={"Reply-To": "reply@example.com", "X-Test": "anything"}
+        )
+        # headers are case-insensitive:
+        self.assertEqual(msg["reply-to"], "reply@example.com")
+        self.assertEqual(msg["X-TEST"], "anything")
 
     def test_construct_headers_from_pairs(self):
         # allows multiple instances of a header
         msg = AnymailInboundMessage.construct(
-            headers=[['Reply-To', "reply@example.com"],
-                     ['Received', "by 10.1.1.4 with SMTP id q4csp; Sun, 22 Oct 2017 00:23:22 -0700 (PDT)"],
-                     ['Received', "from mail.example.com (mail.example.com. [10.10.1.9])"
-                                  " by mx.example.com with SMTPS id 93s8iok for <to@example.com>;"
-                                  " Sun, 22 Oct 2017 00:23:21 -0700 (PDT)"],
-                     ])
-        self.assertEqual(msg['Reply-To'], "reply@example.com")
-        self.assertEqual(msg.get_all('Received'), [
-            "by 10.1.1.4 with SMTP id q4csp; Sun, 22 Oct 2017 00:23:22 -0700 (PDT)",
-            "from mail.example.com (mail.example.com. [10.10.1.9])"
-            " by mx.example.com with SMTPS id 93s8iok for <to@example.com>;"
-            " Sun, 22 Oct 2017 00:23:21 -0700 (PDT)"])
+            headers=[
+                ["Reply-To", "reply@example.com"],
+                [
+                    "Received",
+                    "by 10.1.1.4 with SMTP id q4csp;"
+                    " Sun, 22 Oct 2017 00:23:22 -0700 (PDT)",
+                ],
+                [
+                    "Received",
+                    "from mail.example.com (mail.example.com. [10.10.1.9])"
+                    " by mx.example.com with SMTPS id 93s8iok for <to@example.com>;"
+                    " Sun, 22 Oct 2017 00:23:21 -0700 (PDT)",
+                ],
+            ]
+        )
+        self.assertEqual(msg["Reply-To"], "reply@example.com")
+        self.assertEqual(
+            msg.get_all("Received"),
+            [
+                "by 10.1.1.4 with SMTP id q4csp; Sun, 22 Oct 2017 00:23:22 -0700 (PDT)",
+                "from mail.example.com (mail.example.com. [10.10.1.9])"
+                " by mx.example.com with SMTPS id 93s8iok for <to@example.com>;"
+                " Sun, 22 Oct 2017 00:23:21 -0700 (PDT)",
+            ],
+        )
 
     def test_construct_headers_from_raw(self):
         # (note header "folding" in second Received header)
         msg = AnymailInboundMessage.construct(
-            raw_headers=dedent("""\
+            raw_headers=dedent(
+                """\
                 Reply-To: reply@example.com
                 Subject: raw subject
                 Content-Type: x-custom/custom
@@ -59,86 +80,125 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
                 Received: from mail.example.com (mail.example.com. [10.10.1.9])
                  by mx.example.com with SMTPS id 93s8iok for <to@example.com>;
                  Sun, 22 Oct 2017 00:23:21 -0700 (PDT)
-                """),
-            subject="Explicit subject overrides raw")
-        self.assertEqual(msg['Reply-To'], "reply@example.com")
-        self.assertEqual(msg.get_all('Received'), [
-            "by 10.1.1.4 with SMTP id q4csp; Sun, 22 Oct 2017 00:23:22 -0700 (PDT)",
-            "from mail.example.com (mail.example.com. [10.10.1.9])"  # unfolding should have stripped newlines
-            " by mx.example.com with SMTPS id 93s8iok for <to@example.com>;"
-            " Sun, 22 Oct 2017 00:23:21 -0700 (PDT)"])
-        self.assertEqual(msg.get_all('Subject'), ["Explicit subject overrides raw"])
-        self.assertEqual(msg.get_all('Content-Type'), ["multipart/mixed"])  # Content-Type in raw header ignored
+                """  # NOQA: E501
+            ),
+            subject="Explicit subject overrides raw",
+        )
+        self.assertEqual(msg["Reply-To"], "reply@example.com")
+        self.assertEqual(
+            msg.get_all("Received"),
+            [
+                # unfolding should have stripped newlines
+                "by 10.1.1.4 with SMTP id q4csp; Sun, 22 Oct 2017 00:23:22 -0700 (PDT)",
+                "from mail.example.com (mail.example.com. [10.10.1.9])"
+                " by mx.example.com with SMTPS id 93s8iok for <to@example.com>;"
+                " Sun, 22 Oct 2017 00:23:21 -0700 (PDT)",
+            ],
+        )
+        self.assertEqual(msg.get_all("Subject"), ["Explicit subject overrides raw"])
+        # Content-Type in raw header ignored:
+        self.assertEqual(msg.get_all("Content-Type"), ["multipart/mixed"])
 
     def test_construct_bodies(self):
         # this verifies we construct the expected MIME structure;
         # see the `text` and `html` props (in the ConveniencePropTests below)
         # for an easier way to get to these fields (that works however constructed)
         msg = AnymailInboundMessage.construct(text="Plaintext body", html="HTML body")
-        self.assertEqual(msg['Content-Type'], "multipart/mixed")
+        self.assertEqual(msg["Content-Type"], "multipart/mixed")
         self.assertEqual(len(msg.get_payload()), 1)
 
         related = msg.get_payload(0)
-        self.assertEqual(related['Content-Type'], "multipart/related")
+        self.assertEqual(related["Content-Type"], "multipart/related")
         self.assertEqual(len(related.get_payload()), 1)
 
         alternative = related.get_payload(0)
-        self.assertEqual(alternative['Content-Type'], "multipart/alternative")
+        self.assertEqual(alternative["Content-Type"], "multipart/alternative")
         self.assertEqual(len(alternative.get_payload()), 2)
 
         plaintext = alternative.get_payload(0)
-        self.assertEqual(plaintext['Content-Type'], 'text/plain; charset="utf-8"')
+        self.assertEqual(plaintext["Content-Type"], 'text/plain; charset="utf-8"')
         self.assertEqual(plaintext.get_content_text(), "Plaintext body")
 
         html = alternative.get_payload(1)
-        self.assertEqual(html['Content-Type'], 'text/html; charset="utf-8"')
+        self.assertEqual(html["Content-Type"], 'text/html; charset="utf-8"')
         self.assertEqual(html.get_content_text(), "HTML body")
 
     def test_construct_attachments(self):
         att1 = AnymailInboundMessage.construct_attachment(
-            'text/csv', "One,Two\n1,2".encode('iso-8859-1'), charset="iso-8859-1", filename="test.csv")
+            "text/csv",
+            "One,Two\n1,2".encode("iso-8859-1"),
+            charset="iso-8859-1",
+            filename="test.csv",
+        )
 
         att2 = AnymailInboundMessage.construct_attachment(
-            'image/png', SAMPLE_IMAGE_CONTENT, filename=SAMPLE_IMAGE_FILENAME, content_id="abc123")
+            "image/png",
+            SAMPLE_IMAGE_CONTENT,
+            filename=SAMPLE_IMAGE_FILENAME,
+            content_id="abc123",
+        )
 
         msg = AnymailInboundMessage.construct(attachments=[att1, att2])
-        self.assertEqual(msg['Content-Type'], "multipart/mixed")
+        self.assertEqual(msg["Content-Type"], "multipart/mixed")
         self.assertEqual(len(msg.get_payload()), 2)  # bodies (related), att1
 
         att1_part = msg.get_payload(1)
-        self.assertEqual(att1_part['Content-Type'], 'text/csv; name="test.csv"; charset="iso-8859-1"')
-        self.assertEqual(att1_part['Content-Disposition'], 'attachment; filename="test.csv"')
-        self.assertNotIn('Content-ID', att1_part)
+        self.assertEqual(
+            att1_part["Content-Type"], 'text/csv; name="test.csv"; charset="iso-8859-1"'
+        )
+        self.assertEqual(
+            att1_part["Content-Disposition"], 'attachment; filename="test.csv"'
+        )
+        self.assertNotIn("Content-ID", att1_part)
         self.assertEqual(att1_part.get_content_text(), "One,Two\n1,2")
 
         related = msg.get_payload(0)
-        self.assertEqual(len(related.get_payload()), 2)  # alternatives (with no bodies in this test); att2
+        # alternatives (with no bodies in this test); att2:
+        self.assertEqual(len(related.get_payload()), 2)
         att2_part = related.get_payload(1)
-        self.assertEqual(att2_part['Content-Type'], 'image/png; name="sample_image.png"')
-        self.assertEqual(att2_part['Content-Disposition'], 'inline; filename="sample_image.png"')
-        self.assertEqual(att2_part['Content-ID'], '<abc123>')
+        self.assertEqual(
+            att2_part["Content-Type"], 'image/png; name="sample_image.png"'
+        )
+        self.assertEqual(
+            att2_part["Content-Disposition"], 'inline; filename="sample_image.png"'
+        )
+        self.assertEqual(att2_part["Content-ID"], "<abc123>")
         self.assertEqual(att2_part.get_content_bytes(), SAMPLE_IMAGE_CONTENT)
 
     def test_construct_attachments_from_uploaded_files(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
-        file = SimpleUploadedFile(SAMPLE_IMAGE_FILENAME, SAMPLE_IMAGE_CONTENT, 'image/png')
-        att = AnymailInboundMessage.construct_attachment_from_uploaded_file(file, content_id="abc123")
-        self.assertEqual(att['Content-Type'], 'image/png; name="sample_image.png"')
-        self.assertEqual(att['Content-Disposition'], 'inline; filename="sample_image.png"')
-        self.assertEqual(att['Content-ID'], '<abc123>')
+
+        file = SimpleUploadedFile(
+            SAMPLE_IMAGE_FILENAME, SAMPLE_IMAGE_CONTENT, "image/png"
+        )
+        att = AnymailInboundMessage.construct_attachment_from_uploaded_file(
+            file, content_id="abc123"
+        )
+        self.assertEqual(att["Content-Type"], 'image/png; name="sample_image.png"')
+        self.assertEqual(
+            att["Content-Disposition"], 'inline; filename="sample_image.png"'
+        )
+        self.assertEqual(att["Content-ID"], "<abc123>")
         self.assertEqual(att.get_content_bytes(), SAMPLE_IMAGE_CONTENT)
 
     def test_construct_attachments_from_base64_data(self):
         # This is a fairly common way for ESPs to provide attachment content to webhooks
         content = b64encode(SAMPLE_IMAGE_CONTENT)
-        att = AnymailInboundMessage.construct_attachment(content_type="image/png", content=content, base64=True)
+        att = AnymailInboundMessage.construct_attachment(
+            content_type="image/png", content=content, base64=True
+        )
         self.assertEqual(att.get_content_bytes(), SAMPLE_IMAGE_CONTENT)
 
     def test_construct_attachment_unicode_filename(self):
         # Issue #197
         att = AnymailInboundMessage.construct_attachment(
-            content_type="text/plain", content="Unicode ✓", charset='utf-8', base64=False,
-            filename="Simulácia.txt", content_id="inline-id",)
+            content_type="text/plain",
+            content="Unicode ✓",
+            charset="utf-8",
+            base64=False,
+            filename="Simulácia.txt",
+            content_id="inline-id",
+        )
         self.assertEqual(att.get_filename(), "Simulácia.txt")
         self.assertTrue(att.is_inline_attachment())
         self.assertEqual(att.get_content_text(), "Unicode ✓")
@@ -146,35 +206,40 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
     def test_parse_raw_mime(self):
         # (we're not trying to exhaustively test email.parser MIME handling here;
         # just that AnymailInboundMessage.parse_raw_mime calls it correctly)
-        raw = dedent("""\
+        raw = dedent(
+            """\
             Content-Type: text/plain
             Subject: This is a test message
 
             This is a test body.
-            """)
+            """
+        )
         msg = AnymailInboundMessage.parse_raw_mime(raw)
-        self.assertEqual(msg['Subject'], "This is a test message")
+        self.assertEqual(msg["Subject"], "This is a test message")
         self.assertEqual(msg.get_content_text(), "This is a test body.\n")
         self.assertEqual(msg.defects, [])
 
-    # (see test_attachment_as_uploaded_file below for parsing basic attachment from raw mime)
+    # (see test_attachment_as_uploaded_file below
+    # for parsing basic attachment from raw mime)
 
     def test_parse_raw_mime_bytes(self):
         raw = (
-            b'Content-Type: text/plain; charset=ISO-8859-3\r\n'
-            b'Content-Transfer-Encoding: 8bit\r\n'
-            b'Subject: Test bytes\r\n'
-            b'\r\n'
-            b'\xD8i estas retpo\xFEto.\r\n')
+            b"Content-Type: text/plain; charset=ISO-8859-3\r\n"
+            b"Content-Transfer-Encoding: 8bit\r\n"
+            b"Subject: Test bytes\r\n"
+            b"\r\n"
+            b"\xD8i estas retpo\xFEto.\r\n"
+        )
         msg = AnymailInboundMessage.parse_raw_mime_bytes(raw)
-        self.assertEqual(msg['Subject'], "Test bytes")
+        self.assertEqual(msg["Subject"], "Test bytes")
         self.assertEqual(msg.get_content_text(), "Ĝi estas retpoŝto.\r\n")
-        self.assertEqual(msg.get_content_bytes(), b'\xD8i estas retpo\xFEto.\r\n')
+        self.assertEqual(msg.get_content_bytes(), b"\xD8i estas retpo\xFEto.\r\n")
         self.assertEqual(msg.defects, [])
 
     def test_parse_raw_mime_8bit_utf8(self):
-        # In come cases, the message below ends up with 'Content-Transfer-Encoding: 8bit',
-        # so needs to be parsed as bytes, not text (see https://bugs.python.org/issue18271).
+        # In come cases, the message below ends up with
+        # 'Content-Transfer-Encoding: 8bit', so needs to be parsed as bytes, not text
+        # (see https://bugs.python.org/issue18271).
         # Message.as_string() returns str (text), not bytes.
         # (This might be a Django bug; plain old MIMEText avoids the problem by using
         # 'Content-Transfer-Encoding: base64', which parses fine as text or bytes.)
@@ -188,16 +253,26 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
             msg = AnymailInboundMessage.parse_raw_mime_file(fp)
         self.assertEqual(msg["Subject"], "Test email")
         self.assertEqual(msg.text, "Hi Bob, This is a message. Thanks!\n")
-        self.assertEqual(msg.get_all("Received"), [  # this is the first line in the sample email file
-            "by luna.mailgun.net with SMTP mgrt 8734663311733; Fri, 03 May 2013 18:26:27 +0000"])
+        self.assertEqual(
+            msg.get_all("Received"),
+            [  # this is the first line in the sample email file
+                "by luna.mailgun.net with SMTP mgrt 8734663311733;"
+                " Fri, 03 May 2013 18:26:27 +0000"
+            ],
+        )
 
     def test_parse_raw_mime_file_bytes(self):
         with open(sample_email_path(), mode="rb") as fp:
             msg = AnymailInboundMessage.parse_raw_mime_file(fp)
         self.assertEqual(msg["Subject"], "Test email")
         self.assertEqual(msg.text, "Hi Bob, This is a message. Thanks!\n")
-        self.assertEqual(msg.get_all("Received"), [  # this is the first line in the sample email file
-            "by luna.mailgun.net with SMTP mgrt 8734663311733; Fri, 03 May 2013 18:26:27 +0000"])
+        self.assertEqual(
+            msg.get_all("Received"),
+            [  # this is the first line in the sample email file
+                "by luna.mailgun.net with SMTP mgrt 8734663311733;"
+                " Fri, 03 May 2013 18:26:27 +0000"
+            ],
+        )
 
 
 class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
@@ -207,24 +282,24 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
     def test_address_props(self):
         msg = AnymailInboundMessage.construct(
             from_email='"Sender, Inc." <sender@example.com>',
-            to='First To <to1@example.com>, to2@example.com',
-            cc='First Cc <cc1@example.com>, cc2@example.com',
+            to="First To <to1@example.com>, to2@example.com",
+            cc="First Cc <cc1@example.com>, cc2@example.com",
         )
         self.assertEqual(str(msg.from_email), '"Sender, Inc." <sender@example.com>')
-        self.assertEqual(msg.from_email.addr_spec, 'sender@example.com')
-        self.assertEqual(msg.from_email.display_name, 'Sender, Inc.')
-        self.assertEqual(msg.from_email.username, 'sender')
-        self.assertEqual(msg.from_email.domain, 'example.com')
+        self.assertEqual(msg.from_email.addr_spec, "sender@example.com")
+        self.assertEqual(msg.from_email.display_name, "Sender, Inc.")
+        self.assertEqual(msg.from_email.username, "sender")
+        self.assertEqual(msg.from_email.domain, "example.com")
 
         self.assertEqual(len(msg.to), 2)
-        self.assertEqual(msg.to[0].addr_spec, 'to1@example.com')
-        self.assertEqual(msg.to[0].display_name, 'First To')
-        self.assertEqual(msg.to[1].addr_spec, 'to2@example.com')
-        self.assertEqual(msg.to[1].display_name, '')
+        self.assertEqual(msg.to[0].addr_spec, "to1@example.com")
+        self.assertEqual(msg.to[0].display_name, "First To")
+        self.assertEqual(msg.to[1].addr_spec, "to2@example.com")
+        self.assertEqual(msg.to[1].display_name, "")
 
         self.assertEqual(len(msg.cc), 2)
-        self.assertEqual(msg.cc[0].address, 'First Cc <cc1@example.com>')
-        self.assertEqual(msg.cc[1].address, 'cc2@example.com')
+        self.assertEqual(msg.cc[0].address, "First Cc <cc1@example.com>")
+        self.assertEqual(msg.cc[1].address, "cc2@example.com")
 
         # Default None/empty lists
         msg = AnymailInboundMessage()
@@ -238,15 +313,24 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
         self.assertEqual(msg.html, "Test HTML")
 
         # Make sure attachments don't confuse it
-        att_text = AnymailInboundMessage.construct_attachment('text/plain', "text attachment")
-        att_html = AnymailInboundMessage.construct_attachment('text/html', "html attachment")
+        att_text = AnymailInboundMessage.construct_attachment(
+            "text/plain", "text attachment"
+        )
+        att_html = AnymailInboundMessage.construct_attachment(
+            "text/html", "html attachment"
+        )
 
-        msg = AnymailInboundMessage.construct(text="Test plaintext", attachments=[att_text, att_html])
+        msg = AnymailInboundMessage.construct(
+            text="Test plaintext", attachments=[att_text, att_html]
+        )
         self.assertEqual(msg.text, "Test plaintext")
         self.assertIsNone(msg.html)  # no html body (the html attachment doesn't count)
 
-        msg = AnymailInboundMessage.construct(html="Test HTML", attachments=[att_text, att_html])
-        self.assertIsNone(msg.text)  # no plaintext body (the text attachment doesn't count)
+        msg = AnymailInboundMessage.construct(
+            html="Test HTML", attachments=[att_text, att_html]
+        )
+        # no plaintext body (the text attachment doesn't count):
+        self.assertIsNone(msg.text)
         self.assertEqual(msg.html, "Test HTML")
 
         # Default None
@@ -257,7 +341,8 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
     def test_body_props_charsets(self):
         text_8859_10 = "Detta är det vanliga innehållet".encode("ISO-8859-10")
         html_8859_8 = "<p>HTML זהו תוכן</p>".encode("ISO-8859-8")
-        raw = dedent("""\
+        raw = dedent(
+            """\
             MIME-Version: 1.0
             Subject: Charset test
             Content-Type: multipart/alternative; boundary="this_is_a_boundary"
@@ -273,10 +358,11 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
 
             {html}
             --this_is_a_boundary--
-            """).format(
-                text=quopri.encodestring(text_8859_10).decode("ASCII"),
-                html=quopri.encodestring(html_8859_8).decode("ASCII"),
-            )
+            """
+        ).format(
+            text=quopri.encodestring(text_8859_10).decode("ASCII"),
+            html=quopri.encodestring(html_8859_8).decode("ASCII"),
+        )
 
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         self.assertEqual(msg.defects, [])
@@ -284,41 +370,56 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
         self.assertEqual(msg.html, "<p>HTML זהו תוכן</p>")
 
         self.assertEqual(msg.get_payload(0).get_content_bytes(), text_8859_10)
-        self.assertEqual(msg.get_payload(0).get_content_text(), "Detta är det vanliga innehållet")
+        self.assertEqual(
+            msg.get_payload(0).get_content_text(), "Detta är det vanliga innehållet"
+        )
         self.assertEqual(msg.get_payload(1).get_content_bytes(), html_8859_8)
         self.assertEqual(msg.get_payload(1).get_content_text(), "<p>HTML זהו תוכן</p>")
 
     def test_missing_or_invalid_charsets(self):
-        """get_content_text has options for handling missing/invalid charset declarations"""
-        raw = dedent("""\
+        """
+        get_content_text has options for handling missing/invalid charset declarations
+        """
+        raw = dedent(
+            """\
             Subject: Oops, missing charset declaration
             Content-Type: text/plain
             Content-Transfer-Encoding: quoted-printable
 
             Algunos programas de correo electr=f3nico est=e1n rotos
-            """)
+            """
+        )
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         self.assertEqual(msg.defects, [])
 
-        # default is charset from Content-Type (or 'utf-8' if missing), errors='replace'; .text uses defaults
-        self.assertEqual(msg.get_content_text(),
-                         "Algunos programas de correo electr�nico est�n rotos\n")
-        self.assertEqual(msg.text, "Algunos programas de correo electr�nico est�n rotos\n")
+        # default is charset from Content-Type (or 'utf-8' if missing),
+        # errors='replace'; .text uses defaults
+        self.assertEqual(
+            msg.get_content_text(),
+            "Algunos programas de correo electr�nico est�n rotos\n",
+        )
+        self.assertEqual(
+            msg.text, "Algunos programas de correo electr�nico est�n rotos\n"
+        )
 
         # can give specific charset if you know headers are wrong/missing
-        self.assertEqual(msg.get_content_text(charset='ISO-8859-1'),
-                         "Algunos programas de correo electrónico están rotos\n")
+        self.assertEqual(
+            msg.get_content_text(charset="ISO-8859-1"),
+            "Algunos programas de correo electrónico están rotos\n",
+        )
 
         # can change error handling
         with self.assertRaises(UnicodeDecodeError):
-            msg.get_content_text(errors='strict')
-        self.assertEqual(msg.get_content_text(errors='ignore'),
-                         "Algunos programas de correo electrnico estn rotos\n")
+            msg.get_content_text(errors="strict")
+        self.assertEqual(
+            msg.get_content_text(errors="ignore"),
+            "Algunos programas de correo electrnico estn rotos\n",
+        )
 
     def test_date_props(self):
-        msg = AnymailInboundMessage.construct(headers={
-            'Date': "Mon, 23 Oct 2017 17:50:55 -0700"
-        })
+        msg = AnymailInboundMessage.construct(
+            headers={"Date": "Mon, 23 Oct 2017 17:50:55 -0700"}
+        )
         self.assertEqual(msg.date.isoformat(), "2017-10-23T17:50:55-07:00")
 
         # Default None
@@ -326,7 +427,8 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
 
     def test_attachments_prop(self):
         att = AnymailInboundMessage.construct_attachment(
-            'image/png', SAMPLE_IMAGE_CONTENT, filename=SAMPLE_IMAGE_FILENAME)
+            "image/png", SAMPLE_IMAGE_CONTENT, filename=SAMPLE_IMAGE_FILENAME
+        )
 
         msg = AnymailInboundMessage.construct(attachments=[att])
         self.assertEqual(msg.attachments, [att])
@@ -336,16 +438,21 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
 
     def test_inline_attachments_prop(self):
         att = AnymailInboundMessage.construct_attachment(
-            'image/png', SAMPLE_IMAGE_CONTENT, filename=SAMPLE_IMAGE_FILENAME, content_id="abc123")
+            "image/png",
+            SAMPLE_IMAGE_CONTENT,
+            filename=SAMPLE_IMAGE_FILENAME,
+            content_id="abc123",
+        )
 
         msg = AnymailInboundMessage.construct(attachments=[att])
-        self.assertEqual(msg.inline_attachments, {'abc123': att})
+        self.assertEqual(msg.inline_attachments, {"abc123": att})
 
         # Default empty dict
         self.assertEqual(AnymailInboundMessage().inline_attachments, {})
 
     def test_attachment_as_uploaded_file(self):
-        raw = dedent("""\
+        raw = dedent(
+            """\
             MIME-Version: 1.0
             Subject: Attachment test
             Content-Type: multipart/mixed; boundary="this_is_a_boundary"
@@ -372,7 +479,8 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
             4j9/yYxupaQbXPJLNqsGFgeZ6qwpLP1b4AV4AV5AoKfjpR5OwR6VKwULCAC+AQV4W9Ps4uZQAAAA
             AElFTkSuQmCC
             --this_is_a_boundary--
-            """)
+            """
+        )
 
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         attachment = msg.attachments[0]
@@ -385,7 +493,8 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
     def test_attachment_as_uploaded_file_security(self):
         # Raw attachment filenames can be malicious; we want to make sure that
         # our Django file converter sanitizes them (as much as any uploaded filename)
-        raw = dedent("""\
+        raw = dedent(
+            """\
             MIME-Version: 1.0
             Subject: Attachment test
             Content-Type: multipart/mixed; boundary="this_is_a_boundary"
@@ -407,21 +516,26 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
 
             <body>Hey, did I overwrite your site?</body>
             --this_is_a_boundary--
-            """)
+            """
+        )
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         attachments = msg.attachments
 
-        self.assertEqual(attachments[0].get_filename(), "/etc/passwd")  # you wouldn't want to actually write here
-        self.assertEqual(attachments[0].as_uploaded_file().name, "passwd")  # path removed - good!
+        # you wouldn't want to actually write here:
+        self.assertEqual(attachments[0].get_filename(), "/etc/passwd")
+        # path removed - good!:
+        self.assertEqual(attachments[0].as_uploaded_file().name, "passwd")
 
+        # ditto for relative paths:
         self.assertEqual(attachments[1].get_filename(), "../static/index.html")
-        self.assertEqual(attachments[1].as_uploaded_file().name, "index.html")  # ditto for relative paths
+        self.assertEqual(attachments[1].as_uploaded_file().name, "index.html")
 
 
 class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
     # message/rfc822 attachments should get parsed recursively
 
-    original_raw_message = dedent("""\
+    original_raw_message = dedent(
+        """\
         MIME-Version: 1.0
         From: sender@example.com
         Subject: Original message
@@ -441,11 +555,13 @@ class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
 
         {image_content_base64}
         --boundary-orig--
-        """).format(image_content_base64=b64encode(SAMPLE_IMAGE_CONTENT).decode('ascii'))
+        """
+    ).format(image_content_base64=b64encode(SAMPLE_IMAGE_CONTENT).decode("ascii"))
 
     def test_parse_rfc822_attachment_from_raw_mime(self):
         # message/rfc822 attachments should be parsed recursively
-        raw = dedent("""\
+        raw = dedent(
+            """\
             MIME-Version: 1.0
             From: mailer-demon@example.org
             Subject: Undeliverable
@@ -464,7 +580,8 @@ class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
 
             {original_raw_message}
             --boundary-bounce--
-            """).format(original_raw_message=self.original_raw_message)
+            """
+        ).format(original_raw_message=self.original_raw_message)
 
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         self.assertIsInstance(msg, AnymailInboundMessage)
@@ -476,7 +593,7 @@ class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
 
         orig_msg = att.get_payload(0)
         self.assertIsInstance(orig_msg, AnymailInboundMessage)
-        self.assertEqual(orig_msg['Subject'], "Original message")
+        self.assertEqual(orig_msg["Subject"], "Original message")
         self.assertEqual(orig_msg.get_content_type(), "multipart/related")
         self.assertEqual(att.get_content_text(), self.original_raw_message)
 
@@ -488,7 +605,9 @@ class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
     def test_construct_rfc822_attachment_from_data(self):
         # constructed message/rfc822 attachment should end up as parsed message
         # (same as if attachment was parsed from raw mime, as in previous test)
-        att = AnymailInboundMessage.construct_attachment('message/rfc822', self.original_raw_message)
+        att = AnymailInboundMessage.construct_attachment(
+            "message/rfc822", self.original_raw_message
+        )
         self.assertIsInstance(att, AnymailInboundMessage)
         self.assertEqual(att.get_content_type(), "message/rfc822")
         self.assertTrue(att.is_attachment())
@@ -496,7 +615,7 @@ class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
 
         orig_msg = att.get_payload(0)
         self.assertIsInstance(orig_msg, AnymailInboundMessage)
-        self.assertEqual(orig_msg['Subject'], "Original message")
+        self.assertEqual(orig_msg["Subject"], "Original message")
         self.assertEqual(orig_msg.get_content_type(), "multipart/related")
 
 
@@ -507,7 +626,8 @@ class EmailParserBehaviorTests(SimpleTestCase):
     # in older, broken versions of the EmailParser.)
 
     def test_parse_folded_headers(self):
-        raw = dedent("""\
+        raw = dedent(
+            """\
             Content-Type: text/plain
             Subject: This subject uses
              header folding
@@ -517,19 +637,27 @@ class EmailParserBehaviorTests(SimpleTestCase):
 
             Not-A-Header: This is the body.
              It is not folded.
-            """)
-        for end in ('\n', '\r', '\r\n'):  # check NL, CR, and CRNL line-endings
-            msg = AnymailInboundMessage.parse_raw_mime(raw.replace('\n', end))
-            self.assertEqual(msg['Subject'], "This subject uses header folding")
-            self.assertEqual(msg["X-Json"],
-                             '{"problematic": ["encoded newline\\n", "comma,semi;no space"]}')
-            self.assertEqual(msg.get_content_text(),
-                             "Not-A-Header: This is the body.{end} It is not folded.{end}".format(end=end))
+            """
+        )
+        for end in ("\n", "\r", "\r\n"):  # check NL, CR, and CRNL line-endings
+            msg = AnymailInboundMessage.parse_raw_mime(raw.replace("\n", end))
+            self.assertEqual(msg["Subject"], "This subject uses header folding")
+            self.assertEqual(
+                msg["X-Json"],
+                '{"problematic": ["encoded newline\\n", "comma,semi;no space"]}',
+            )
+            self.assertEqual(
+                msg.get_content_text(),
+                "Not-A-Header: This is the body.{end} It is not folded.{end}".format(
+                    end=end
+                ),
+            )
             self.assertEqual(msg.defects, [])
 
     def test_parse_encoded_headers(self):
         # RFC2047 header encoding
-        raw = dedent("""\
+        raw = dedent(
+            """\
             Content-Type: text/plain
             From: =?US-ASCII?Q?Keith_Moore?= <moore@example.com>
             To: =?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld@example.com>,
@@ -540,35 +668,43 @@ class EmailParserBehaviorTests(SimpleTestCase):
             X-Broken: =?utf-8?q?Not_a_char:_=88.?=
 
             Some examples adapted from http://dogmamix.com/MimeHeadersDecoder/
-            """)
+            """
+        )
         msg = AnymailInboundMessage.parse_raw_mime(raw)
 
         self.assertEqual(msg["From"], "Keith Moore <moore@example.com>")
         self.assertEqual(msg.from_email.display_name, "Keith Moore")
         self.assertEqual(msg.from_email.addr_spec, "moore@example.com")
 
-        self.assertEqual(msg["To"],
-                         'Keld Jørn Simonsen <keld@example.com>, '
-                         '"André Pirard, Jr." <PIRARD@example.com>')
+        self.assertEqual(
+            msg["To"],
+            "Keld Jørn Simonsen <keld@example.com>, "
+            '"André Pirard, Jr." <PIRARD@example.com>',
+        )
         self.assertEqual(msg.to[0].display_name, "Keld Jørn Simonsen")
         self.assertEqual(msg.to[1].display_name, "André Pirard, Jr.")
 
-        # Note: Like email.headerregistry.Address, Anymail decodes an RFC2047-encoded display_name,
-        # but does not decode a punycode domain. (Use `idna.decode(domain)` if you need that.)
+        # Note: Like email.headerregistry.Address, Anymail decodes an RFC2047-encoded
+        # display_name, but does not decode a punycode domain.
+        # (Use `idna.decode(domain)` if you need that.)
         self.assertEqual(msg["Cc"], "Người nhận <cc@xn--th-e0a.example.com>")
         self.assertEqual(msg.cc[0].display_name, "Người nhận")
         self.assertEqual(msg.cc[0].addr_spec, "cc@xn--th-e0a.example.com")
         self.assertEqual(msg.cc[0].domain, "xn--th-e0a.example.com")
 
-        # Subject breaks between 'o' and 'u' in the word "you", must be re-joined without space.
-        # Also tests joining encoded words with different charsets:
-        self.assertEqual(msg["Subject"], "If you can read this you understand the example\N{CHECK MARK}")
+        # Subject breaks between 'o' and 'u' in the word "you", must be re-joined
+        # without space. Also tests joining encoded words with different charsets:
+        self.assertEqual(
+            msg["Subject"],
+            "If you can read this you understand the example\N{CHECK MARK}",
+        )
 
         # Replace illegal encodings (rather than causing error):
         self.assertEqual(msg["X-Broken"], "Not a char: \N{REPLACEMENT CHARACTER}.")
 
     def test_parse_encoded_params(self):
-        raw = dedent("""\
+        raw = dedent(
+            """\
             MIME-Version: 1.0
             Content-Type: multipart/mixed; boundary="this_is_a_boundary"
 
@@ -584,10 +720,14 @@ class EmailParserBehaviorTests(SimpleTestCase):
 
             This is an attachment
             --this_is_a_boundary--
-            """)
+            """
+        )
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         att = msg.attachments[0]
         self.assertTrue(att.is_attachment())
         self.assertEqual(att.get_content_disposition(), "attachment")
-        self.assertEqual(collapse_rfc2231_value(att.get_param("Name", header="Content-Type")), "TPS Report")
+        self.assertEqual(
+            collapse_rfc2231_value(att.get_param("Name", header="Content-Type")),
+            "TPS Report",
+        )
         self.assertEqual(att.get_filename(), "Une pièce jointe.txt")

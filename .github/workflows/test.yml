@@ -3,14 +3,13 @@ name: test
 on:
   pull_request:
   push:
-    branches: [ "main", "v[0-9]*" ]
-    tags: [ "v[0-9]*" ]
+    branches: ["main", "v[0-9]*"]
+    tags: ["v[0-9]*"]
   workflow_dispatch:
   schedule:
     # Weekly test (on branch main) every Thursday at 12:00 UTC.
     # (Used to monitor compatibility with Django patches/dev and other dependencies.)
     - cron: "0 12 * * 4"
-
 
 jobs:
   get-envlist:

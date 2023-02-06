@@ -13,7 +13,7 @@ import os
 import sys
 from pathlib import Path
 
-ON_READTHEDOCS = os.environ.get('READTHEDOCS', None) == 'True'
+ON_READTHEDOCS = os.environ.get("READTHEDOCS", None) == "True"
 DOCS_PATH = Path(__file__).parent
 PROJECT_ROOT_PATH = DOCS_PATH.parent
 
@@ -27,35 +27,35 @@ sys.path.insert(0, PROJECT_ROOT_PATH.resolve())
 __version__ = "UNSET"
 __minor_version__ = "UNSET"
 version_path = PROJECT_ROOT_PATH / "anymail/_version.py"
-code = compile(version_path.read_text(), version_path, 'exec')
+code = compile(version_path.read_text(), version_path, "exec")
 exec(code)
 
 
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-needs_sphinx = '1.0'
+needs_sphinx = "1.0"
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.intersphinx', 'sphinx.ext.extlinks']
+extensions = ["sphinx.ext.intersphinx", "sphinx.ext.extlinks"]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # The suffix of source filenames.
-source_suffix = '.rst'
+source_suffix = ".rst"
 
 # The encoding of source files.
 # source_encoding = 'utf-8-sig'
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = "index"
 
 # General information about the project.
-project = 'Anymail'
+project = "Anymail"
 # noinspection PyShadowingBuiltins
-copyright = 'Anymail contributors'
+copyright = "Anymail contributors"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -78,7 +78,7 @@ release = __version__
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = ["_build"]
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 default_role = "py:obj"
@@ -95,7 +95,7 @@ default_role = "py:obj"
 # show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = "sphinx"
 
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
@@ -107,7 +107,8 @@ pygments_style = 'sphinx'
 # a list of builtin themes.
 if not ON_READTHEDOCS:  # only import and set the theme if we're building docs locally
     import sphinx_rtd_theme  # this seems to come with sphinx; if not, pip install it
-    html_theme = 'sphinx_rtd_theme'
+
+    html_theme = "sphinx_rtd_theme"
     html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # else readthedocs.org uses their theme by default (and specifying it here breaks them)
 
@@ -138,7 +139,7 @@ if not ON_READTHEDOCS:  # only import and set the theme if we're building docs l
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -187,7 +188,7 @@ html_static_path = ['_static']
 # html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'Anymaildoc'
+htmlhelp_basename = "Anymaildoc"
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -195,10 +196,8 @@ htmlhelp_basename = 'Anymaildoc'
 latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
     # 'papersize': 'letterpaper',
-
     # The font size ('10pt', '11pt' or '12pt').
     # 'pointsize': '10pt',
-
     # Additional stuff for the LaTeX preamble.
     # 'preamble': '',
 }
@@ -206,8 +205,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'Anymail.tex', 'Anymail Documentation',
-   'Anymail contributors', 'manual'),
+    ("index", "Anymail.tex", "Anymail Documentation", "Anymail contributors", "manual"),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -235,10 +233,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    ('index', 'anymail', 'Anymail Documentation',
-     ['Anymail contributors'], 1)
-]
+man_pages = [("index", "anymail", "Anymail Documentation", ["Anymail contributors"], 1)]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
@@ -250,9 +245,15 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'Anymail', 'Anymail Documentation',
-   'Anymail contributors', 'Anymail', 'Multi-ESP transactional email for Django.',
-   'Miscellaneous'),
+    (
+        "index",
+        "Anymail",
+        "Anymail Documentation",
+        "Anymail contributors",
+        "Anymail",
+        "Multi-ESP transactional email for Django.",
+        "Miscellaneous",
+    ),
 ]
 
 # Documents to append as an appendix to all manuals.
@@ -267,16 +268,19 @@ texinfo_documents = [
 # -- Options for extlinks ---------------------------------------------------
 
 extlinks = {
-    'pypi': ('https://pypi.org/project/%s/', ''),
+    "pypi": ("https://pypi.org/project/%s/", ""),
 }
 
 # -- Options for Intersphinx ------------------------------------------------
 
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3.10', None),
-    'django': ('https://docs.djangoproject.com/en/stable/', 'https://docs.djangoproject.com/en/stable/_objects/'),
-    'requests': ('https://requests.readthedocs.io/en/stable/', None),
-    'urllib3': ('https://urllib3.readthedocs.io/en/stable/', None),
+    "python": ("https://docs.python.org/3.10", None),
+    "django": (
+        "https://docs.djangoproject.com/en/stable/",
+        "https://docs.djangoproject.com/en/stable/_objects/",
+    ),
+    "requests": ("https://requests.readthedocs.io/en/stable/", None),
+    "urllib3": ("https://urllib3.readthedocs.io/en/stable/", None),
 }
 
 
@@ -289,7 +293,8 @@ def setup(app):
     app.add_js_file("version-alert.js", **{"async": "async"})
     app.add_js_file("https://unpkg.com/rate-the-docs", **{"async": "async"})
 
-    # Django-specific roles, from https://github.com/django/django/blob/master/docs/_ext/djangodocs.py:
+    # Django-specific roles, from
+    # https://github.com/django/django/blob/master/docs/_ext/djangodocs.py:
     app.add_crossref_type(
         directivename="setting",
         rolename="setting",
@@ -298,12 +303,12 @@ def setup(app):
     app.add_crossref_type(
         directivename="templatetag",
         rolename="ttag",
-        indextemplate="pair: %s; template tag"
+        indextemplate="pair: %s; template tag",
     )
     app.add_crossref_type(
         directivename="templatefilter",
         rolename="tfilter",
-        indextemplate="pair: %s; template filter"
+        indextemplate="pair: %s; template filter",
     )
     app.add_crossref_type(
         directivename="fieldlookup",

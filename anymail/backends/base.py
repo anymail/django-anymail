@@ -3,17 +3,31 @@ from datetime import date, datetime, timezone
 
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
-from django.utils.timezone import is_naive, get_current_timezone, make_aware
+from django.utils.timezone import get_current_timezone, is_naive, make_aware
 from requests.structures import CaseInsensitiveDict
 
 from ..exceptions import (
-    AnymailCancelSend, AnymailError, AnymailUnsupportedFeature, AnymailRecipientsRefused,
-    AnymailSerializationError)
+    AnymailCancelSend,
+    AnymailError,
+    AnymailRecipientsRefused,
+    AnymailSerializationError,
+    AnymailUnsupportedFeature,
+)
 from ..message import AnymailStatus
-from ..signals import pre_send, post_send
+from ..signals import post_send, pre_send
 from ..utils import (
-    Attachment, UNSET, combine, last, get_anymail_setting, parse_address_list, parse_single_address,
-    force_non_lazy, force_non_lazy_list, force_non_lazy_dict, is_lazy)
+    UNSET,
+    Attachment,
+    combine,
+    force_non_lazy,
+    force_non_lazy_dict,
+    force_non_lazy_list,
+    get_anymail_setting,
+    is_lazy,
+    last,
+    parse_address_list,
+    parse_single_address,
+)
 
 
 class AnymailBaseBackend(BaseEmailBackend):
@@ -24,17 +38,23 @@ class AnymailBaseBackend(BaseEmailBackend):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.ignore_unsupported_features = get_anymail_setting('ignore_unsupported_features',
-                                                               kwargs=kwargs, default=False)
-        self.ignore_recipient_status = get_anymail_setting('ignore_recipient_status',
-                                                           kwargs=kwargs, default=False)
-        self.debug_api_requests = get_anymail_setting('debug_api_requests',  # generate debug output
-                                                      kwargs=kwargs, default=False)
+        self.ignore_unsupported_features = get_anymail_setting(
+            "ignore_unsupported_features", kwargs=kwargs, default=False
+        )
+        self.ignore_recipient_status = get_anymail_setting(
+            "ignore_recipient_status", kwargs=kwargs, default=False
+        )
+        self.debug_api_requests = get_anymail_setting(
+            "debug_api_requests", kwargs=kwargs, default=False
+        )
 
         # Merge SEND_DEFAULTS and <esp_name>_SEND_DEFAULTS settings
-        send_defaults = get_anymail_setting('send_defaults', default={})  # but not from kwargs
-        esp_send_defaults = get_anymail_setting('send_defaults', esp_name=self.esp_name,
-                                                kwargs=kwargs, default=None)
+        send_defaults = get_anymail_setting(
+            "send_defaults", default={}  # but not from kwargs
+        )
+        esp_send_defaults = get_anymail_setting(
+            "send_defaults", esp_name=self.esp_name, kwargs=kwargs, default=None
+        )
         if esp_send_defaults is not None:
             send_defaults = send_defaults.copy()
             send_defaults.update(esp_send_defaults)
@@ -128,7 +148,9 @@ class AnymailBaseBackend(BaseEmailBackend):
         message.anymail_status.set_recipient_status(recipient_status)
 
         self.run_post_send(message)  # send signal before raising status errors
-        self.raise_for_recipient_status(message.anymail_status, response, payload, message)
+        self.raise_for_recipient_status(
+            message.anymail_status, response, payload, message
+        )
 
         return True
 
@@ -143,8 +165,12 @@ class AnymailBaseBackend(BaseEmailBackend):
     def run_post_send(self, message):
         """Send post_send signal to all receivers"""
         results = post_send.send_robust(
-            self.__class__, message=message, status=message.anymail_status, esp_name=self.esp_name)
-        for (receiver, response) in results:
+            self.__class__,
+            message=message,
+            status=message.anymail_status,
+            esp_name=self.esp_name,
+        )
+        for receiver, response in results:
             if isinstance(response, Exception):
                 raise response
 
@@ -161,8 +187,10 @@ class AnymailBaseBackend(BaseEmailBackend):
         :param defaults: dict
         :return: :class:BasePayload
         """
-        raise NotImplementedError("%s.%s must implement build_message_payload" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement build_message_payload"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def post_to_esp(self, payload, message):
         """Post payload to ESP send API endpoint, and return the raw response.
@@ -173,25 +201,35 @@ class AnymailBaseBackend(BaseEmailBackend):
 
         Can raise AnymailAPIError (or derived exception) for problems posting to the ESP
         """
-        raise NotImplementedError("%s.%s must implement post_to_esp" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement post_to_esp"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def parse_recipient_status(self, response, payload, message):
         """Return a dict mapping email to AnymailRecipientStatus for each recipient.
 
         Can raise AnymailAPIError (or derived exception) if response is unparsable
         """
-        raise NotImplementedError("%s.%s must implement parse_recipient_status" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement parse_recipient_status"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def raise_for_recipient_status(self, anymail_status, response, payload, message):
-        """If *all* recipients are refused or invalid, raises AnymailRecipientsRefused"""
+        """
+        If *all* recipients are refused or invalid, raises AnymailRecipientsRefused
+        """
         if not self.ignore_recipient_status:
-            # Error if *all* recipients are invalid or refused
-            # (This behavior parallels smtplib.SMTPRecipientsRefused from Django's SMTP EmailBackend)
+            # Error if *all* recipients are invalid or refused. (This behavior parallels
+            # smtplib.SMTPRecipientsRefused from Django's SMTP EmailBackend.)
             if anymail_status.status.issubset({"invalid", "rejected"}):
-                raise AnymailRecipientsRefused(email_message=message, payload=payload, response=response,
-                                               backend=self)
+                raise AnymailRecipientsRefused(
+                    email_message=message,
+                    payload=payload,
+                    response=response,
+                    backend=self,
+                )
 
     @property
     def esp_name(self):
@@ -202,8 +240,10 @@ class AnymailBaseBackend(BaseEmailBackend):
             esp_name = "Postmark"
             esp_name = "SendGrid"  # (use ESP's preferred capitalization)
         """
-        raise NotImplementedError("%s.%s must declare esp_name class attr" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must declare esp_name class attr"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
 
 class BasePayload:
@@ -222,36 +262,36 @@ class BasePayload:
     # the combined/converted results for each attr.
     base_message_attrs = (
         # Standard EmailMessage/EmailMultiAlternatives props
-        ('from_email', last, parse_address_list),  # multiple from_emails are allowed
-        ('to', combine, parse_address_list),
-        ('cc', combine, parse_address_list),
-        ('bcc', combine, parse_address_list),
-        ('subject', last, force_non_lazy),
-        ('reply_to', combine, parse_address_list),
-        ('extra_headers', combine, force_non_lazy_dict),
-        ('body', last, force_non_lazy),  # special handling below checks message.content_subtype
-        ('alternatives', combine, 'prepped_alternatives'),
-        ('attachments', combine, 'prepped_attachments'),
+        ("from_email", last, parse_address_list),  # multiple from_emails are allowed
+        ("to", combine, parse_address_list),
+        ("cc", combine, parse_address_list),
+        ("bcc", combine, parse_address_list),
+        ("subject", last, force_non_lazy),
+        ("reply_to", combine, parse_address_list),
+        ("extra_headers", combine, force_non_lazy_dict),
+        ("body", last, force_non_lazy),  # set_body handles content_subtype
+        ("alternatives", combine, "prepped_alternatives"),
+        ("attachments", combine, "prepped_attachments"),
     )
     anymail_message_attrs = (
         # Anymail expando-props
-        ('envelope_sender', last, parse_single_address),
-        ('metadata', combine, force_non_lazy_dict),
-        ('send_at', last, 'aware_datetime'),
-        ('tags', combine, force_non_lazy_list),
-        ('track_clicks', last, None),
-        ('track_opens', last, None),
-        ('template_id', last, force_non_lazy),
-        ('merge_data', combine, force_non_lazy_dict),
-        ('merge_global_data', combine, force_non_lazy_dict),
-        ('merge_metadata', combine, force_non_lazy_dict),
-        ('esp_extra', combine, force_non_lazy_dict),
+        ("envelope_sender", last, parse_single_address),
+        ("metadata", combine, force_non_lazy_dict),
+        ("send_at", last, "aware_datetime"),
+        ("tags", combine, force_non_lazy_list),
+        ("track_clicks", last, None),
+        ("track_opens", last, None),
+        ("template_id", last, force_non_lazy),
+        ("merge_data", combine, force_non_lazy_dict),
+        ("merge_global_data", combine, force_non_lazy_dict),
+        ("merge_metadata", combine, force_non_lazy_dict),
+        ("esp_extra", combine, force_non_lazy_dict),
     )
     esp_message_attrs = ()  # subclasses can override
 
     # If any of these attrs are set on a message, treat the message
     # as a batch send (separate message for each `to` recipient):
-    batch_attrs = ('merge_data', 'merge_metadata')
+    batch_attrs = ("merge_data", "merge_metadata")
 
     def __init__(self, message, defaults, backend):
         self.message = message
@@ -262,11 +302,16 @@ class BasePayload:
 
         self.init_payload()
 
-        # we should consider hoisting the first text/html out of alternatives into set_html_body
-        message_attrs = self.base_message_attrs + self.anymail_message_attrs + self.esp_message_attrs
+        # we should consider hoisting the first text/html
+        # out of alternatives into set_html_body
+        message_attrs = (
+            self.base_message_attrs
+            + self.anymail_message_attrs
+            + self.esp_message_attrs
+        )
         for attr, combiner, converter in message_attrs:
             value = getattr(message, attr, UNSET)
-            if attr in ('to', 'cc', 'bcc', 'reply_to') and value is not UNSET:
+            if attr in ("to", "cc", "bcc", "reply_to") and value is not UNSET:
                 self.validate_not_bare_string(attr, value)
             if combiner is not None:
                 default_value = self.defaults.get(attr, UNSET)
@@ -281,16 +326,17 @@ class BasePayload:
                     else:
                         value = converter(value)
             if value is not UNSET:
-                if attr == 'from_email':
+                if attr == "from_email":
                     setter = self.set_from_email_list
-                elif attr == 'extra_headers':
+                elif attr == "extra_headers":
                     setter = self.process_extra_headers
                 else:
-                    # AttributeError here? Your Payload subclass is missing a set_<attr> implementation
-                    setter = getattr(self, 'set_%s' % attr)
+                    # AttributeError here? Your Payload subclass is missing
+                    # a set_<attr> implementation
+                    setter = getattr(self, "set_%s" % attr)
                 setter(value)
             if attr in self.batch_attrs:
-                self._batch_attrs_used[attr] = (value is not UNSET)
+                self._batch_attrs_used[attr] = value is not UNSET
 
     def is_batch(self):
         """
@@ -301,45 +347,62 @@ class BasePayload:
         inside a set_<attr> method or during __init__).
         """
         batch_attrs_used = self._batch_attrs_used.values()
-        assert UNSET not in batch_attrs_used, "Cannot call is_batch before all attributes processed"
+        assert (
+            UNSET not in batch_attrs_used
+        ), "Cannot call is_batch before all attributes processed"
         return any(batch_attrs_used)
 
     def unsupported_feature(self, feature):
         if not self.backend.ignore_unsupported_features:
-            raise AnymailUnsupportedFeature("%s does not support %s" % (self.esp_name, feature),
-                                            email_message=self.message, payload=self, backend=self.backend)
+            raise AnymailUnsupportedFeature(
+                "%s does not support %s" % (self.esp_name, feature),
+                email_message=self.message,
+                payload=self,
+                backend=self.backend,
+            )
 
     def process_extra_headers(self, headers):
         # Handle some special-case headers, and pass the remainder to set_extra_headers.
         # (Subclasses shouldn't need to override this.)
-        headers = CaseInsensitiveDict(headers)  # email headers are case-insensitive per RFC-822 et seq
 
-        reply_to = headers.pop('Reply-To', None)
+        # email headers are case-insensitive per RFC-822 et seq:
+        headers = CaseInsensitiveDict(headers)
+
+        reply_to = headers.pop("Reply-To", None)
         if reply_to:
             # message.extra_headers['Reply-To'] will override message.reply_to
             # (because the extra_headers attr is processed after reply_to).
             # This matches the behavior of Django's EmailMessage.message().
-            self.set_reply_to(parse_address_list([reply_to], field="extra_headers['Reply-To']"))
+            self.set_reply_to(
+                parse_address_list([reply_to], field="extra_headers['Reply-To']")
+            )
 
-        if 'From' in headers:
-            # If message.extra_headers['From'] is supplied, it should override message.from_email,
-            # but message.from_email should be used as the envelope_sender. See:
-            #   - https://code.djangoproject.com/ticket/9214
-            #   - https://github.com/django/django/blob/1.8/django/core/mail/message.py#L269
-            #   - https://github.com/django/django/blob/1.8/django/core/mail/backends/smtp.py#L118
-            header_from = parse_address_list(headers.pop('From'), field="extra_headers['From']")
-            envelope_sender = parse_single_address(self.message.from_email, field="from_email")  # must be single
+        if "From" in headers:
+            # If message.extra_headers['From'] is supplied, it should override
+            # message.from_email, but message.from_email should be used as the
+            # envelope_sender. See:
+            #   https://code.djangoproject.com/ticket/9214
+            #   https://github.com/django/django/blob/1.8/django/core/mail/message.py#L269
+            #   https://github.com/django/django/blob/1.8/django/core/mail/backends/smtp.py#L118
+            header_from = parse_address_list(
+                headers.pop("From"), field="extra_headers['From']"
+            )
+            # sender must be single:
+            envelope_sender = parse_single_address(
+                self.message.from_email, field="from_email"
+            )
             self.set_from_email_list(header_from)
             self.set_envelope_sender(envelope_sender)
 
-        if 'To' in headers:
-            # If message.extra_headers['To'] is supplied, message.to is used only as the envelope
-            # recipients (SMTP.sendmail to_addrs), and the header To is spoofed. See:
-            #   - https://github.com/django/django/blob/1.8/django/core/mail/message.py#L270
-            #   - https://github.com/django/django/blob/1.8/django/core/mail/backends/smtp.py#L119-L120
+        if "To" in headers:
+            # If message.extra_headers['To'] is supplied, message.to is used only as
+            # the envelope recipients (SMTP.sendmail to_addrs), and the header To is
+            # spoofed. See:
+            #   https://github.com/django/django/blob/1.8/django/core/mail/message.py#L270
+            #   https://github.com/django/django/blob/1.8/django/core/mail/backends/smtp.py#L119-L120
             # No current ESP supports this, so this code is mainly here to flag
             # the SMTP backend's behavior as an unsupported feature in Anymail:
-            header_to = headers.pop('To')
+            header_to = headers.pop("To")
             self.set_spoofed_to_header(header_to)
 
         if headers:
@@ -363,20 +426,25 @@ class BasePayload:
         #   TypeError: can only concatenate list (not "str") to list
         #   TypeError: Can't convert 'list' object to str implicitly
         if isinstance(value, str) or is_lazy(value):
-            raise TypeError('"{attr}" attribute must be a list or other iterable'.format(attr=attr))
+            raise TypeError(
+                '"{attr}" attribute must be a list or other iterable'.format(attr=attr)
+            )
 
     #
     # Attribute converters
     #
 
     def prepped_alternatives(self, alternatives):
-        return [(force_non_lazy(content), mimetype)
-                for (content, mimetype) in alternatives]
+        return [
+            (force_non_lazy(content), mimetype) for (content, mimetype) in alternatives
+        ]
 
     def prepped_attachments(self, attachments):
         str_encoding = self.message.encoding or settings.DEFAULT_CHARSET
-        return [Attachment(attachment, str_encoding)  # (handles lazy content, filename)
-                for attachment in attachments]
+        return [
+            Attachment(attachment, str_encoding)  # (handles lazy content, filename)
+            for attachment in attachments
+        ]
 
     def aware_datetime(self, value):
         """Converts a date or datetime or timestamp to an aware datetime.
@@ -406,12 +474,14 @@ class BasePayload:
     #
 
     def init_payload(self):
-        raise NotImplementedError("%s.%s must implement init_payload" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement init_payload"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def set_from_email_list(self, emails):
-        # If your backend supports multiple from emails, override this to handle the whole list;
-        # otherwise just implement set_from_email
+        # If your backend supports multiple from emails, override this to handle
+        # the whole list; otherwise just implement set_from_email
         if len(emails) > 1:
             self.unsupported_feature("multiple from emails")
             # fall through if ignoring unsupported features
@@ -419,36 +489,42 @@ class BasePayload:
             self.set_from_email(emails[0])
 
     def set_from_email(self, email):
-        raise NotImplementedError("%s.%s must implement set_from_email or set_from_email_list" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement set_from_email or set_from_email_list"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def set_to(self, emails):
-        return self.set_recipients('to', emails)
+        return self.set_recipients("to", emails)
 
     def set_cc(self, emails):
-        return self.set_recipients('cc', emails)
+        return self.set_recipients("cc", emails)
 
     def set_bcc(self, emails):
-        return self.set_recipients('bcc', emails)
+        return self.set_recipients("bcc", emails)
 
     def set_recipients(self, recipient_type, emails):
         for email in emails:
             self.add_recipient(recipient_type, email)
 
     def add_recipient(self, recipient_type, email):
-        raise NotImplementedError("%s.%s must implement add_recipient, set_recipients, or set_{to,cc,bcc}" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement add_recipient, set_recipients, or set_{to,cc,bcc}"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def set_subject(self, subject):
-        raise NotImplementedError("%s.%s must implement set_subject" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement set_subject"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def set_reply_to(self, emails):
-        self.unsupported_feature('reply_to')
+        self.unsupported_feature("reply_to")
 
     def set_extra_headers(self, headers):
         # headers is a CaseInsensitiveDict, and is a copy (so is safe to modify)
-        self.unsupported_feature('extra_headers')
+        self.unsupported_feature("extra_headers")
 
     def set_body(self, body):
         # Interpret message.body depending on message.content_subtype.
@@ -463,12 +539,16 @@ class BasePayload:
             self.add_alternative(body, "text/%s" % content_subtype)
 
     def set_text_body(self, body):
-        raise NotImplementedError("%s.%s must implement set_text_body" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement set_text_body"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def set_html_body(self, body):
-        raise NotImplementedError("%s.%s must implement set_html_body" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement set_html_body"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def set_alternatives(self, alternatives):
         # Handle treating first text/{plain,html} alternatives as bodies.
@@ -499,12 +579,15 @@ class BasePayload:
             self.add_attachment(attachment)
 
     def add_attachment(self, attachment):
-        raise NotImplementedError("%s.%s must implement add_attachment or set_attachments" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must implement add_attachment or set_attachments"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
     def set_spoofed_to_header(self, header_to):
-        # In the unlikely case an ESP supports *completely replacing* the To message header
-        # without altering the actual envelope recipients, the backend can implement this.
+        # In the unlikely case an ESP supports *completely replacing* the To message
+        # header without altering the actual envelope recipients, the backend can
+        # implement this.
         self.unsupported_feature("spoofing `To` header")
 
     # Anymail-specific payload construction
@@ -557,13 +640,18 @@ class BasePayload:
             return json.dumps(data, default=self._json_default)
         except TypeError as err:
             # Add some context to the "not JSON serializable" message
-            raise AnymailSerializationError(orig_err=err, email_message=self.message,
-                                            backend=self.backend, payload=self) from None
+            raise AnymailSerializationError(
+                orig_err=err,
+                email_message=self.message,
+                backend=self.backend,
+                payload=self,
+            ) from None
 
     @staticmethod
     def _json_default(o):
         """json.dump default function that handles some common Payload data types"""
         if isinstance(o, CaseInsensitiveDict):  # used for headers
             return dict(o)
-        raise TypeError("Object of type '%s' is not JSON serializable" %
-                        o.__class__.__name__)
+        raise TypeError(
+            "Object of type '%s' is not JSON serializable" % o.__class__.__name__
+        )

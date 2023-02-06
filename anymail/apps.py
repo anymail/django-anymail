@@ -5,7 +5,7 @@ from .checks import check_deprecated_settings, check_insecure_settings
 
 
 class AnymailBaseConfig(AppConfig):
-    name = 'anymail'
+    name = "anymail"
     verbose_name = "Anymail"
 
     def ready(self):

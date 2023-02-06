@@ -11,20 +11,32 @@ class DeprecatedSettingsTests(AnymailTestMixin, SimpleTestCase):
     @override_settings(ANYMAIL={"WEBHOOK_AUTHORIZATION": "abcde:12345"})
     def test_webhook_authorization(self):
         errors = check_deprecated_settings(None)
-        self.assertEqual(errors, [checks.Error(
-            "The ANYMAIL setting 'WEBHOOK_AUTHORIZATION' has been renamed 'WEBHOOK_SECRET' to improve security.",
-            hint="You must update your settings.py.",
-            id="anymail.E001",
-        )])
+        self.assertEqual(
+            errors,
+            [
+                checks.Error(
+                    "The ANYMAIL setting 'WEBHOOK_AUTHORIZATION' has been renamed"
+                    " 'WEBHOOK_SECRET' to improve security.",
+                    hint="You must update your settings.py.",
+                    id="anymail.E001",
+                )
+            ],
+        )
 
     @override_settings(ANYMAIL_WEBHOOK_AUTHORIZATION="abcde:12345", ANYMAIL={})
     def test_anymail_webhook_authorization(self):
         errors = check_deprecated_settings(None)
-        self.assertEqual(errors, [checks.Error(
-            "The ANYMAIL_WEBHOOK_AUTHORIZATION setting has been renamed ANYMAIL_WEBHOOK_SECRET to improve security.",
-            hint="You must update your settings.py.",
-            id="anymail.E001",
-        )])
+        self.assertEqual(
+            errors,
+            [
+                checks.Error(
+                    "The ANYMAIL_WEBHOOK_AUTHORIZATION setting has been renamed"
+                    " ANYMAIL_WEBHOOK_SECRET to improve security.",
+                    hint="You must update your settings.py.",
+                    id="anymail.E001",
+                )
+            ],
+        )
 
 
 class InsecureSettingsTests(AnymailTestMixin, SimpleTestCase):

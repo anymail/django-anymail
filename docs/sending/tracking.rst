@@ -270,4 +270,3 @@ on your production server, in a hard-to-debug way. See Django's
 
 .. _listening to signals:
     https://docs.djangoproject.com/en/stable/topics/signals/#listening-to-signals
-

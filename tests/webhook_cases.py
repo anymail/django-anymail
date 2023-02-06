@@ -1,10 +1,10 @@
 import base64
-from unittest.mock import create_autospec, ANY
+from unittest.mock import ANY, create_autospec
 
-from django.test import override_settings, SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from anymail.exceptions import AnymailInsecureWebhookWarning
-from anymail.signals import tracking, inbound
+from anymail.signals import inbound, tracking
 
 from .utils import AnymailTestMixin, ClientWithCsrfChecks
 
@@ -14,7 +14,7 @@ def event_handler(sender, event, esp_name, **kwargs):
     pass
 
 
-@override_settings(ANYMAIL={'WEBHOOK_SECRET': 'username:password'})
+@override_settings(ANYMAIL={"WEBHOOK_SECRET": "username:password"})
 class WebhookTestCase(AnymailTestMixin, SimpleTestCase):
     """Base for testing webhooks
 
@@ -38,18 +38,23 @@ class WebhookTestCase(AnymailTestMixin, SimpleTestCase):
         inbound.connect(self.inbound_handler)
         self.addCleanup(inbound.disconnect, self.inbound_handler)
 
-    def set_basic_auth(self, username='username', password='password'):
+    def set_basic_auth(self, username="username", password="password"):
         """Set basic auth for all subsequent test client requests"""
-        credentials = base64.b64encode("{}:{}".format(username, password).encode('utf-8')).decode('utf-8')
-        self.client.defaults['HTTP_AUTHORIZATION'] = "Basic {}".format(credentials)
+        credentials = base64.b64encode(
+            "{}:{}".format(username, password).encode("utf-8")
+        ).decode("utf-8")
+        self.client.defaults["HTTP_AUTHORIZATION"] = "Basic {}".format(credentials)
 
     def clear_basic_auth(self):
-        self.client.defaults.pop('HTTP_AUTHORIZATION', None)
+        self.client.defaults.pop("HTTP_AUTHORIZATION", None)
 
-    def assert_handler_called_once_with(self, mockfn, *expected_args, **expected_kwargs):
+    def assert_handler_called_once_with(
+        self, mockfn, *expected_args, **expected_kwargs
+    ):
         """Verifies mockfn was called with expected_args and at least expected_kwargs.
 
-        Ignores *additional* actual kwargs (which might be added by Django signal dispatch).
+        Ignores *additional* actual kwargs
+        (which might be added by Django signal dispatch).
         (This differs from mock.assert_called_once_with.)
 
         Returns the actual kwargs.
@@ -80,16 +85,17 @@ class WebhookBasicAuthTestCase(WebhookTestCase):
     - adding or overriding any tests as appropriate
     """
 
-    def __init__(self, methodName='runTest'):
+    def __init__(self, methodName="runTest"):
         if self.__class__ is WebhookBasicAuthTestCase:
             # don't run these tests on the abstract base implementation
-            methodName = 'runNoTestsInBaseClass'
+            methodName = "runNoTestsInBaseClass"
         super().__init__(methodName)
 
     def runNoTestsInBaseClass(self):
         pass
 
-    should_warn_if_no_auth = True  # subclass set False if other webhook verification used
+    #: subclass set False if other webhook verification used
+    should_warn_if_no_auth = True
 
     def call_webhook(self):
         # Concrete test cases should call a webhook via self.client.post,
@@ -111,7 +117,7 @@ class WebhookBasicAuthTestCase(WebhookTestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_verifies_bad_auth(self):
-        self.set_basic_auth('baduser', 'wrongpassword')
+        self.set_basic_auth("baduser", "wrongpassword")
         response = self.call_webhook()
         self.assertEqual(response.status_code, 400)
 
@@ -120,17 +126,17 @@ class WebhookBasicAuthTestCase(WebhookTestCase):
         response = self.call_webhook()
         self.assertEqual(response.status_code, 400)
 
-    @override_settings(ANYMAIL={'WEBHOOK_SECRET': ['cred1:pass1', 'cred2:pass2']})
+    @override_settings(ANYMAIL={"WEBHOOK_SECRET": ["cred1:pass1", "cred2:pass2"]})
     def test_supports_credential_rotation(self):
         """You can supply a list of basic auth credentials, and any is allowed"""
-        self.set_basic_auth('cred1', 'pass1')
+        self.set_basic_auth("cred1", "pass1")
         response = self.call_webhook()
         self.assertEqual(response.status_code, 200)
 
-        self.set_basic_auth('cred2', 'pass2')
+        self.set_basic_auth("cred2", "pass2")
         response = self.call_webhook()
         self.assertEqual(response.status_code, 200)
 
-        self.set_basic_auth('baduser', 'wrongpassword')
+        self.set_basic_auth("baduser", "wrongpassword")
         response = self.call_webhook()
         self.assertEqual(response.status_code, 400)

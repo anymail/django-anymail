@@ -17,7 +17,7 @@ from .exceptions import AnymailConfigurationError, AnymailInvalidAddress
 BASIC_NUMERIC_TYPES = (int, float)
 
 
-UNSET = type('UNSET', (object,), {})  # Used as non-None default value
+UNSET = type("UNSET", (object,), {})  # Used as non-None default value
 
 
 def combine(*args):
@@ -93,7 +93,7 @@ def getfirst(dct, keys, default=UNSET):
         except KeyError:
             pass
     if default is UNSET:
-        raise KeyError("None of %s found in dict" % ', '.join(keys))
+        raise KeyError("None of %s found in dict" % ", ".join(keys))
     else:
         return default
 
@@ -105,7 +105,11 @@ def update_deep(dct, other):
     and other can be any Mapping
     """
     for key, value in other.items():
-        if key in dct and isinstance(dct[key], MutableMapping) and isinstance(value, Mapping):
+        if (
+            key in dct
+            and isinstance(dct[key], MutableMapping)
+            and isinstance(value, Mapping)
+        ):
             update_deep(dct[key], value)
         else:
             dct[key] = value
@@ -138,18 +142,25 @@ def parse_address_list(address_list, field=None):
     # from the list -- which may split comma-seperated strings into multiple addresses.
     # (See django.core.mail.message: EmailMessage.message to/cc/bcc/reply_to handling;
     # also logic for ADDRESS_HEADERS in forbid_multi_line_headers.)
-    address_list_strings = [force_str(address) for address in address_list]  # resolve lazy strings
+
+    # resolve lazy strings:
+    address_list_strings = [force_str(address) for address in address_list]
     name_email_pairs = getaddresses(address_list_strings)
     if name_email_pairs == [] and address_list_strings == [""]:
-        name_email_pairs = [('', '')]  # getaddresses ignores a single empty string
-    parsed = [EmailAddress(display_name=name, addr_spec=email)
-              for (name, email) in name_email_pairs]
+        name_email_pairs = [("", "")]  # getaddresses ignores a single empty string
+    parsed = [
+        EmailAddress(display_name=name, addr_spec=email)
+        for (name, email) in name_email_pairs
+    ]
 
     # Sanity-check, and raise useful errors
     for address in parsed:
-        if address.username == '' or address.domain == '':
-            # Django SMTP allows username-only emails, but they're not meaningful with an ESP
-            errmsg = "Invalid email address '{problem}' parsed from '{source}'{where}.".format(
+        if address.username == "" or address.domain == "":
+            # Django SMTP allows username-only emails,
+            # but they're not meaningful with an ESP
+            errmsg = (
+                "Invalid email address '{problem}'" " parsed from '{source}'{where}."
+            ).format(
                 problem=address.addr_spec,
                 source=", ".join(address_list_strings),
                 where=" in `%s`" % field if field else "",
@@ -165,7 +176,8 @@ def parse_single_address(address, field=None):
     """Parses a single EmailAddress from str address, or raises AnymailInvalidAddress
 
     :param str address: the fully-formatted email str to parse
-    :param str|None field: optional description of the source of this address, for error message
+    :param str|None field:
+        optional description of the source of this address, for error message
     :return :class:`EmailAddress`: if address contains a single email
     :raises :exc:`AnymailInvalidAddress`: if address contains no or multiple emails
     """
@@ -173,8 +185,11 @@ def parse_single_address(address, field=None):
     count = len(parsed)
     if count > 1:
         raise AnymailInvalidAddress(
-            "Only one email address is allowed; found {count} in '{address}'{where}.".format(
-                count=count, address=address, where=" in `%s`" % field if field else ""))
+            "Only one email address is allowed;"
+            " found {count} in '{address}'{where}.".format(
+                count=count, address=address, where=" in `%s`" % field if field else ""
+            )
+        )
     else:
         return parsed[0]
 
@@ -205,7 +220,7 @@ class EmailAddress:
         (also available as `str(EmailAddress)`)
     """
 
-    def __init__(self, display_name='', addr_spec=None):
+    def __init__(self, display_name="", addr_spec=None):
         self._address = None  # lazy formatted address
         if addr_spec is None:
             try:
@@ -215,10 +230,10 @@ class EmailAddress:
 
         # ESPs should clean or reject addresses containing newlines, but some
         # extra protection can't hurt (and it seems to be a common oversight)
-        if '\n' in display_name or '\r' in display_name:
-            raise ValueError('EmailAddress display_name cannot contain newlines')
-        if '\n' in addr_spec or '\r' in addr_spec:
-            raise ValueError('EmailAddress addr_spec cannot contain newlines')
+        if "\n" in display_name or "\r" in display_name:
+            raise ValueError("EmailAddress display_name cannot contain newlines")
+        if "\n" in addr_spec or "\r" in addr_spec:
+            raise ValueError("EmailAddress addr_spec cannot contain newlines")
 
         self.display_name = display_name
         self.addr_spec = addr_spec
@@ -227,11 +242,12 @@ class EmailAddress:
             # do we need to unquote username?
         except ValueError:
             self.username = addr_spec
-            self.domain = ''
+            self.domain = ""
 
     def __repr__(self):
         return "EmailAddress({display_name!r}, {addr_spec!r})".format(
-            display_name=self.display_name, addr_spec=self.addr_spec)
+            display_name=self.display_name, addr_spec=self.addr_spec
+        )
 
     @property
     def address(self):
@@ -278,7 +294,7 @@ class Attachment:
         # Note that an attachment can be either a tuple of (filename, content, mimetype)
         # or a MIMEBase object. (Also, both filename and mimetype may be missing.)
         self._attachment = attachment
-        self.encoding = encoding  # should we be checking attachment["Content-Encoding"] ???
+        self.encoding = encoding  # or check attachment["Content-Encoding"] ???
         self.inline = False
         self.content_id = None
         self.cid = ""
@@ -289,12 +305,15 @@ class Attachment:
             if self.content is None:
                 self.content = attachment.as_bytes()
             self.mimetype = attachment.get_content_type()
-            self.content_type = attachment["Content-Type"]  # includes charset if provided
+            # Content-Type includes charset if provided
+            self.content_type = attachment["Content-Type"]
 
             content_disposition = attachment.get_content_disposition()
-            if content_disposition == 'inline' or (not content_disposition and 'Content-ID' in attachment):
+            if content_disposition == "inline" or (
+                not content_disposition and "Content-ID" in attachment
+            ):
                 self.inline = True
-                self.content_id = attachment["Content-ID"]  # probably including the <...>
+                self.content_id = attachment["Content-ID"]  # probably including <...>
                 if self.content_id is not None:
                     self.cid = unquote(self.content_id)  # without the <, >
         else:
@@ -322,7 +341,9 @@ class Attachment:
             details.append("name={name!r}".format(name=self.name))
         if self.inline:
             details.insert(0, "inline")
-            details.append("content_id={content_id!r}".format(content_id=self.content_id))
+            details.append(
+                "content_id={content_id!r}".format(content_id=self.content_id)
+            )
         return "Attachment<{details}>".format(details=", ".join(details))
 
     @property
@@ -334,7 +355,9 @@ class Attachment:
         return b64encode(content).decode("ascii")
 
 
-def get_anymail_setting(name, default=UNSET, esp_name=None, kwargs=None, allow_bare=False):
+def get_anymail_setting(
+    name, default=UNSET, esp_name=None, kwargs=None, allow_bare=False
+):
     """Returns an Anymail option from kwargs or Django settings.
 
     Returns first of:
@@ -352,7 +375,7 @@ def get_anymail_setting(name, default=UNSET, esp_name=None, kwargs=None, allow_b
 
     try:
         value = kwargs.pop(name)
-        if name in ['username', 'password']:
+        if name in ["username", "password"]:
             # Work around a problem in django.core.mail.send_mail, which calls
             # get_connection(... username=None, password=None) by default.
             # We need to ignore those None defaults (else settings like
@@ -382,7 +405,10 @@ def get_anymail_setting(name, default=UNSET, esp_name=None, kwargs=None, allow_b
                 except AttributeError:
                     pass
             if default is UNSET:
-                message = "You must set %s or ANYMAIL = {'%s': ...}" % (anymail_setting, setting)
+                message = "You must set %s or ANYMAIL = {'%s': ...}" % (
+                    anymail_setting,
+                    setting,
+                )
                 if allow_bare:
                     message += " or %s" % setting
                 message += " in your Django settings"
@@ -413,7 +439,9 @@ def collect_all_methods(cls, method_name):
 
 
 def querydict_getfirst(qdict, field, default=UNSET):
-    """Like :func:`django.http.QueryDict.get`, but returns *first* value of multi-valued field.
+    """
+    Like :func:`django.http.QueryDict.get`,
+    but returns *first* value of multi-valued field.
 
     >>> from django.http import QueryDict
     >>> q = QueryDict('a=1&a=2&a=3')
@@ -429,8 +457,9 @@ def querydict_getfirst(qdict, field, default=UNSET):
     >>> q.getfirst('a')
     '1'
     """
-    # (Why not instead define a QueryDict subclass with this method? Because there's no simple way
-    # to efficiently initialize a QueryDict subclass with the contents of an existing instance.)
+    # (Why not instead define a QueryDict subclass with this method? Because there's
+    # no simple way to efficiently initialize a QueryDict subclass with the contents
+    # of an existing instance.)
     values = qdict.getlist(field)
     if len(values) > 0:
         return values[0]
@@ -453,10 +482,10 @@ def angle_wrap(s):
     # This is the inverse behavior of email.utils.unquote
     # (which you might think email.utils.quote would do, but it doesn't)
     if len(s) > 0:
-        if s[0] != '<':
-            s = '<' + s
-        if s[-1] != '>':
-            s = s + '>'
+        if s[0] != "<":
+            s = "<" + s
+        if s[-1] != ">":
+            s = s + ">"
     return s
 
 
@@ -468,7 +497,9 @@ def is_lazy(obj):
 
 
 def force_non_lazy(obj):
-    """If obj is a Django lazy object, return it coerced to text; otherwise return it unchanged.
+    """
+    If obj is a Django lazy object, return it coerced to text;
+    otherwise return it unchanged.
 
     (Similar to django.utils.encoding.force_text, but doesn't alter non-text objects.)
     """
@@ -500,9 +531,9 @@ def get_request_basic_auth(request):
     If request includes basic auth, result is string 'username:password'.
     """
     try:
-        authtype, authdata = request.META['HTTP_AUTHORIZATION'].split()
+        authtype, authdata = request.META["HTTP_AUTHORIZATION"].split()
         if authtype.lower() == "basic":
-            return base64.b64decode(authdata).decode('utf-8')
+            return base64.b64decode(authdata).decode("utf-8")
     except (IndexError, KeyError, TypeError, ValueError):
         pass
     return None
@@ -519,8 +550,15 @@ def get_request_uri(request):
     if basic_auth is not None:
         # must reassemble url with auth
         parts = urlsplit(url)
-        url = urlunsplit((parts.scheme, basic_auth + '@' + parts.netloc,
-                          parts.path, parts.query, parts.fragment))
+        url = urlunsplit(
+            (
+                parts.scheme,
+                basic_auth + "@" + parts.netloc,
+                parts.path,
+                parts.query,
+                parts.fragment,
+            )
+        )
     return url
 
 
@@ -558,6 +596,7 @@ class CaseInsensitiveCasePreservingDict(CaseInsensitiveDict):
     >>> cid.keys()
     ["accEPT"]
     """
+
     def __setitem__(self, key, value):
         _k = key.lower()
         try:

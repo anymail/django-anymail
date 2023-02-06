@@ -3,14 +3,13 @@ name: integration-test
 on:
   pull_request:
   push:
-    branches: [ "main", "v[0-9]*" ]
-    tags: [ "v[0-9]*" ]
+    branches: ["main", "v[0-9]*"]
+    tags: ["v[0-9]*"]
   workflow_dispatch:
   schedule:
     # Weekly test (on branch main) every Thursday at 12:15 UTC.
     # (Used to monitor compatibility with ESP API changes.)
     - cron: "15 12 * * 4"
-
 
 jobs:
   skip_duplicate_runs:

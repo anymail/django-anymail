@@ -1,6 +1,5 @@
 /* Anymail modifications to sphinx-rtd-theme styles */
 
-
 /* Sticky table first column (used for ESP feature matrix) */
 table.sticky-left td:first-of-type,
 table.sticky-left th:first-of-type {
@@ -17,7 +16,6 @@ table.sticky-left th:first-of-type[colspan] > p {
   position: sticky;
   left: 17px; /* (.wy-table $table-padding-size) + (docutils border="1" in html) */
 }
-
 
 /* Show code cross-reference links as clickable $link-color (blue).
 
@@ -44,13 +42,12 @@ table.sticky-left th:first-of-type[colspan] > p {
   color: inherit;
 }
 
-
 /* Inline search forms (Anymail addition) */
 .anymail-inline-search-form {
   margin-top: -1em;
   margin-bottom: 1em;
 }
-.anymail-inline-search-form input[type=search] {
+.anymail-inline-search-form input[type="search"] {
   width: 280px;
   max-width: 100%;
   border-radius: 50px;

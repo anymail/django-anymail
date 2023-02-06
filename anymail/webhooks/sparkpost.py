@@ -2,11 +2,18 @@ import json
 from base64 import b64decode
 from datetime import datetime, timezone
 
-from .base import AnymailBaseWebhookView
 from ..exceptions import AnymailConfigurationError
 from ..inbound import AnymailInboundMessage
-from ..signals import inbound, tracking, AnymailInboundEvent, AnymailTrackingEvent, EventType, RejectReason
+from ..signals import (
+    AnymailInboundEvent,
+    AnymailTrackingEvent,
+    EventType,
+    RejectReason,
+    inbound,
+    tracking,
+)
 from ..utils import get_anymail_setting
+from .base import AnymailBaseWebhookView
 
 
 class SparkPostBaseWebhookView(AnymailBaseWebhookView):
@@ -15,7 +22,7 @@ class SparkPostBaseWebhookView(AnymailBaseWebhookView):
     esp_name = "SparkPost"
 
     def parse_events(self, request):
-        raw_events = json.loads(request.body.decode('utf-8'))
+        raw_events = json.loads(request.body.decode("utf-8"))
         unwrapped_events = [self.unwrap_event(raw_event) for raw_event in raw_events]
         return [
             self.esp_to_anymail_event(event_class, event, raw_event)
@@ -30,17 +37,19 @@ class SparkPostBaseWebhookView(AnymailBaseWebhookView):
 
         Can return None, None, raw_event for SparkPost "ping" raw_event={'msys': {}}
         """
-        event_classes = raw_event['msys'].keys()
+        event_classes = raw_event["msys"].keys()
         try:
             (event_class,) = event_classes
-            event = raw_event['msys'][event_class]
+            event = raw_event["msys"][event_class]
         except ValueError:  # too many/not enough event_classes to unpack
             if len(event_classes) == 0:
                 # Empty event (SparkPost sometimes sends as a "ping")
                 event_class = event = None
             else:
                 raise TypeError(
-                    "Invalid SparkPost webhook event has multiple event classes: %r" % raw_event) from None
+                    "Invalid SparkPost webhook event has multiple event classes: %r"
+                    % raw_event
+                ) from None
         return event_class, event, raw_event
 
     def esp_to_anymail_event(self, event_class, event, raw_event):
@@ -54,54 +63,54 @@ class SparkPostTrackingWebhookView(SparkPostBaseWebhookView):
 
     event_types = {
         # Map SparkPost event.type: Anymail normalized type
-        'bounce': EventType.BOUNCED,
-        'delivery': EventType.DELIVERED,
-        'injection': EventType.QUEUED,
-        'spam_complaint': EventType.COMPLAINED,
-        'out_of_band': EventType.BOUNCED,
-        'policy_rejection': EventType.REJECTED,
-        'delay': EventType.DEFERRED,
-        'click': EventType.CLICKED,
-        'open': EventType.OPENED,
-        'amp_click': EventType.CLICKED,
-        'amp_open': EventType.OPENED,
-        'generation_failure': EventType.FAILED,
-        'generation_rejection': EventType.REJECTED,
-        'list_unsubscribe': EventType.UNSUBSCRIBED,
-        'link_unsubscribe': EventType.UNSUBSCRIBED,
+        "bounce": EventType.BOUNCED,
+        "delivery": EventType.DELIVERED,
+        "injection": EventType.QUEUED,
+        "spam_complaint": EventType.COMPLAINED,
+        "out_of_band": EventType.BOUNCED,
+        "policy_rejection": EventType.REJECTED,
+        "delay": EventType.DEFERRED,
+        "click": EventType.CLICKED,
+        "open": EventType.OPENED,
+        "amp_click": EventType.CLICKED,
+        "amp_open": EventType.OPENED,
+        "generation_failure": EventType.FAILED,
+        "generation_rejection": EventType.REJECTED,
+        "list_unsubscribe": EventType.UNSUBSCRIBED,
+        "link_unsubscribe": EventType.UNSUBSCRIBED,
     }
 
     # Additional event_types mapping when Anymail setting
     # SPARKPOST_TRACK_INITIAL_OPEN_AS_OPENED is enabled.
     initial_open_event_types = {
-        'initial_open': EventType.OPENED,
-        'amp_initial_open': EventType.OPENED,
+        "initial_open": EventType.OPENED,
+        "amp_initial_open": EventType.OPENED,
     }
 
     reject_reasons = {
         # Map SparkPost event.bounce_class: Anymail normalized reject reason.
-        # Can also supply (RejectReason, EventType) for bounce_class that affects our event_type.
-        # https://support.sparkpost.com/customer/portal/articles/1929896
-        '1': RejectReason.OTHER,     # Undetermined (response text could not be identified)
-        '10': RejectReason.INVALID,  # Invalid Recipient
-        '20': RejectReason.BOUNCED,  # Soft Bounce
-        '21': RejectReason.BOUNCED,  # DNS Failure
-        '22': RejectReason.BOUNCED,  # Mailbox Full
-        '23': RejectReason.BOUNCED,  # Too Large
-        '24': RejectReason.TIMED_OUT,  # Timeout
-        '25': RejectReason.BLOCKED,  # Admin Failure (configured policies)
-        '30': RejectReason.BOUNCED,  # Generic Bounce: No RCPT
-        '40': RejectReason.BOUNCED,  # Generic Bounce: unspecified reasons
-        '50': RejectReason.BLOCKED,  # Mail Block (by the receiver)
-        '51': RejectReason.SPAM,     # Spam Block (by the receiver)
-        '52': RejectReason.SPAM,     # Spam Content (by the receiver)
-        '53': RejectReason.OTHER,    # Prohibited Attachment (by the receiver)
-        '54': RejectReason.BLOCKED,  # Relaying Denied (by the receiver)
-        '60': (RejectReason.OTHER, EventType.AUTORESPONDED),  # Auto-Reply/vacation
-        '70': RejectReason.BOUNCED,  # Transient Failure
-        '80': (RejectReason.OTHER, EventType.SUBSCRIBED),  # Subscribe
-        '90': (RejectReason.UNSUBSCRIBED, EventType.UNSUBSCRIBED),  # Unsubscribe
-        '100': (RejectReason.OTHER, EventType.AUTORESPONDED),  # Challenge-Response
+        # Can also supply (RejectReason, EventType) for bounce_class that affects our
+        # event_type. https://support.sparkpost.com/customer/portal/articles/1929896
+        "1": RejectReason.OTHER,  # Undetermined (response text could not be identified)
+        "10": RejectReason.INVALID,  # Invalid Recipient
+        "20": RejectReason.BOUNCED,  # Soft Bounce
+        "21": RejectReason.BOUNCED,  # DNS Failure
+        "22": RejectReason.BOUNCED,  # Mailbox Full
+        "23": RejectReason.BOUNCED,  # Too Large
+        "24": RejectReason.TIMED_OUT,  # Timeout
+        "25": RejectReason.BLOCKED,  # Admin Failure (configured policies)
+        "30": RejectReason.BOUNCED,  # Generic Bounce: No RCPT
+        "40": RejectReason.BOUNCED,  # Generic Bounce: unspecified reasons
+        "50": RejectReason.BLOCKED,  # Mail Block (by the receiver)
+        "51": RejectReason.SPAM,  # Spam Block (by the receiver)
+        "52": RejectReason.SPAM,  # Spam Content (by the receiver)
+        "53": RejectReason.OTHER,  # Prohibited Attachment (by the receiver)
+        "54": RejectReason.BLOCKED,  # Relaying Denied (by the receiver)
+        "60": (RejectReason.OTHER, EventType.AUTORESPONDED),  # Auto-Reply/vacation
+        "70": RejectReason.BOUNCED,  # Transient Failure
+        "80": (RejectReason.OTHER, EventType.SUBSCRIBED),  # Subscribe
+        "90": (RejectReason.UNSUBSCRIBED, EventType.UNSUBSCRIBED),  # Unsubscribe
+        "100": (RejectReason.OTHER, EventType.AUTORESPONDED),  # Challenge-Response
     }
 
     def __init__(self, **kwargs):
@@ -111,34 +120,43 @@ class SparkPostTrackingWebhookView(SparkPostBaseWebhookView):
         # other ESPs.) Handling "initial_open" is opt-in, to help avoid duplicate
         # "opened" events on the same first open.
         track_initial_open_as_opened = get_anymail_setting(
-            'track_initial_open_as_opened', default=False,
-            esp_name=self.esp_name, kwargs=kwargs)
+            "track_initial_open_as_opened",
+            default=False,
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+        )
         if track_initial_open_as_opened:
             self.event_types = {**self.event_types, **self.initial_open_event_types}
         super().__init__(**kwargs)
 
     def esp_to_anymail_event(self, event_class, event, raw_event):
-        if event_class == 'relay_message':
+        if event_class == "relay_message":
             # This is an inbound event
             raise AnymailConfigurationError(
                 "You seem to have set SparkPost's *inbound* relay webhook URL "
-                "to Anymail's SparkPost *tracking* webhook URL.")
+                "to Anymail's SparkPost *tracking* webhook URL."
+            )
 
-        event_type = self.event_types.get(event['type'], EventType.UNKNOWN)
+        event_type = self.event_types.get(event["type"], EventType.UNKNOWN)
         try:
-            timestamp = datetime.fromtimestamp(int(event['timestamp']), tz=timezone.utc)
+            timestamp = datetime.fromtimestamp(int(event["timestamp"]), tz=timezone.utc)
         except (KeyError, TypeError, ValueError):
             timestamp = None
 
         try:
-            tag = event['campaign_id']  # not 'rcpt_tags' -- those don't come from sending a message
+            tag = event["campaign_id"]
+            # not "rcpt_tags" -- those don't come from sending a message
             tags = [tag] if tag else None
         except KeyError:
             tags = []
 
         try:
-            reject_reason = self.reject_reasons.get(event['bounce_class'], RejectReason.OTHER)
-            try:  # unpack (RejectReason, EventType) for reasons that change our event type
+            reject_reason = self.reject_reasons.get(
+                event["bounce_class"], RejectReason.OTHER
+            )
+            try:
+                # unpack (RejectReason, EventType)
+                # for reasons that change our event type
                 reject_reason, event_type = reject_reason
             except ValueError:
                 pass
@@ -148,16 +166,19 @@ class SparkPostTrackingWebhookView(SparkPostBaseWebhookView):
         return AnymailTrackingEvent(
             event_type=event_type,
             timestamp=timestamp,
-            message_id=event.get('transmission_id', None),  # not 'message_id' -- see SparkPost backend
-            event_id=event.get('event_id', None),
-            recipient=event.get('raw_rcpt_to', None),  # preserves email case (vs. 'rcpt_to')
+            # use transmission_id, not message_id -- see SparkPost backend
+            message_id=event.get("transmission_id", None),
+            event_id=event.get("event_id", None),
+            # raw_rcpt_to preserves email case (vs. rcpt_to)
+            recipient=event.get("raw_rcpt_to", None),
             reject_reason=reject_reason,
-            mta_response=event.get('raw_reason', None),
+            mta_response=event.get("raw_reason", None),
             # description=???,
             tags=tags,
-            metadata=event.get('rcpt_meta', None) or {},  # message + recipient metadata
-            click_url=event.get('target_link_url', None),
-            user_agent=event.get('user_agent', None),
+            # metadata includes message + recipient metadata
+            metadata=event.get("rcpt_meta", None) or {},
+            click_url=event.get("target_link_url", None),
+            user_agent=event.get("user_agent", None),
             esp_event=raw_event,
         )
 
@@ -168,29 +189,35 @@ class SparkPostInboundWebhookView(SparkPostBaseWebhookView):
     signal = inbound
 
     def esp_to_anymail_event(self, event_class, event, raw_event):
-        if event_class != 'relay_message':
+        if event_class != "relay_message":
             # This is not an inbound event
             raise AnymailConfigurationError(
                 "You seem to have set SparkPost's *tracking* webhook URL "
-                "to Anymail's SparkPost *inbound* relay webhook URL.")
+                "to Anymail's SparkPost *inbound* relay webhook URL."
+            )
 
-        if event['protocol'] != 'smtp':
+        if event["protocol"] != "smtp":
             raise AnymailConfigurationError(
-                "You cannot use Anymail's webhooks for SparkPost '{protocol}' relay events. "
-                "Anymail only handles the 'smtp' protocol".format(protocol=event['protocol']))
+                "You cannot use Anymail's webhooks for SparkPost '{protocol}' relay"
+                " events. Anymail only handles the 'smtp' protocol".format(
+                    protocol=event["protocol"]
+                )
+            )
 
-        raw_mime = event['content']['email_rfc822']
-        if event['content']['email_rfc822_is_base64']:
-            raw_mime = b64decode(raw_mime).decode('utf-8')
+        raw_mime = event["content"]["email_rfc822"]
+        if event["content"]["email_rfc822_is_base64"]:
+            raw_mime = b64decode(raw_mime).decode("utf-8")
         message = AnymailInboundMessage.parse_raw_mime(raw_mime)
 
-        message.envelope_sender = event.get('msg_from', None)
-        message.envelope_recipient = event.get('rcpt_to', None)
+        message.envelope_sender = event.get("msg_from", None)
+        message.envelope_recipient = event.get("rcpt_to", None)
 
         return AnymailInboundEvent(
             event_type=EventType.INBOUND,
-            timestamp=None,  # SparkPost does not provide a relay event timestamp
-            event_id=None,  # SparkPost does not provide an idempotent id for relay events
+            # SparkPost does not provide a relay event timestamp
+            timestamp=None,
+            # SparkPost does not provide an idempotent id for relay events
+            event_id=None,
             esp_event=raw_event,
             message=message,
         )

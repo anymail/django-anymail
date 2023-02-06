@@ -3,35 +3,36 @@ import json
 from base64 import b64decode
 from datetime import datetime, timezone
 
-
-from .base import AnymailBaseWebhookView
 from ..exceptions import (
+    AnymailConfigurationError,
+    AnymailImproperlyInstalled,
     AnymailInvalidAddress,
     AnymailWebhookValidationFailure,
-    AnymailImproperlyInstalled,
     _LazyError,
-    AnymailConfigurationError,
 )
 from ..inbound import AnymailInboundMessage
 from ..signals import (
-    inbound,
-    tracking,
     AnymailInboundEvent,
     AnymailTrackingEvent,
     EventType,
     RejectReason,
+    inbound,
+    tracking,
 )
-from ..utils import parse_single_address, get_anymail_setting
+from ..utils import get_anymail_setting, parse_single_address
+from .base import AnymailBaseWebhookView
 
 try:
-    from cryptography.hazmat.primitives import serialization, hashes
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives.asymmetric import padding
     from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
 except ImportError:
-    # This module gets imported by anymail.urls, so don't complain about cryptography missing
-    # unless one of the Postal webhook views is actually used and needs it
-    error = _LazyError(AnymailImproperlyInstalled(missing_package='cryptography', backend='postal'))
+    # This module gets imported by anymail.urls, so don't complain about cryptography
+    # missing unless one of the Postal webhook views is actually used and needs it
+    error = _LazyError(
+        AnymailImproperlyInstalled(missing_package="cryptography", backend="postal")
+    )
     serialization = error
     hashes = error
     default_backend = error
@@ -50,7 +51,9 @@ class PostalBaseWebhookView(AnymailBaseWebhookView):
     webhook_key = None
 
     def __init__(self, **kwargs):
-        self.webhook_key = get_anymail_setting('webhook_key', esp_name=self.esp_name, kwargs=kwargs, allow_bare=True)
+        self.webhook_key = get_anymail_setting(
+            "webhook_key", esp_name=self.esp_name, kwargs=kwargs, allow_bare=True
+        )
 
         super().__init__(**kwargs)
 
@@ -58,23 +61,27 @@ class PostalBaseWebhookView(AnymailBaseWebhookView):
         try:
             signature = request.META["HTTP_X_POSTAL_SIGNATURE"]
         except KeyError:
-            raise AnymailWebhookValidationFailure("X-Postal-Signature header missing from webhook")
+            raise AnymailWebhookValidationFailure(
+                "X-Postal-Signature header missing from webhook"
+            )
 
         public_key = serialization.load_pem_public_key(
-            ('-----BEGIN PUBLIC KEY-----\n' + self.webhook_key + '\n-----END PUBLIC KEY-----').encode(),
-            backend=default_backend()
+            (
+                "-----BEGIN PUBLIC KEY-----\n"
+                + self.webhook_key
+                + "\n-----END PUBLIC KEY-----"
+            ).encode(),
+            backend=default_backend(),
         )
 
         try:
             public_key.verify(
-                b64decode(signature),
-                request.body,
-                padding.PKCS1v15(),
-                hashes.SHA1()
+                b64decode(signature), request.body, padding.PKCS1v15(), hashes.SHA1()
             )
         except (InvalidSignature, binascii.Error):
             raise AnymailWebhookValidationFailure(
-                "Postal webhook called with incorrect signature")
+                "Postal webhook called with incorrect signature"
+            )
 
 
 class PostalTrackingWebhookView(PostalBaseWebhookView):
@@ -85,10 +92,11 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
 
-        if 'rcpt_to' in esp_event:
+        if "rcpt_to" in esp_event:
             raise AnymailConfigurationError(
                 "You seem to have set Postal's *inbound* webhook "
-                "to Anymail's Postal *tracking* webhook URL.")
+                "to Anymail's Postal *tracking* webhook URL."
+            )
 
         raw_timestamp = esp_event.get("timestamp")
         timestamp = (
@@ -133,8 +141,8 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
         if message.get("direction") == "incoming":
             # Let's ignore tracking events about an inbound emails.
             # This happens when an inbound email could not be forwarded.
-            # The email didn't originate from Anymail, so the user can't do much about it.
-            # It is part of normal Postal operation, not a configuration error.
+            # The email didn't originate from Anymail, so the user can't do much about
+            # it. It is part of normal Postal operation, not a configuration error.
             return []
 
         # only for MessageLinkClicked
@@ -144,7 +152,7 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
         event = AnymailTrackingEvent(
             event_type=event_type,
             timestamp=timestamp,
-            event_id=esp_event.get('uuid'),
+            event_id=esp_event.get("uuid"),
             esp_event=esp_event,
             click_url=click_url,
             description=description,
@@ -152,7 +160,9 @@ class PostalTrackingWebhookView(PostalBaseWebhookView):
             metadata=None,
             mta_response=mta_response,
             recipient=recipient,
-            reject_reason=RejectReason.BOUNCED if event_type == EventType.BOUNCED else None,
+            reject_reason=(
+                RejectReason.BOUNCED if event_type == EventType.BOUNCED else None
+            ),
             tags=[tag],
             user_agent=user_agent,
         )
@@ -168,18 +178,19 @@ class PostalInboundWebhookView(PostalBaseWebhookView):
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
 
-        if 'status' in esp_event:
+        if "status" in esp_event:
             raise AnymailConfigurationError(
                 "You seem to have set Postal's *tracking* webhook "
-                "to Anymail's Postal *inbound* webhook URL.")
+                "to Anymail's Postal *inbound* webhook URL."
+            )
 
         raw_mime = esp_event["message"]
         if esp_event.get("base64") is True:
             raw_mime = b64decode(esp_event["message"]).decode("utf-8")
         message = AnymailInboundMessage.parse_raw_mime(raw_mime)
 
-        message.envelope_sender = esp_event.get('mail_from', None)
-        message.envelope_recipient = esp_event.get('rcpt_to', None)
+        message.envelope_sender = esp_event.get("mail_from", None)
+        message.envelope_recipient = esp_event.get("rcpt_to", None)
 
         event = AnymailInboundEvent(
             event_type=EventType.INBOUND,

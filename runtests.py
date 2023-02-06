@@ -4,35 +4,37 @@
 #   or
 # runtests.py [tests.test_x tests.test_y.SomeTestCase ...]
 
+import os
 import sys
+import warnings
 
 import django
-import os
-import warnings
 from django.conf import settings
 from django.test.utils import get_runner
 
 
 def setup_and_run_tests(test_labels=None):
     """Discover and run project tests. Returns number of failures."""
-    test_labels = test_labels or ['tests']
+    test_labels = test_labels or ["tests"]
 
-    tags = envlist('ANYMAIL_ONLY_TEST')
-    exclude_tags = envlist('ANYMAIL_SKIP_TESTS')
+    tags = envlist("ANYMAIL_ONLY_TEST")
+    exclude_tags = envlist("ANYMAIL_SKIP_TESTS")
 
     # In automated testing, don't run live tests unless specifically requested
-    if envbool('CONTINUOUS_INTEGRATION') and not envbool('ANYMAIL_RUN_LIVE_TESTS'):
-        exclude_tags.append('live')
+    if envbool("CONTINUOUS_INTEGRATION") and not envbool("ANYMAIL_RUN_LIVE_TESTS"):
+        exclude_tags.append("live")
 
     if tags:
         print("Only running tests tagged: %r" % tags)
     if exclude_tags:
         print("Excluding tests tagged: %r" % exclude_tags)
 
-    warnings.simplefilter('default')  # show DeprecationWarning and other default-ignored warnings
+    # show DeprecationWarning and other default-ignored warnings:
+    warnings.simplefilter("default")
 
-    os.environ['DJANGO_SETTINGS_MODULE'] = \
-        'tests.test_settings.settings_%d_%d' % django.VERSION[:2]
+    os.environ["DJANGO_SETTINGS_MODULE"] = (
+        "tests.test_settings.settings_%d_%d" % django.VERSION[:2]
+    )
     django.setup()
 
     TestRunner = get_runner(settings)
@@ -54,12 +56,12 @@ def envbool(var, default=False):
     and `'false'` and similar string representations to `False`.
     """
     # Adapted from the old :func:`~distutils.util.strtobool`
-    val = os.getenv(var, '').strip().lower()
-    if val == '':
+    val = os.getenv(var, "").strip().lower()
+    if val == "":
         return default
-    elif val in ('y', 'yes', 't', 'true', 'on', '1'):
+    elif val in ("y", "yes", "t", "true", "on", "1"):
         return True
-    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+    elif val in ("n", "no", "f", "false", "off", "0"):
         return False
     else:
         raise ValueError("invalid boolean value env[%r]=%r" % (var, val))
@@ -70,12 +72,12 @@ def envlist(var):
 
     Returns an empty list if variable is empty or not set.
     """
-    val = [item.strip() for item in os.getenv(var, '').split(',')]
-    if val == ['']:
+    val = [item.strip() for item in os.getenv(var, "").split(",")]
+    if val == [""]:
         # "Splitting an empty string with a specified separator returns ['']"
         val = []
     return val
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     runtests(test_labels=sys.argv[1:])

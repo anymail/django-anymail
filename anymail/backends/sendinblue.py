@@ -1,9 +1,9 @@
 from requests.structures import CaseInsensitiveDict
 
-from .base_requests import AnymailRequestsBackend, RequestsPayload
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
-from ..utils import get_anymail_setting, BASIC_NUMERIC_TYPES
+from ..utils import BASIC_NUMERIC_TYPES, get_anymail_setting
+from .base_requests import AnymailRequestsBackend, RequestsPayload
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -17,13 +17,13 @@ class EmailBackend(AnymailRequestsBackend):
         """Init options from Django settings"""
         esp_name = self.esp_name
         self.api_key = get_anymail_setting(
-            'api_key',
+            "api_key",
             esp_name=esp_name,
             kwargs=kwargs,
             allow_bare=True,
         )
         api_url = get_anymail_setting(
-            'api_url',
+            "api_url",
             esp_name=esp_name,
             kwargs=kwargs,
             default="https://api.sendinblue.com/v3/",
@@ -40,42 +40,45 @@ class EmailBackend(AnymailRequestsBackend):
         # https://developers.sendinblue.com/docs/responses
         message_id = None
 
-        if response.content != b'':
+        if response.content != b"":
             parsed_response = self.deserialize_json_response(response, payload, message)
             try:
-                message_id = parsed_response['messageId']
+                message_id = parsed_response["messageId"]
             except (KeyError, TypeError) as err:
-                raise AnymailRequestsAPIError("Invalid SendinBlue API response format",
-                                              email_message=message, payload=payload, response=response,
-                                              backend=self) from err
+                raise AnymailRequestsAPIError(
+                    "Invalid SendinBlue API response format",
+                    email_message=message,
+                    payload=payload,
+                    response=response,
+                    backend=self,
+                ) from err
 
         status = AnymailRecipientStatus(message_id=message_id, status="queued")
         return {recipient.addr_spec: status for recipient in payload.all_recipients}
 
 
 class SendinBluePayload(RequestsPayload):
-
     def __init__(self, message, defaults, backend, *args, **kwargs):
         self.all_recipients = []  # used for backend.parse_recipient_status
 
-        http_headers = kwargs.pop('headers', {})
-        http_headers['api-key'] = backend.api_key
-        http_headers['Content-Type'] = 'application/json'
+        http_headers = kwargs.pop("headers", {})
+        http_headers["api-key"] = backend.api_key
+        http_headers["Content-Type"] = "application/json"
 
-        super().__init__(message, defaults, backend, headers=http_headers, *args, **kwargs)
+        super().__init__(
+            message, defaults, backend, headers=http_headers, *args, **kwargs
+        )
 
     def get_api_endpoint(self):
         return "smtp/email"
 
     def init_payload(self):
-        self.data = {  # becomes json
-            'headers': CaseInsensitiveDict()
-        }
+        self.data = {"headers": CaseInsensitiveDict()}  # becomes json
 
     def serialize_data(self):
         """Performs any necessary serialization on self.data, and returns the result."""
-        if not self.data['headers']:
-            del self.data['headers']  # don't send empty headers
+        if not self.data["headers"]:
+            del self.data["headers"]  # don't send empty headers
         return self.serialize_json(self.data)
 
     #
@@ -86,9 +89,9 @@ class SendinBluePayload(RequestsPayload):
     def email_object(email):
         """Converts EmailAddress to SendinBlue API array"""
         email_object = dict()
-        email_object['email'] = email.addr_spec
+        email_object["email"] = email.addr_spec
         if email.display_name:
-            email_object['name'] = email.display_name
+            email_object["name"] = email.display_name
         return email_object
 
     def set_from_email(self, email):
@@ -109,39 +112,41 @@ class SendinBluePayload(RequestsPayload):
         if len(emails) > 1:
             self.unsupported_feature("multiple reply_to addresses")
         if len(emails) > 0:
-            self.data['replyTo'] = self.email_object(emails[0])
+            self.data["replyTo"] = self.email_object(emails[0])
 
     def set_extra_headers(self, headers):
-        # SendinBlue requires header values to be strings -- not integers -- as of 11/2022.
-        # We'll stringify ints and floats; anything else is the caller's responsibility.
-        self.data["headers"].update({
-            k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
-            for k, v in headers.items()
-        })
+        # SendinBlue requires header values to be strings (not integers) as of 11/2022.
+        # Stringify ints and floats; anything else is the caller's responsibility.
+        self.data["headers"].update(
+            {
+                k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
+                for k, v in headers.items()
+            }
+        )
 
     def set_tags(self, tags):
         if len(tags) > 0:
-            self.data['tags'] = tags
+            self.data["tags"] = tags
 
     def set_template_id(self, template_id):
-        self.data['templateId'] = template_id
+        self.data["templateId"] = template_id
 
     def set_text_body(self, body):
         if body:
-            self.data['textContent'] = body
+            self.data["textContent"] = body
 
     def set_html_body(self, body):
         if body:
             if "htmlContent" in self.data:
                 self.unsupported_feature("multiple html parts")
 
-            self.data['htmlContent'] = body
+            self.data["htmlContent"] = body
 
     def add_attachment(self, attachment):
         """Converts attachments to SendinBlue API {name, base64} array"""
         att = {
-            'name': attachment.name or '',
-            'content': attachment.b64content,
+            "name": attachment.name or "",
+            "content": attachment.b64content,
         }
 
         if attachment.inline:
@@ -157,15 +162,15 @@ class SendinBluePayload(RequestsPayload):
         self.unsupported_feature("merge_data")
 
     def set_merge_global_data(self, merge_global_data):
-        self.data['params'] = merge_global_data
+        self.data["params"] = merge_global_data
 
     def set_metadata(self, metadata):
         # SendinBlue expects a single string payload
-        self.data['headers']["X-Mailin-custom"] = self.serialize_json(metadata)
+        self.data["headers"]["X-Mailin-custom"] = self.serialize_json(metadata)
 
     def set_send_at(self, send_at):
         try:
             start_time_iso = send_at.isoformat(timespec="milliseconds")
         except (AttributeError, TypeError):
             start_time_iso = send_at  # assume user already formatted
-        self.data['scheduledAt'] = start_time_iso
+        self.data["scheduledAt"] = start_time_iso

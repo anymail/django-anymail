@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 
 from ..exceptions import AnymailInsecureWebhookWarning, AnymailWebhookValidationFailure
-from ..utils import get_anymail_setting, collect_all_methods, get_request_basic_auth
+from ..utils import collect_all_methods, get_anymail_setting, get_request_basic_auth
 
 
 # Mixin note: Django's View.__init__ doesn't cooperate with chaining,
@@ -25,7 +25,7 @@ class AnymailCoreWebhookView(View):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.validators = collect_all_methods(self.__class__, 'validate_request')
+        self.validators = collect_all_methods(self.__class__, "validate_request")
 
     # Subclass implementation:
 
@@ -99,8 +99,10 @@ class AnymailCoreWebhookView(View):
             esp_name = "Postmark"
             esp_name = "SendGrid"  # (use ESP's preferred capitalization)
         """
-        raise NotImplementedError("%s.%s must declare esp_name class attr" %
-                                  (self.__class__.__module__, self.__class__.__name__))
+        raise NotImplementedError(
+            "%s.%s must declare esp_name class attr"
+            % (self.__class__.__module__, self.__class__.__name__)
+        )
 
 
 class AnymailBasicAuthMixin(AnymailCoreWebhookView):
@@ -113,11 +115,16 @@ class AnymailBasicAuthMixin(AnymailCoreWebhookView):
     warn_if_no_basic_auth = True
 
     # List of allowable HTTP basic-auth 'user:pass' strings.
-    basic_auth = None  # (Declaring class attr allows override by kwargs in View.as_view.)
+    # (Declaring class attr allows override by kwargs in View.as_view.):
+    basic_auth = None
 
     def __init__(self, **kwargs):
-        self.basic_auth = get_anymail_setting('webhook_secret', default=[],
-                                              kwargs=kwargs)  # no esp_name -- auth is shared between ESPs
+        self.basic_auth = get_anymail_setting(
+            "webhook_secret",
+            default=[],
+            # no esp_name -- auth is shared between ESPs
+            kwargs=kwargs,
+        )
 
         # Allow a single string:
         if isinstance(self.basic_auth, str):
@@ -127,25 +134,31 @@ class AnymailBasicAuthMixin(AnymailCoreWebhookView):
                 "Your Anymail webhooks are insecure and open to anyone on the web. "
                 "You should set WEBHOOK_SECRET in your ANYMAIL settings. "
                 "See 'Securing webhooks' in the Anymail docs.",
-                AnymailInsecureWebhookWarning)
+                AnymailInsecureWebhookWarning,
+            )
         super().__init__(**kwargs)
 
     def validate_request(self, request):
         """If configured for webhook basic auth, validate request has correct auth."""
         if self.basic_auth:
             request_auth = get_request_basic_auth(request)
-            # Use constant_time_compare to avoid timing attack on basic auth. (It's OK that any()
-            # can terminate early: we're not trying to protect how many auth strings are allowed,
-            # just the contents of each individual auth string.)
-            auth_ok = any(constant_time_compare(request_auth, allowed_auth)
-                          for allowed_auth in self.basic_auth)
+            # Use constant_time_compare to avoid timing attack on basic auth. (It's OK
+            # that any() can terminate early: we're not trying to protect how many auth
+            # strings are allowed, just the contents of each individual auth string.)
+            auth_ok = any(
+                constant_time_compare(request_auth, allowed_auth)
+                for allowed_auth in self.basic_auth
+            )
             if not auth_ok:
                 raise AnymailWebhookValidationFailure(
-                    "Missing or invalid basic auth in Anymail %s webhook" % self.esp_name)
+                    "Missing or invalid basic auth in Anymail %s webhook"
+                    % self.esp_name
+                )
 
 
 class AnymailBaseWebhookView(AnymailBasicAuthMixin, AnymailCoreWebhookView):
     """
     Abstract base class for most webhook views, enforcing HTTP basic auth security
     """
+
     pass

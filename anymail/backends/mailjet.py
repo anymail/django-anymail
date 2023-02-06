@@ -1,7 +1,7 @@
-from .base_requests import AnymailRequestsBackend, RequestsPayload
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
 from ..utils import get_anymail_setting, update_deep
+from .base_requests import AnymailRequestsBackend, RequestsPayload
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -14,10 +14,18 @@ class EmailBackend(AnymailRequestsBackend):
     def __init__(self, **kwargs):
         """Init options from Django settings"""
         esp_name = self.esp_name
-        self.api_key = get_anymail_setting('api_key', esp_name=esp_name, kwargs=kwargs, allow_bare=True)
-        self.secret_key = get_anymail_setting('secret_key', esp_name=esp_name, kwargs=kwargs, allow_bare=True)
-        api_url = get_anymail_setting('api_url', esp_name=esp_name, kwargs=kwargs,
-                                      default="https://api.mailjet.com/v3.1/")
+        self.api_key = get_anymail_setting(
+            "api_key", esp_name=esp_name, kwargs=kwargs, allow_bare=True
+        )
+        self.secret_key = get_anymail_setting(
+            "secret_key", esp_name=esp_name, kwargs=kwargs, allow_bare=True
+        )
+        api_url = get_anymail_setting(
+            "api_url",
+            esp_name=esp_name,
+            kwargs=kwargs,
+            default="https://api.mailjet.com/v3.1/",
+        )
         if not api_url.endswith("/"):
             api_url += "/"
         super().__init__(api_url, **kwargs)
@@ -37,42 +45,57 @@ class EmailBackend(AnymailRequestsBackend):
 
         # Global error? (no messages sent)
         if "ErrorCode" in parsed_response:
-            raise AnymailRequestsAPIError(email_message=message, payload=payload, response=response, backend=self)
+            raise AnymailRequestsAPIError(
+                email_message=message, payload=payload, response=response, backend=self
+            )
 
         recipient_status = {}
         try:
             for result in parsed_response["Messages"]:
-                status = 'sent' if result["Status"] == 'success' else 'failed'  # Status is 'success' or 'error'
-                recipients = result.get("To", []) + result.get("Cc", []) + result.get("Bcc", [])
+                # result["Status"] is "success" or "error"
+                status = "sent" if result["Status"] == "success" else "failed"
+                recipients = (
+                    result.get("To", []) + result.get("Cc", []) + result.get("Bcc", [])
+                )
                 for recipient in recipients:
-                    email = recipient['Email']
-                    message_id = str(recipient['MessageID'])  # MessageUUID isn't yet useful for other Mailjet APIs
-                    recipient_status[email] = AnymailRecipientStatus(message_id=message_id, status=status)
-                # Note that for errors, Mailjet doesn't identify the problem recipients.
-                # This can occur with a batch send. We patch up the missing recipients below.
+                    email = recipient["Email"]
+                    # other Mailjet APIs expect MessageID (not MessageUUID)
+                    message_id = str(recipient["MessageID"])
+                    recipient_status[email] = AnymailRecipientStatus(
+                        message_id=message_id, status=status
+                    )
+                # For errors, Mailjet doesn't identify the problem recipients. (This
+                # can occur with a batch send.) Patch up the missing recipients below.
         except (KeyError, TypeError) as err:
-            raise AnymailRequestsAPIError("Invalid Mailjet API response format",
-                                          email_message=message, payload=payload, response=response,
-                                          backend=self) from err
+            raise AnymailRequestsAPIError(
+                "Invalid Mailjet API response format",
+                email_message=message,
+                payload=payload,
+                response=response,
+                backend=self,
+            ) from err
 
         # Any recipient who wasn't reported as a 'success' must have been an error:
         for email in payload.recipients:
             if email.addr_spec not in recipient_status:
-                recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='failed')
+                recipient_status[email.addr_spec] = AnymailRecipientStatus(
+                    message_id=None, status="failed"
+                )
 
         return recipient_status
 
 
 class MailjetPayload(RequestsPayload):
-
     def __init__(self, message, defaults, backend, *args, **kwargs):
         auth = (backend.api_key, backend.secret_key)
         http_headers = {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
         }
         self.recipients = []  # for backend parse_recipient_status
         self.metadata = None
-        super().__init__(message, defaults, backend, auth=auth, headers=http_headers, *args, **kwargs)
+        super().__init__(
+            message, defaults, backend, auth=auth, headers=http_headers, *args, **kwargs
+        )
 
     def get_api_endpoint(self):
         return "send"
@@ -122,9 +145,9 @@ class MailjetPayload(RequestsPayload):
             # This case shouldn't happen. Please file a bug report if it does.
             raise AssertionError("set_to called with non-empty Messages list")
         if emails:
-            self.data["Messages"].append({
-                "To": [self._mailjet_email(email) for email in emails]
-            })
+            self.data["Messages"].append(
+                {"To": [self._mailjet_email(email) for email in emails]}
+            )
             self.recipients += emails
         else:
             # Mailjet requires a To list; cc-only messages aren't possible
@@ -132,12 +155,16 @@ class MailjetPayload(RequestsPayload):
 
     def set_cc(self, emails):
         if emails:
-            self.data["Globals"]["Cc"] = [self._mailjet_email(email) for email in emails]
+            self.data["Globals"]["Cc"] = [
+                self._mailjet_email(email) for email in emails
+            ]
             self.recipients += emails
 
     def set_bcc(self, emails):
         if emails:
-            self.data["Globals"]["Bcc"] = [self._mailjet_email(email) for email in emails]
+            self.data["Globals"]["Bcc"] = [
+                self._mailjet_email(email) for email in emails
+            ]
             self.recipients += emails
 
     def set_subject(self, subject):
@@ -159,7 +186,8 @@ class MailjetPayload(RequestsPayload):
     def set_html_body(self, body):
         if body is not None:
             if "HTMLPart" in self.data["Globals"]:
-                # second html body could show up through multiple alternatives, or html body + alternative
+                # second html body could show up through multiple alternatives,
+                # or html body + alternative
                 self.unsupported_feature("multiple html parts")
 
             self.data["Globals"]["HTMLPart"] = body
@@ -183,7 +211,7 @@ class MailjetPayload(RequestsPayload):
     def set_metadata(self, metadata):
         # Mailjet expects a single string payload
         self.data["Globals"]["EventPayload"] = self.serialize_json(metadata)
-        self.metadata = metadata  # keep original in case we need to merge with merge_metadata
+        self.metadata = metadata  # save for set_merge_metadata
 
     def set_merge_metadata(self, merge_metadata):
         self._burst_for_batch_send()
@@ -204,7 +232,7 @@ class MailjetPayload(RequestsPayload):
         if len(tags) > 0:
             self.data["Globals"]["CustomCampaign"] = tags[0]
             if len(tags) > 1:
-                self.unsupported_feature('multiple tags (%r)' % tags)
+                self.unsupported_feature("multiple tags (%r)" % tags)
 
     def set_track_clicks(self, track_clicks):
         self.data["Globals"]["TrackClicks"] = "enabled" if track_clicks else "disabled"
@@ -213,7 +241,8 @@ class MailjetPayload(RequestsPayload):
         self.data["Globals"]["TrackOpens"] = "enabled" if track_opens else "disabled"
 
     def set_template_id(self, template_id):
-        self.data["Globals"]["TemplateID"] = int(template_id)  # Mailjet requires integer (not string)
+        # Mailjet requires integer (not string) TemplateID:
+        self.data["Globals"]["TemplateID"] = int(template_id)
         self.data["Globals"]["TemplateLanguage"] = True
 
     def set_merge_data(self, merge_data):

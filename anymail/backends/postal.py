@@ -1,7 +1,7 @@
-from .base_requests import AnymailRequestsBackend, RequestsPayload
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
 from ..utils import get_anymail_setting
+from .base_requests import AnymailRequestsBackend, RequestsPayload
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -106,7 +106,7 @@ class PostalPayload(RequestsPayload):
         if attachment.inline:
             # see https://github.com/postalhq/postal/issues/731
             # but it might be possible with the send/raw endpoint
-            self.unsupported_feature('inline attachments')
+            self.unsupported_feature("inline attachments")
         return att
 
     def set_attachments(self, attachments):

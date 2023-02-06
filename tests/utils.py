@@ -15,13 +15,14 @@ import django.test.client
 
 def decode_att(att):
     """Returns the original data from base64-encoded attachment content"""
-    return b64decode(att.encode('ascii'))
+    return b64decode(att.encode("ascii"))
 
 
 def rfc822_unfold(text):
-    # "Unfolding is accomplished by simply removing any CRLF that is immediately followed by WSP"
-    # (WSP is space or tab, and per email.parser semantics, we allow CRLF, CR, or LF endings)
-    return re.sub(r'(\r\n|\r|\n)(?=[ \t])', "", text)
+    # "Unfolding is accomplished by simply removing any CRLF that is immediately
+    # followed by WSP" (WSP is space or tab, and per email.parser semantics, we allow
+    # CRLF, CR, or LF endings)
+    return re.sub(r"(\r\n|\r|\n)(?=[ \t])", "", text)
 
 
 #
@@ -60,13 +61,16 @@ def sample_email_path(filename=SAMPLE_EMAIL_FILENAME):
 
 
 def sample_email_content(filename=SAMPLE_EMAIL_FILENAME):
-    """Returns bytes contents of an email file (e.g., for forwarding as an attachment)"""
+    """
+    Returns bytes contents of an email file (e.g., for forwarding as an attachment)
+    """
     return test_file_content(filename)
 
 
 #
 # TestCase helpers
 #
+
 
 class AnymailTestMixin(TestCase):
     """Helpful additional methods for Anymail tests"""
@@ -86,20 +90,21 @@ class AnymailTestMixin(TestCase):
             if key not in actual:
                 missing.append(key)
             elif value != actual[key]:
-                mismatched.append('%s, expected: %s, actual: %s' %
-                                  (safe_repr(key), safe_repr(value),
-                                   safe_repr(actual[key])))
+                mismatched.append(
+                    "%s, expected: %s, actual: %s"
+                    % (safe_repr(key), safe_repr(value), safe_repr(actual[key]))
+                )
 
         if not (missing or mismatched):
             return
 
-        standardMsg = ''
+        standardMsg = ""
         if missing:
-            standardMsg = 'Missing: %s' % ','.join(safe_repr(m) for m in missing)
+            standardMsg = "Missing: %s" % ",".join(safe_repr(m) for m in missing)
         if mismatched:
             if standardMsg:
-                standardMsg += '; '
-            standardMsg += 'Mismatched values: %s' % ','.join(mismatched)
+                standardMsg += "; "
+            standardMsg += "Mismatched values: %s" % ",".join(mismatched)
 
         self.fail(self._formatMessage(msg, standardMsg))
 
@@ -124,8 +129,8 @@ class AnymailTestMixin(TestCase):
         # (Technically, this is unfolding both headers and (incorrectly) bodies,
         # but that doesn't really affect the tests.)
         if isinstance(first, bytes) and isinstance(second, bytes):
-            first = first.decode('utf-8')
-            second = second.decode('utf-8')
+            first = first.decode("utf-8")
+            second = second.decode("utf-8")
         first = rfc822_unfold(first)
         second = rfc822_unfold(second)
         self.assertEqual(first, second, msg)
@@ -135,8 +140,7 @@ class AnymailTestMixin(TestCase):
         try:
             uuid.UUID(uuid_str, version=version)
         except (ValueError, AttributeError, TypeError):
-            raise self.failureException(
-                msg or "%r is not a valid UUID" % uuid_str)
+            raise self.failureException(msg or "%r is not a valid UUID" % uuid_str)
 
     @contextmanager
     def assertPrints(self, expected, match="contain", msg=None):
@@ -168,8 +172,11 @@ class AnymailTestMixin(TestCase):
                 bound_matchfn = getattr(actual, matchfn)
                 if not bound_matchfn(expected):
                     raise self.failureException(
-                        msg or "Stdout {actual!r} does not {match} {expected!r}".format(
-                            actual=actual, match=match, expected=expected))
+                        msg
+                        or "Stdout {actual!r} does not {match} {expected!r}".format(
+                            actual=actual, match=match, expected=expected
+                        )
+                    )
         finally:
             sys.stdout = old_stdout
 
@@ -186,8 +193,8 @@ class ClientWithCsrfChecks(django.test.Client):
 
 # dedent for bytestrs
 # https://stackoverflow.com/a/39841195/647002
-_whitespace_only_re = re.compile(b'^[ \t]+$', re.MULTILINE)
-_leading_whitespace_re = re.compile(b'(^[ \t]*)(?:[^ \t\n])', re.MULTILINE)
+_whitespace_only_re = re.compile(b"^[ \t]+$", re.MULTILINE)
+_leading_whitespace_re = re.compile(b"(^[ \t]*)(?:[^ \t\n])", re.MULTILINE)
 
 
 def dedent_bytes(text):
@@ -195,7 +202,7 @@ def dedent_bytes(text):
     # Look for the longest leading string of spaces and tabs common to
     # all lines.
     margin = None
-    text = _whitespace_only_re.sub(b'', text)
+    text = _whitespace_only_re.sub(b"", text)
     indents = _leading_whitespace_re.findall(text)
     for indent in indents:
         if margin is None:
@@ -219,10 +226,10 @@ def dedent_bytes(text):
                     margin = margin[:i]
                     break
             else:
-                margin = margin[:len(indent)]
+                margin = margin[: len(indent)]
 
     if margin:
-        text = re.sub(b'(?m)^' + margin, b'', text)
+        text = re.sub(b"(?m)^" + margin, b"", text)
     return text
 
 
@@ -233,7 +240,7 @@ def make_fileobj(content, filename=None, content_type=None, encoding=None):
     """
     # The logic that unpacks this is in django.test.client.encode_file.
     if isinstance(content, str):
-        content = content.encode(encoding or 'utf-8')
+        content = content.encode(encoding or "utf-8")
     fileobj = BytesIO(content)
     if filename is not None:
         fileobj.name = filename
@@ -254,5 +261,5 @@ def encode_multipart(boundary, data):
     encoded = django.test.client.encode_multipart(boundary, data)
     re_keys = r"|".join(re.escape(key) for key in data.keys())
     return re.sub(
-        rb'filename="(%s)"' % re_keys.encode("ascii"),
-        b'filename=""', encoded)
+        rb'filename="(%s)"' % re_keys.encode("ascii"), b'filename=""', encoded
+    )

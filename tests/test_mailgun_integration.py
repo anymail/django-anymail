@@ -10,21 +10,27 @@ from django.test import SimpleTestCase, override_settings, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
+
 from .utils import AnymailTestMixin, sample_image_path
 
+ANYMAIL_TEST_MAILGUN_API_KEY = os.getenv("ANYMAIL_TEST_MAILGUN_API_KEY")
+ANYMAIL_TEST_MAILGUN_DOMAIN = os.getenv("ANYMAIL_TEST_MAILGUN_DOMAIN")
 
-ANYMAIL_TEST_MAILGUN_API_KEY = os.getenv('ANYMAIL_TEST_MAILGUN_API_KEY')
-ANYMAIL_TEST_MAILGUN_DOMAIN = os.getenv('ANYMAIL_TEST_MAILGUN_DOMAIN')
 
-
-@tag('mailgun', 'live')
-@unittest.skipUnless(ANYMAIL_TEST_MAILGUN_API_KEY and ANYMAIL_TEST_MAILGUN_DOMAIN,
-                     "Set ANYMAIL_TEST_MAILGUN_API_KEY and ANYMAIL_TEST_MAILGUN_DOMAIN environment variables "
-                     "to run Mailgun integration tests")
-@override_settings(ANYMAIL={'MAILGUN_API_KEY': ANYMAIL_TEST_MAILGUN_API_KEY,
-                            'MAILGUN_SENDER_DOMAIN': ANYMAIL_TEST_MAILGUN_DOMAIN,
-                            'MAILGUN_SEND_DEFAULTS': {'esp_extra': {'o:testmode': 'yes'}}},
-                   EMAIL_BACKEND="anymail.backends.mailgun.EmailBackend")
+@tag("mailgun", "live")
+@unittest.skipUnless(
+    ANYMAIL_TEST_MAILGUN_API_KEY and ANYMAIL_TEST_MAILGUN_DOMAIN,
+    "Set ANYMAIL_TEST_MAILGUN_API_KEY and ANYMAIL_TEST_MAILGUN_DOMAIN environment"
+    " variables to run Mailgun integration tests",
+)
+@override_settings(
+    ANYMAIL={
+        "MAILGUN_API_KEY": ANYMAIL_TEST_MAILGUN_API_KEY,
+        "MAILGUN_SENDER_DOMAIN": ANYMAIL_TEST_MAILGUN_DOMAIN,
+        "MAILGUN_SEND_DEFAULTS": {"esp_extra": {"o:testmode": "yes"}},
+    },
+    EMAIL_BACKEND="anymail.backends.mailgun.EmailBackend",
+)
 class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Mailgun API integration tests
 
@@ -37,13 +43,18 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     def setUp(self):
         super().setUp()
-        self.from_email = 'from@%s' % ANYMAIL_TEST_MAILGUN_DOMAIN
-        self.message = AnymailMessage('Anymail Mailgun integration test', 'Text content',
-                                      self.from_email, ['test+to1@anymail.dev'])
-        self.message.attach_alternative('<p>HTML content</p>', "text/html")
+        self.from_email = "from@%s" % ANYMAIL_TEST_MAILGUN_DOMAIN
+        self.message = AnymailMessage(
+            "Anymail Mailgun integration test",
+            "Text content",
+            self.from_email,
+            ["test+to1@anymail.dev"],
+        )
+        self.message.attach_alternative("<p>HTML content</p>", "text/html")
 
-    def fetch_mailgun_events(self, message_id, event=None,
-                             initial_delay=2, retry_delay=2, max_retries=5):
+    def fetch_mailgun_events(
+        self, message_id, event=None, initial_delay=2, retry_delay=2, max_retries=5
+    ):
         """Return list of Mailgun events related to message_id"""
         url = "https://api.mailgun.net/v3/%s/events" % ANYMAIL_TEST_MAILGUN_DOMAIN
         auth = ("api", ANYMAIL_TEST_MAILGUN_API_KEY)
@@ -51,9 +62,9 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         # Despite the docs, Mailgun's events API actually expects the message-id
         # without the <...> brackets (so, not exactly "as returned by the messages API")
         # https://documentation.mailgun.com/api-events.html#filter-field
-        params = {'message-id': message_id[1:-1]}  # strip <...>
+        params = {"message-id": message_id[1:-1]}  # strip <...>
         if event is not None:
-            params['event'] = event
+            params["event"] = event
 
         # It can take a few seconds for the events to show up
         # in Mailgun's logs, so retry a few times if necessary:
@@ -72,14 +83,17 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
                 # server error (hopefully transient); try again after delay
                 pass
             elif 403 == response.status_code:
-                # "forbidden": this may be related to API throttling; try again after delay
+                # "forbidden": this may be related to API throttling;
+                # try again after delay
                 pass
             else:
                 response.raise_for_status()
         # Max retries exceeded:
         if response is not None and 200 != response.status_code:
-            logging.warning("Ignoring Mailgun events API error %d:\n%s"
-                            % (response.status_code, response.text))
+            logging.warning(
+                "Ignoring Mailgun events API error %d:\n%s"
+                % (response.status_code, response.text)
+            )
         return None
 
     def test_simple_send(self):
@@ -88,13 +102,15 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(sent_count, 1)
 
         anymail_status = self.message.anymail_status
-        sent_status = anymail_status.recipients['test+to1@anymail.dev'].status
-        message_id = anymail_status.recipients['test+to1@anymail.dev'].message_id
+        sent_status = anymail_status.recipients["test+to1@anymail.dev"].status
+        message_id = anymail_status.recipients["test+to1@anymail.dev"].message_id
 
-        self.assertEqual(sent_status, 'queued')  # Mailgun always queues
-        self.assertGreater(len(message_id), 0)  # don't know what it'll be, but it should exist
+        self.assertEqual(sent_status, "queued")  # Mailgun always queues
+        # don't know what it'll be, but it should exist:
+        self.assertGreater(len(message_id), 0)
 
-        self.assertEqual(anymail_status.status, {sent_status})  # set of all recipient statuses
+        # set of all recipient statuses:
+        self.assertEqual(anymail_status.status, {sent_status})
         self.assertEqual(anymail_status.message_id, message_id)
 
     def test_all_options(self):
@@ -110,7 +126,6 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
             reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
             headers={"X-Anymail-Test": "value"},
-
             metadata={"meta1": "simple string", "meta2": 2},
             send_at=send_at,
             tags=["tag 1", "tag 2"],
@@ -119,35 +134,55 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         )
         message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
         message.attach("vedhæftet fil.csv", "ID,Name\n1,3", "text/csv")
-        cid = message.attach_inline_image_file(sample_image_path(), domain=ANYMAIL_TEST_MAILGUN_DOMAIN)
+        cid = message.attach_inline_image_file(
+            sample_image_path(), domain=ANYMAIL_TEST_MAILGUN_DOMAIN
+        )
         message.attach_alternative(
             "<div>This is the <i>html</i> body <img src='cid:%s'></div>" % cid,
-            "text/html")
+            "text/html",
+        )
 
         message.send()
-        self.assertEqual(message.anymail_status.status, {'queued'})  # Mailgun always queues
+        # Mailgun always queues:
+        self.assertEqual(message.anymail_status.status, {"queued"})
         message_id = message.anymail_status.message_id
 
         events = self.fetch_mailgun_events(message_id, event="accepted")
         if events is None:
-            self.skipTest("No Mailgun 'accepted' event after 30sec -- can't complete this test")
+            self.skipTest(
+                "No Mailgun 'accepted' event after 30sec -- can't complete this test"
+            )
             return
 
         event = events.pop()
-        self.assertCountEqual(event["tags"], ["tag 1", "tag 2"])  # don't care about order
-        self.assertEqual(event["user-variables"],
-                         {"meta1": "simple string", "meta2": "2"})  # all metadata values become strings
+        # don't care about order:
+        self.assertCountEqual(event["tags"], ["tag 1", "tag 2"])
+        # all metadata values become strings:
+        self.assertEqual(
+            event["user-variables"], {"meta1": "simple string", "meta2": "2"}
+        )
 
         self.assertEqual(event["message"]["scheduled-for"], send_at_timestamp)
-        self.assertIn(event["recipient"], ['test+to1@anymail.dev', 'test+to2@anymail.dev',
-                                           'test+cc1@anymail.dev', 'test+cc2@anymail.dev',
-                                           'test+bcc1@anymail.dev', 'test+bcc2@anymail.dev'])
+        self.assertIn(
+            event["recipient"],
+            [
+                "test+to1@anymail.dev",
+                "test+to2@anymail.dev",
+                "test+cc1@anymail.dev",
+                "test+cc2@anymail.dev",
+                "test+bcc1@anymail.dev",
+                "test+bcc2@anymail.dev",
+            ],
+        )
 
         headers = event["message"]["headers"]
         self.assertEqual(headers["from"], from_email)
-        self.assertEqual(headers["to"],
-                         "test+to1@anymail.dev, Recipient 2 <test+to2@anymail.dev>")
-        self.assertEqual(headers["subject"], "Anymail Mailgun all-options integration test")
+        self.assertEqual(
+            headers["to"], "test+to1@anymail.dev, Recipient 2 <test+to2@anymail.dev>"
+        )
+        self.assertEqual(
+            headers["subject"], "Anymail Mailgun all-options integration test"
+        )
 
         attachments = event["message"]["attachments"]
         if len(attachments) == 3:
@@ -168,24 +203,28 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     def test_stored_template(self):
         message = AnymailMessage(
-            template_id='test-template',  # name of a real template named in Anymail's Mailgun test account
-            subject='Your order %recipient.order%',  # Mailgun templates don't define subject
-            from_email=formataddr(('Test From>', self.from_email)),  # Mailgun templates don't define sender
+            # name of a real template named in Anymail's Mailgun test account:
+            template_id="test-template",
+            # Mailgun templates don't define subject:
+            subject="Your order %recipient.order%",
+            # Mailgun templates don't define sender:
+            from_email=formataddr(("Test From>", self.from_email)),
             to=["test+to1@anymail.dev"],
-            # metadata and merge_data must not have any conflicting keys when using template_id
+            # metadata and merge_data must not have any conflicting keys
+            # when using template_id:
             metadata={"meta1": "simple string", "meta2": 2},
             merge_data={
-                'test+to1@anymail.dev': {
-                    'name': "Test Recipient",
+                "test+to1@anymail.dev": {
+                    "name": "Test Recipient",
                 }
             },
             merge_global_data={
-                'order': '12345',
+                "order": "12345",
             },
         )
         message.send()
         recipient_status = message.anymail_status.recipients
-        self.assertEqual(recipient_status['test+to1@anymail.dev'].status, 'queued')
+        self.assertEqual(recipient_status["test+to1@anymail.dev"].status, "queued")
 
     # As of Anymail 0.10, this test is no longer possible, because
     # Anymail now raises AnymailInvalidAddress without even calling Mailgun
@@ -197,9 +236,13 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     #     self.assertEqual(err.status_code, 400)
     #     self.assertIn("'from' parameter is not a valid address", str(err))
 
-    @override_settings(ANYMAIL={'MAILGUN_API_KEY': "Hey, that's not an API key",
-                                'MAILGUN_SENDER_DOMAIN': ANYMAIL_TEST_MAILGUN_DOMAIN,
-                                'MAILGUN_SEND_DEFAULTS': {'esp_extra': {'o:testmode': 'yes'}}})
+    @override_settings(
+        ANYMAIL={
+            "MAILGUN_API_KEY": "Hey, that's not an API key",
+            "MAILGUN_SENDER_DOMAIN": ANYMAIL_TEST_MAILGUN_DOMAIN,
+            "MAILGUN_SEND_DEFAULTS": {"esp_extra": {"o:testmode": "yes"}},
+        }
+    )
     def test_invalid_api_key(self):
         with self.assertRaises(AnymailAPIError) as cm:
             self.message.send()

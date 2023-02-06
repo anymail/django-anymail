@@ -4,10 +4,10 @@ from email.utils import quote as rfc822_quote
 
 from requests.structures import CaseInsensitiveDict
 
-from .base_requests import AnymailRequestsBackend, RequestsPayload
 from ..exceptions import AnymailConfigurationError, AnymailWarning
 from ..message import AnymailRecipientStatus
 from ..utils import BASIC_NUMERIC_TYPES, Mapping, get_anymail_setting, update_deep
+from .base_requests import AnymailRequestsBackend, RequestsPayload
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -22,29 +22,45 @@ class EmailBackend(AnymailRequestsBackend):
         esp_name = self.esp_name
 
         # Warn if v2-only username or password settings found
-        username = get_anymail_setting('username', esp_name=esp_name, kwargs=kwargs, default=None, allow_bare=True)
-        password = get_anymail_setting('password', esp_name=esp_name, kwargs=kwargs, default=None, allow_bare=True)
+        username = get_anymail_setting(
+            "username", esp_name=esp_name, kwargs=kwargs, default=None, allow_bare=True
+        )
+        password = get_anymail_setting(
+            "password", esp_name=esp_name, kwargs=kwargs, default=None, allow_bare=True
+        )
         if username or password:
             raise AnymailConfigurationError(
-                "SendGrid v3 API doesn't support username/password auth; Please change to API key.")
+                "SendGrid v3 API doesn't support username/password auth;"
+                " Please change to API key."
+            )
 
-        self.api_key = get_anymail_setting('api_key', esp_name=esp_name, kwargs=kwargs, allow_bare=True)
+        self.api_key = get_anymail_setting(
+            "api_key", esp_name=esp_name, kwargs=kwargs, allow_bare=True
+        )
 
-        self.generate_message_id = get_anymail_setting('generate_message_id', esp_name=esp_name,
-                                                       kwargs=kwargs, default=True)
-        self.merge_field_format = get_anymail_setting('merge_field_format', esp_name=esp_name,
-                                                      kwargs=kwargs, default=None)
+        self.generate_message_id = get_anymail_setting(
+            "generate_message_id", esp_name=esp_name, kwargs=kwargs, default=True
+        )
+        self.merge_field_format = get_anymail_setting(
+            "merge_field_format", esp_name=esp_name, kwargs=kwargs, default=None
+        )
 
-        # Undocumented setting to disable workaround for SendGrid display-name quoting bug (see below).
-        # If/when SendGrid fixes their API, recipient names will end up with extra double quotes
-        # until Anymail is updated to remove the workaround. In the meantime, you can disable it
-        # by adding `"SENDGRID_WORKAROUND_NAME_QUOTE_BUG": False` to your `ANYMAIL` settings.
-        self.workaround_name_quote_bug = get_anymail_setting('workaround_name_quote_bug', esp_name=esp_name,
-                                                             kwargs=kwargs, default=True)
+        # Undocumented setting to disable workaround for SendGrid display-name quoting
+        # bug (see below). If/when SendGrid fixes their API, recipient names will end up
+        # with extra double quotes until Anymail is updated to remove the workaround.
+        # In the meantime, you can disable it by adding
+        # `"SENDGRID_WORKAROUND_NAME_QUOTE_BUG": False` to your `ANYMAIL` settings.
+        self.workaround_name_quote_bug = get_anymail_setting(
+            "workaround_name_quote_bug", esp_name=esp_name, kwargs=kwargs, default=True
+        )
 
         # This is SendGrid's newer Web API v3
-        api_url = get_anymail_setting('api_url', esp_name=esp_name, kwargs=kwargs,
-                                      default="https://api.sendgrid.com/v3/")
+        api_url = get_anymail_setting(
+            "api_url",
+            esp_name=esp_name,
+            kwargs=kwargs,
+            default="https://api.sendgrid.com/v3/",
+        )
         if not api_url.endswith("/"):
             api_url += "/"
         super().__init__(api_url, **kwargs)
@@ -53,17 +69,19 @@ class EmailBackend(AnymailRequestsBackend):
         return SendGridPayload(message, defaults, self)
 
     def parse_recipient_status(self, response, payload, message):
-        # If we get here, the send call was successful.
-        # (SendGrid uses a non-2xx response for any failures, caught in raise_for_status.)
-        # SendGrid v3 doesn't provide any information in the response for a successful send,
-        # so simulate a per-recipient status of "queued":
-        return {recip.addr_spec: AnymailRecipientStatus(message_id=payload.message_ids.get(recip.addr_spec),
-                                                        status="queued")
-                for recip in payload.all_recipients}
+        # If we get here, the "send" call was successful. (SendGrid uses a non-2xx
+        # response for any failures, caught in raise_for_status.) SendGrid v3 doesn't
+        # provide any information in the response for a successful send, so simulate a
+        # per-recipient status of "queued":
+        return {
+            recip.addr_spec: AnymailRecipientStatus(
+                message_id=payload.message_ids.get(recip.addr_spec), status="queued"
+            )
+            for recip in payload.all_recipients
+        }
 
 
 class SendGridPayload(RequestsPayload):
-
     def __init__(self, message, defaults, backend, *args, **kwargs):
         self.all_recipients = []  # used for backend.parse_recipient_status
         self.generate_message_id = backend.generate_message_id
@@ -75,11 +93,13 @@ class SendGridPayload(RequestsPayload):
         self.merge_global_data = {}
         self.merge_metadata = {}
 
-        http_headers = kwargs.pop('headers', {})
-        http_headers['Authorization'] = 'Bearer %s' % backend.api_key
-        http_headers['Content-Type'] = 'application/json'
-        http_headers['Accept'] = 'application/json'
-        super().__init__(message, defaults, backend, headers=http_headers, *args, **kwargs)
+        http_headers = kwargs.pop("headers", {})
+        http_headers["Authorization"] = "Bearer %s" % backend.api_key
+        http_headers["Content-Type"] = "application/json"
+        http_headers["Accept"] = "application/json"
+        super().__init__(
+            message, defaults, backend, headers=http_headers, *args, **kwargs
+        )
 
     def get_api_endpoint(self):
         return "mail/send"
@@ -105,11 +125,17 @@ class SendGridPayload(RequestsPayload):
         return self.serialize_json(self.data)
 
     def set_anymail_id(self):
-        """Ensure each personalization has a known anymail_id for later event tracking"""
+        """
+        Ensure each personalization has a known anymail_id for later event tracking
+        """
         for personalization in self.data["personalizations"]:
             message_id = str(uuid.uuid4())
             personalization.setdefault("custom_args", {})["anymail_id"] = message_id
-            for recipient in personalization["to"] + personalization.get("cc", []) + personalization.get("bcc", []):
+            for recipient in (
+                personalization["to"]
+                + personalization.get("cc", [])
+                + personalization.get("bcc", [])
+            ):
                 self.message_ids[recipient["email"]] = message_id
 
     def expand_personalizations_for_batch(self):
@@ -139,8 +165,10 @@ class SendGridPayload(RequestsPayload):
                 self.convert_dynamic_template_data_to_legacy_substitutions()
 
     def convert_dynamic_template_data_to_legacy_substitutions(self):
-        """Change personalizations[...]['dynamic_template_data'] to ...['substitutions]"""
-        merge_field_format = self.merge_field_format or '{}'
+        """
+        Change personalizations[...]['dynamic_template_data'] to ...['substitutions]
+        """
+        merge_field_format = self.merge_field_format or "{}"
 
         all_merge_fields = set()
         for personalization in self.data["personalizations"]:
@@ -149,10 +177,12 @@ class SendGridPayload(RequestsPayload):
             except KeyError:
                 pass  # no substitutions for this recipient
             else:
-                # Convert dynamic_template_data keys for substitutions, using merge_field_format
+                # Convert dynamic_template_data keys for substitutions,
+                # using merge_field_format
                 personalization["substitutions"] = {
                     merge_field_format.format(field): data
-                    for field, data in dynamic_template_data.items()}
+                    for field, data in dynamic_template_data.items()
+                }
                 all_merge_fields.update(dynamic_template_data.keys())
 
         if self.merge_field_format is None:
@@ -160,15 +190,21 @@ class SendGridPayload(RequestsPayload):
                 warnings.warn(
                     "Your SendGrid merge fields don't seem to have delimiters, "
                     "which can cause unexpected results with Anymail's merge_data. "
-                    "Search SENDGRID_MERGE_FIELD_FORMAT in the Anymail docs for more info.",
-                    AnymailWarning)
+                    "Search SENDGRID_MERGE_FIELD_FORMAT in the Anymail docs "
+                    "for more info.",
+                    AnymailWarning,
+                )
 
-            if self.merge_global_data and all(field.isalnum() for field in self.merge_global_data.keys()):
+            if self.merge_global_data and all(
+                field.isalnum() for field in self.merge_global_data.keys()
+            ):
                 warnings.warn(
                     "Your SendGrid global merge fields don't seem to have delimiters, "
                     "which can cause unexpected results with Anymail's merge_data. "
-                    "Search SENDGRID_MERGE_FIELD_FORMAT in the Anymail docs for more info.",
-                    AnymailWarning)
+                    "Search SENDGRID_MERGE_FIELD_FORMAT in the Anymail docs "
+                    "for more info.",
+                    AnymailWarning,
+                )
 
     def build_merge_metadata(self):
         if self.merge_metadata:
@@ -208,8 +244,9 @@ class SendGridPayload(RequestsPayload):
             workaround_name_quote_bug = self.workaround_name_quote_bug
             # Normally, exactly one "personalizations" entry for all recipients
             # (Exception: with merge_data; will be burst apart later.)
-            self.data["personalizations"][0][recipient_type] = \
-                [self.email_object(email, workaround_name_quote_bug) for email in emails]
+            self.data["personalizations"][0][recipient_type] = [
+                self.email_object(email, workaround_name_quote_bug) for email in emails
+            ]
             self.all_recipients += emails  # used for backend.parse_recipient_status
 
     def set_subject(self, subject):
@@ -226,10 +263,12 @@ class SendGridPayload(RequestsPayload):
     def set_extra_headers(self, headers):
         # SendGrid requires header values to be strings -- not integers.
         # We'll stringify ints and floats; anything else is the caller's responsibility.
-        self.data["headers"].update({
-            k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
-            for k, v in headers.items()
-        })
+        self.data["headers"].update(
+            {
+                k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
+                for k, v in headers.items()
+            }
+        )
 
     def set_text_body(self, body):
         # Empty strings (the EmailMessage default) can cause unexpected SendGrid
@@ -238,33 +277,41 @@ class SendGridPayload(RequestsPayload):
         # Treat an empty string as a request to omit the body
         # (which means use the template content if present.)
         if body != "":
-            self.data.setdefault("content", []).append({
-                "type": "text/plain",
-                "value": body,
-            })
+            self.data.setdefault("content", []).append(
+                {
+                    "type": "text/plain",
+                    "value": body,
+                }
+            )
 
     def set_html_body(self, body):
         # SendGrid's API permits multiple html bodies
         # "If you choose to include the text/plain or text/html mime types, they must be
         # the first indices of the content array in the order text/plain, text/html."
-        if body != "":  # see note in set_text_body about template rendering
-            self.data.setdefault("content", []).append({
-                "type": "text/html",
-                "value": body,
-            })
+        # Body must not be empty (see note in set_text_body about template rendering).
+        if body != "":
+            self.data.setdefault("content", []).append(
+                {
+                    "type": "text/html",
+                    "value": body,
+                }
+            )
 
     def add_alternative(self, content, mimetype):
-        # SendGrid is one of the few ESPs that supports arbitrary alternative parts in their API
-        self.data.setdefault("content", []).append({
-            "type": mimetype,
-            "value": content,
-        })
+        # SendGrid is one of the few ESPs that supports arbitrary alternative parts
+        self.data.setdefault("content", []).append(
+            {
+                "type": mimetype,
+                "value": content,
+            }
+        )
 
     def add_attachment(self, attachment):
         att = {
             "content": attachment.b64content,
             "type": attachment.mimetype,
-            "filename": attachment.name or '',  # required -- submit empty string if unknown
+            # (filename is required -- submit empty string if unknown)
+            "filename": attachment.name or "",
         }
         if attachment.inline:
             att["disposition"] = "inline"
@@ -276,9 +323,10 @@ class SendGridPayload(RequestsPayload):
 
     def transform_metadata(self, metadata):
         # SendGrid requires custom_args values to be strings -- not integers.
-        # (And issues the cryptic error {"field": null, "message": "Bad Request", "help": null}
+        # (And issues the cryptic error
+        #    {"field": null, "message": "Bad Request", "help": null}
         # if they're not.)
-        # We'll stringify ints and floats; anything else is the caller's responsibility.
+        # Stringify ints and floats; anything else is the caller's responsibility.
         return {
             k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
             for k, v in metadata.items()
@@ -330,8 +378,12 @@ class SendGridPayload(RequestsPayload):
         self.merge_metadata = merge_metadata
 
     def set_esp_extra(self, extra):
-        self.merge_field_format = extra.pop("merge_field_format", self.merge_field_format)
-        self.use_dynamic_template = extra.pop("use_dynamic_template", self.use_dynamic_template)
+        self.merge_field_format = extra.pop(
+            "merge_field_format", self.merge_field_format
+        )
+        self.use_dynamic_template = extra.pop(
+            "use_dynamic_template", self.use_dynamic_template
+        )
         if isinstance(extra.get("personalizations", None), Mapping):
             # merge personalizations *dict* into other message personalizations
             assert len(self.data["personalizations"]) == 1
@@ -339,6 +391,7 @@ class SendGridPayload(RequestsPayload):
         if "x-smtpapi" in extra:
             raise AnymailConfigurationError(
                 "You are attempting to use SendGrid v2 API-style x-smtpapi params "
-                "with the SendGrid v3 API. Please update your `esp_extra` to the new API."
+                "with the SendGrid v3 API. Please update your `esp_extra` "
+                "to the new API."
             )
         update_deep(self.data, extra)

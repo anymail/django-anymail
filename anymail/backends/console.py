@@ -1,4 +1,5 @@
 import uuid
+
 from django.core.mail.backends.console import EmailBackend as DjangoConsoleBackend
 
 from ..exceptions import AnymailError
