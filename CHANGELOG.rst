@@ -25,6 +25,17 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes*
+
+Other
+~~~~~
+* Use black, isort and doc8 to format code,
+  enforced via pre-commit. (Thanks to `@tim-schilling`_.)
+
+
 v9.0
 ----
 

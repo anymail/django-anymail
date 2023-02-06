@@ -51,8 +51,8 @@ Pull requests
 Pull requests are always welcome to fix bugs and improve support for ESP and Django features.
 
 * Please include test cases.
-* We try to follow the `Django coding style`_
-  (basically, :pep:`8` with longer lines OK).
+* We try to follow the `Django coding style`_.
+* If you install `pre-commit`_, most of the style guidelines will be handled automatically.
 * By submitting a pull request, you're agreeing to release your changes under under
   the same BSD license as the rest of this project.
 * Documentation is appreciated, but not required.
@@ -61,6 +61,8 @@ Pull requests are always welcome to fix bugs and improve support for ESP and Dja
 .. Intentionally point to Django dev branch for coding docs (rather than Django stable):
 .. _Django coding style:
     https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/
+.. _pre-commit:
+    https://pre-commit.com/
 
 
 Testing

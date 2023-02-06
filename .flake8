@@ -1,2 +1,11 @@
 [flake8]
-max-line-length = 120
+extend-exclude =
+    build,
+    tests/test_settings/settings_*.py
+
+# Black compatibility:
+# - E203 (spaces around slice operators) is not PEP-8 compliant (and Black _is_)
+# - Black sometimes deliberately overruns max-line-length by a small amount
+#   (97 is Black's max-line-length of 88 + 10%)
+extend-ignore = E203
+max-line-length = 97

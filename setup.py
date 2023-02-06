@@ -32,7 +32,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 # Additional requirements for development/build/release
 requirements_dev = [
-    "flake8",
+    "pre-commit",
     "sphinx",
     "sphinx-rtd-theme",
     "tox",

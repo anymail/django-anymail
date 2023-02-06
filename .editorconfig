@@ -1,25 +1,55 @@
-# https://editorconfig.org
+# https://editorconfig.org/
+# This is adapted from Django's .editorconfig:
+# https://github.com/django/django/blob/main/.editorconfig
 
 root = true
 
 [*]
-charset = utf-8
-end_of_line = lf
-indent_size = 2
 indent_style = space
-insert_final_newline = true
-trim_trailing_whitespace = true
-
-[*.py]
 indent_size = 4
+insert_final_newline = true
+max_line_length = 88
+trim_trailing_whitespace = true
+end_of_line = lf
+charset = utf-8
+
+# Match pyproject.toml [tool.black] config:
+[*.py]
+max_line_length = 88
+
+# Match pyproject.toml [tool.doc8] config:
+[*.rst]
 max_line_length = 120
 
-[*.{ini,lock}]
-indent_size = 4
+[*.md]
+indent_size = 2
 
-[{Makefile,*.bat}]
+[*.html]
+indent_size = 2
+
+# Anymail uses smaller indents than Django in css and js sources
+[*.css]
+indent_size = 2
+
+[*.js]
+indent_size = 2
+
+[*.json]
+indent_size = 2
+
+# Minified files shouldn't be changed
+[**.min.{css,js}]
+indent_style = ignore
+insert_final_newline = ignore
+
+# Makefiles always use tabs for indentation
+[Makefile]
 indent_style = tab
-indent_size = 4
 
+# Batch files use tabs for indentation
 [*.bat]
 end_of_line = crlf
+indent_style = tab
+
+[*.{yml,yaml}]
+indent_size = 2

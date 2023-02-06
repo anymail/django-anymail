@@ -1,0 +1,19 @@
+[tool.black]
+force-exclude = '^/tests/test_settings/settings_.*\.py'
+max-line-length = 88
+target-version = ["py36"]
+
+[tool.doc8]
+# ignore very long lines in ESP support table:
+ignore-path-errors = ["docs/esps/index.rst;D001"]
+# for now, Anymail allows longer lines in docs source:
+max-line-length = 120
+
+[tool.flake8]
+# See .flake8 file in project root
+
+[tool.isort]
+combine_as_imports = true
+known_first_party = "anymail"
+profile = "black"
+py_version = "36"
