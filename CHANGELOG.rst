@@ -30,6 +30,14 @@ vNext
 
 *Unreleased changes*
 
+Deprecations
+~~~~~~~~~~~~
+* **Amazon SES:** Anymail is switching to the Amazon SES v2 API for sending mail.
+  Support for the original SES v1 API is now deprecated, and will be dropped in a
+  future Anymail release (likely in late 2023). Many projects will not
+  require code changes, but you will need to update your IAM permissions. See
+  `Migrating to the SES v2 API <https://anymail.dev/en/latest/esps/amazon_ses/#amazon-ses-v2>`__.
+
 Other
 ~~~~~
 * Test against Django 4.2 prerelease, Python 3.11 (with Django 4.2),
