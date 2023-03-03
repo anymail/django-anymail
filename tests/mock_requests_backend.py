@@ -17,6 +17,7 @@ class RequestsBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
     """TestCase that mocks API calls through requests"""
 
     DEFAULT_RAW_RESPONSE = b"""{"subclass": "should override"}"""
+    DEFAULT_CONTENT_TYPE = None  # e.g., "application/json"
     DEFAULT_STATUS_CODE = 200  # most APIs use '200 OK' for success
 
     class MockResponse(requests.Response):
@@ -26,6 +27,7 @@ class RequestsBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
             self,
             status_code=200,
             raw=b"RESPONSE",
+            content_type=None,
             encoding="utf-8",
             reason=None,
             test_case=None,
@@ -35,6 +37,8 @@ class RequestsBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
             self.encoding = encoding
             self.reason = reason or ("OK" if 200 <= status_code < 300 else "ERROR")
             self.raw = BytesIO(raw)
+            if content_type is not None:
+                self.headers["Content-Type"] = content_type
             self.test_case = test_case
 
         @property
@@ -54,12 +58,32 @@ class RequestsBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
         self.set_mock_response()
 
     def set_mock_response(
-        self, status_code=DEFAULT_STATUS_CODE, raw=UNSET, encoding="utf-8", reason=None
+        self,
+        status_code=UNSET,
+        raw=UNSET,
+        json_data=UNSET,
+        encoding="utf-8",
+        content_type=UNSET,
+        reason=None,
     ):
+        if status_code is UNSET:
+            status_code = self.DEFAULT_STATUS_CODE
+        if json_data is not UNSET:
+            assert raw is UNSET, "provide json_data or raw, not both"
+            raw = json.dumps(json_data).encode(encoding)
+            if content_type is UNSET:
+                content_type = "application/json"
         if raw is UNSET:
             raw = self.DEFAULT_RAW_RESPONSE
+        if content_type is UNSET:
+            content_type = self.DEFAULT_CONTENT_TYPE
         mock_response = self.MockResponse(
-            status_code, raw=raw, encoding=encoding, reason=reason, test_case=self
+            status_code,
+            raw=raw,
+            content_type=content_type,
+            encoding=encoding,
+            reason=reason,
+            test_case=self,
         )
         self.mock_request.return_value = mock_response
         return mock_response
