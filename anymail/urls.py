@@ -4,6 +4,10 @@ from .webhooks.amazon_ses import (
     AmazonSESInboundWebhookView,
     AmazonSESTrackingWebhookView,
 )
+from .webhooks.mailersend import (
+    MailerSendInboundWebhookView,
+    MailerSendTrackingWebhookView,
+)
 from .webhooks.mailgun import MailgunInboundWebhookView, MailgunTrackingWebhookView
 from .webhooks.mailjet import MailjetInboundWebhookView, MailjetTrackingWebhookView
 from .webhooks.mandrill import MandrillCombinedWebhookView
@@ -22,6 +26,11 @@ urlpatterns = [
         "amazon_ses/inbound/",
         AmazonSESInboundWebhookView.as_view(),
         name="amazon_ses_inbound_webhook",
+    ),
+    path(
+        "mailersend/inbound/",
+        MailerSendInboundWebhookView.as_view(),
+        name="mailersend_inbound_webhook",
     ),
     re_path(
         # Mailgun delivers inbound messages differently based on whether
@@ -61,6 +70,11 @@ urlpatterns = [
         "amazon_ses/tracking/",
         AmazonSESTrackingWebhookView.as_view(),
         name="amazon_ses_tracking_webhook",
+    ),
+    path(
+        "mailersend/tracking/",
+        MailerSendTrackingWebhookView.as_view(),
+        name="mailersend_tracking_webhook",
     ),
     path(
         "mailgun/tracking/",
