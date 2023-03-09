@@ -95,7 +95,7 @@ class MailerSendBackendStandardEmailTests(MailerSendBackendMockAPITestCase):
         self.assert_esp_called("/v1/email")
 
         headers = self.get_api_call_headers()
-        self.assertEqual("Bearer test_api_token", headers["Authorization"])
+        self.assertEqual(headers["Authorization"], "Bearer test_api_token")
 
         data = self.get_api_call_json()
         self.assertEqual(data["subject"], "Subject here")
@@ -649,16 +649,22 @@ class MailerSendBackendAnymailFeatureTests(MailerSendBackendMockAPITestCase):
             },
         )
 
-    def test_esp_extra_batch_send_mode(self):
+    def test_esp_extra_settings_overrides(self):
+        """esp_extra can override batch_send_mode and api_token settings"""
         self.message.merge_data = {}  # trigger batch send
         self.message.esp_extra = {
+            "api_token": "token-from-esp-extra",
             "batch_send_mode": "use-bulk-email",
             "hypothetical_future_mailersend_param": 123,
         }
         self.message.send()
-        data = self.get_api_call_json()
         self.assert_esp_called("/v1/bulk-email")  # batch_send_mode from esp_extra
+        headers = self.get_api_call_headers()
+        self.assertEqual(headers["Authorization"], "Bearer token-from-esp-extra")
+
+        data = self.get_api_call_json()
         self.assertEqual(len(data), 1)  # payload burst for batch
+        self.assertNotIn("api_token", data[0])  # not in API payload
         self.assertNotIn("batch_send_mode", data[0])  # not sent to API
         # But other esp_extra params sent:
         self.assertEqual(data[0]["hypothetical_future_mailersend_param"], 123)

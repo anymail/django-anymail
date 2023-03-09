@@ -120,6 +120,7 @@ class MailerSendPayload(RequestsPayload):
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
+            # Token may be changed in set_esp_extra below:
             "Authorization": f"Bearer {backend.api_token}",
         }
         self.all_recipients = []  # needed for parse_recipient_status
@@ -211,7 +212,7 @@ class MailerSendPayload(RequestsPayload):
     #
 
     def make_mailersend_email(self, email):
-        """Return MailerSend email/name dict for an EmailAddress"""
+        """Return MailerSend email/name object for an EmailAddress"""
         obj = {"email": email.addr_spec}
         if email.display_name:
             obj["name"] = email.display_name
@@ -267,32 +268,24 @@ class MailerSendPayload(RequestsPayload):
             self.unsupported_feature("multiple html parts")
         self.data["html"] = body
 
-    def make_mailersend_attachment(self, attachment):
-        """Returns MailerSend attachment dict for attachment"""
-        filename = attachment.name
-        if not filename:
+    def add_attachment(self, attachment):
+        # Add a MailerSend attachments[] object for attachment:
+        attachment_object = {
+            "filename": attachment.name,
+            "content": attachment.b64content,
+            "disposition": "attachment",
+        }
+        if not attachment_object["filename"]:
             # MailerSend requires filename, and determines mimetype from it
             # (even for inline attachments). For unnamed attachments, try
             # to generate a generic filename with the correct extension:
             ext = mimetypes.guess_extension(attachment.mimetype, strict=False)
             if ext is not None:
-                filename = f"attachment{ext}"
-        att = {
-            "filename": filename,
-            "content": attachment.b64content,
-            "disposition": "attachment",
-        }
+                attachment_object["filename"] = f"attachment{ext}"
         if attachment.inline:
-            att["disposition"] = "inline"
-            att["id"] = attachment.cid
-        return att
-
-    def set_attachments(self, attachments):
-        if attachments:
-            self.data["attachments"] = [
-                self.make_mailersend_attachment(attachment)
-                for attachment in attachments
-            ]
+            attachment_object["disposition"] = "inline"
+            attachment_object["id"] = attachment.cid
+        self.data.setdefault("attachments", []).append(attachment_object)
 
     # MailerSend doesn't have metadata
     # def set_metadata(self, metadata):
@@ -329,6 +322,15 @@ class MailerSendPayload(RequestsPayload):
     def set_esp_extra(self, extra):
         # Deep merge to allow (e.g.,) {"settings": {"track_content": True}}:
         update_deep(self.data, extra)
+
+        # Allow overriding api_token on individual message:
+        try:
+            api_token = self.data.pop("api_token")
+        except KeyError:
+            pass
+        else:
+            self.headers["Authorization"] = f"Bearer {api_token}"
+
         # Allow overriding batch_send_mode on individual message:
         try:
             self.batch_send_mode = self.data.pop("batch_send_mode")
