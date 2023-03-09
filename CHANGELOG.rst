@@ -38,6 +38,11 @@ Deprecations
   require code changes, but you will need to update your IAM permissions. See
   `Migrating to the SES v2 API <https://anymail.dev/en/latest/esps/amazon_ses/#amazon-ses-v2>`__.
 
+Features
+~~~~~~~~
+* **MailerSend:** Add support for this ESP
+  (`docs <https://anymail.dev/en/latest/esps/mailersend/>`__).
+
 Other
 ~~~~~
 * Test against Django 4.2 prerelease, Python 3.11 (with Django 4.2),

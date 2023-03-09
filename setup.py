@@ -56,12 +56,12 @@ setup(
     name="django-anymail",
     version=version,
     description=(
-        "Django email backends and webhooks for Amazon SES, Mailgun, Mailjet,"
-        " Mandrill, Postal, Postmark, SendGrid, SendinBlue, and SparkPost"
+        "Django email backends and webhooks for Amazon SES, MailerSend, Mailgun,"
+        " Mailjet, Mandrill, Postal, Postmark, SendGrid, SendinBlue, and SparkPost"
     ),
     keywords=(
         "Django, email, email backend, ESP, transactional mail,"
-        " Amazon SES, Mailgun, Mailjet, Mandrill, Postal, Postmark,"
+        " Amazon SES, MailerSend, Mailgun, Mailjet, Mandrill, Postal, Postmark,"
         " SendGrid, SendinBlue, SparkPost"
     ),
     author="Mike Edmunds and Anymail contributors",
@@ -76,6 +76,7 @@ setup(
         # This can be used if particular backends have unique dependencies.
         # For simplicity, requests is included in the base requirements.
         "amazon_ses": ["boto3"],
+        "mailersend": [],
         "mailgun": [],
         "mailjet": [],
         "mandrill": [],

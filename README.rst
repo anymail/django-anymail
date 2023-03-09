@@ -28,6 +28,7 @@ a consistent API that avoids locking your code to one specific ESP
 Anymail currently supports these ESPs:
 
 * **Amazon SES**
+* **MailerSend**
 * **Mailgun**
 * **Mailjet**
 * **Mandrill** (MailChimp transactional)
