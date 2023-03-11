@@ -41,9 +41,9 @@ class MailerSendWebhookTestCase(WebhookTestCase):
 
 @tag("mailersend")
 class MailerSendWebhookSettingsTestCase(MailerSendWebhookTestCase):
-    def test_requires_webhook_signing_secret(self):
+    def test_requires_signing_secret(self):
         with self.assertRaisesMessage(
-            ImproperlyConfigured, "MAILERSEND_WEBHOOK_SIGNING_SECRET"
+            ImproperlyConfigured, "MAILERSEND_SIGNING_SECRET"
         ):
             self.client_post_signed(
                 "/anymail/mailersend/tracking/", {"data": {"type": "sent"}}
@@ -51,7 +51,7 @@ class MailerSendWebhookSettingsTestCase(MailerSendWebhookTestCase):
 
     @override_settings(
         ANYMAIL={
-            "MAILERSEND_WEBHOOK_SIGNING_SECRET": "webhook secret",
+            "MAILERSEND_SIGNING_SECRET": "webhook secret",
             "MAILERSEND_INBOUND_SECRET": "inbound secret",
         }
     )
@@ -63,20 +63,16 @@ class MailerSendWebhookSettingsTestCase(MailerSendWebhookTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    @override_settings(ANYMAIL_MAILERSEND_WEBHOOK_SIGNING_SECRET="settings secret")
-    def test_webhook_signing_secret_view_params(self):
+    @override_settings(ANYMAIL_MAILERSEND_SIGNING_SECRET="settings secret")
+    def test_signing_secret_view_params(self):
         """Webhook signing secret can be provided as a view param"""
-        view = MailerSendTrackingWebhookView.as_view(
-            webhook_signing_secret="view-level secret"
-        )
+        view = MailerSendTrackingWebhookView.as_view(signing_secret="view-level secret")
         view_instance = view.view_class(**view.view_initkwargs)
         self.assertEqual(view_instance.signing_secret, b"view-level secret")
 
 
 @tag("mailersend")
-@override_settings(
-    ANYMAIL_MAILERSEND_WEBHOOK_SIGNING_SECRET=TEST_WEBHOOK_SIGNING_SECRET
-)
+@override_settings(ANYMAIL_MAILERSEND_SIGNING_SECRET=TEST_WEBHOOK_SIGNING_SECRET)
 class MailerSendWebhookSecurityTestCase(
     MailerSendWebhookTestCase, WebhookBasicAuthTestCase
 ):
@@ -108,18 +104,20 @@ class MailerSendWebhookSecurityTestCase(
         self.assertEqual(response.status_code, 400)
 
     def test_verifies_bad_signature(self):
-        response = self.client_post_signed(
-            "/anymail/mailersend/tracking/",
-            {"data": {"type": "sent"}},
-            secret="wrong signing key",
-        )
+        # This also verifies that the error log references the correct setting to check.
+        with self.assertLogs() as logs:
+            response = self.client_post_signed(
+                "/anymail/mailersend/tracking/",
+                {"data": {"type": "sent"}},
+                secret="wrong signing key",
+            )
+        # SuspiciousOperation causes 400 response (even in test client):
         self.assertEqual(response.status_code, 400)
+        self.assertIn("check Anymail MAILERSEND_SIGNING_SECRET", logs.output[0])
 
 
 @tag("mailersend")
-@override_settings(
-    ANYMAIL_MAILERSEND_WEBHOOK_SIGNING_SECRET=TEST_WEBHOOK_SIGNING_SECRET
-)
+@override_settings(ANYMAIL_MAILERSEND_SIGNING_SECRET=TEST_WEBHOOK_SIGNING_SECRET)
 class MailerSendTestCase(MailerSendWebhookTestCase):
     def test_sent_event(self):
         # This is an actual, complete (sanitized) "sent" event as received from

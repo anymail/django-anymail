@@ -52,12 +52,16 @@ class MailerSendInboundSecurityTestCase(
         self.assertEqual(response.status_code, 400)
 
     def test_verifies_bad_signature(self):
-        response = self.client_post_signed(
-            "/anymail/mailersend/inbound/",
-            {"type": "inbound.message", "data": {"raw": "..."}},
-            secret="wrong signing key",
-        )
+        # This also verifies that the error log references the correct setting to check.
+        with self.assertLogs() as logs:
+            response = self.client_post_signed(
+                "/anymail/mailersend/inbound/",
+                {"type": "inbound.message", "data": {"raw": "..."}},
+                secret="wrong signing key",
+            )
+        # SuspiciousOperation causes 400 response (even in test client):
         self.assertEqual(response.status_code, 400)
+        self.assertIn("check Anymail MAILERSEND_INBOUND_SECRET", logs.output[0])
 
 
 @tag("mailersend")

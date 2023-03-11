@@ -72,11 +72,14 @@ used with more than one ``to`` recipient.
       }
 
 
-.. setting:: ANYMAIL_MAILERSEND_WEBHOOK_SIGNING_SECRET
+.. setting:: ANYMAIL_MAILERSEND_SIGNING_SECRET
 
-.. rubric:: MAILERSEND_WEBHOOK_SIGNING_SECRET
+.. rubric:: MAILERSEND_SIGNING_SECRET
 
-Required for using activity tracking webhooks, otherwise not necessary.
+The MailerSend webhook signing secret needed to verify webhook posts.
+Required if you are using activity tracking, otherwise not necessary.
+(This is separate from Anymail's
+:setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>` setting.)
 
 Find this in your MailerSend `Email domains settings`_: after adding
 a webhook, look for the "signing secret" on the webhook's management page.
@@ -85,10 +88,10 @@ a webhook, look for the "signing secret" on the webhook's management page.
 
       ANYMAIL = {
           ...
-          "MAILERSEND_WEBHOOK_SIGNING_SECRET": "<your webhook signing secret>",
+          "MAILERSEND_SIGNING_SECRET": "<secret from webhook management page>",
       }
 
-MailerSend generates a unique secret for each webhook; if you remove and re-add
+MailerSend generates a unique secret for each webhook; if you edit
 your webhook you will need to update this setting with the new signing secret.
 (Also, inbound routes use a *different* secret, with a different setting---see
 below.)
@@ -98,7 +101,8 @@ below.)
 
 .. rubric:: MAILERSEND_INBOUND_SECRET
 
-Required for inbound handling, otherwise not necessary.
+The MailerSend inbound route secret needed to verify inbound notifications.
+Required if you are using inbound routing, otherwise not necessary.
 
 Find this in your MailerSend `Email domains settings`_: after you have
 added an inbound route, look for the "secret" immediately below the route url
@@ -108,11 +112,11 @@ on the management page for that inbound route.
 
       ANYMAIL = {
           ...
-          "MAILERSEND_INBOUND_SECRET": "<your inbound secret>",
+          "MAILERSEND_INBOUND_SECRET": "<secret from inbound management page>",
       }
 
-MailerSend generates a unique secret for each inbound route url; if you remove
-and re-add your route you will need to update this setting with the new secret.
+MailerSend generates a unique secret for each inbound route url; if you edit
+your route you will need to update this setting with the new secret.
 (Also, activity tracking webhooks use a *different* secret, with a different
 setting---see above.)
 
@@ -379,15 +383,18 @@ You can still use templates and :attr:`~!anymail.message.AnymailMessage.merge_da
     # (There's no need to specify a MailerSend "batch-send-mode".)
     to_list = ["alice@example.com", "bob@example.com"]
     merge_data = {
-          "alice@example.com": {"name": "Alice", "order_no": "12345"},
-          "bob@example.com": {"name": "Bob", "order_no": "54321"},
+        "alice@example.com": {"name": "Alice", "order_no": "12345"},
+        "bob@example.com": {"name": "Bob", "order_no": "54321"},
+    }
+    merge_global_data = {
+        "ship_date": "May 15",
     }
     for to_email in to_list:
-        message = EmailMessage(
+        message = AnymailMessage(
             # just one recipient per message:
             to=[to_email],
             # provide template variables for this one recipient:
-            merge_global_data = merge_data[to_email],
+            merge_global_data = merge_global_data | merge_data[to_email],
             # any other attributes you want:
             template_id = "vzq12345678",
             from_email="shipping@example.com",
@@ -395,10 +402,12 @@ You can still use templates and :attr:`~!anymail.message.AnymailMessage.merge_da
         try:
             message.send()
         except AnymailAPIError:
-            # handle error -- e.g., schedule for retry later
+            # Handle error -- e.g., schedule for retry later.
         else:
-            # message.anymail_status is available immediately here,
-            # and message.anymail_status.message_id will match tracking webhooks
+            # Either successful send or to_email is rejected.
+            # message.anymail_status will be {"queued"} or {"rejected"}.
+            # message.anymail_status.message_id can be stored to match
+            # with event.message_id in a status tracking signal receiver.
 
 
 .. _bulk-email API:
@@ -422,8 +431,9 @@ follow MailerSend's instructions to `add a webhook to your domain`_.
 
     Because MailerSend implements webhook signing, it's not necessary to use Anymail's
     shared webhook secret for security with MailerSend webhooks. However, it doesn't
-    hurt to use both. If you *have* set an :setting:`ANYMAIL_WEBHOOK_SECRET`, include
-    that *random:random* Anymail webhook secret in the webhook endpoint URL:
+    hurt to use both. If you *have* set an Anymail
+    :setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>`, include that *random:random*
+    shared secret in the webhook endpoint URL:
 
    :samp:`https://{random}:{random}@{yoursite.example.com}/anymail/mailersend/tracking/`
 
@@ -432,14 +442,14 @@ follow MailerSend's instructions to `add a webhook to your domain`_.
 *   After you have saved the webhook, go back into MailerSend's webhook
     management page, and reveal and copy the MailerSend "webhook signing secret".
     Provide that in your settings.py ``ANYMAIL`` settings as
-    :setting:`MAILERSEND_WEBHOOK_SIGNING_SECRET <ANYMAIL_MAILERSEND_WEBHOOK_SIGNING_SECRET>`
+    :setting:`MAILERSEND_SIGNING_SECRET <ANYMAIL_MAILERSEND_SIGNING_SECRET>`
     so that Anymail can verify calls to the webhook:
 
     .. code-block:: python
 
         ANYMAIL = {
             # ...
-            MAILERSEND_WEBHOOK_SIGNING_SECRET = "<secret you copied>"
+            MAILERSEND_SIGNING_SECRET = "<secret you copied>"
         }
 
 For troubleshooting, MailerSend provides a helpful log of calls to the webhook.
@@ -452,6 +462,11 @@ See "`About webhook attempts`_" in their documentation for more details.
     receiver function, or MailerSend will consider the notification failed
     at retry it. The event's :attr:`~anymail.signals.AnymailTrackingEvent.event_id`
     field can help identify duplicate notifications.
+
+    MailerSend retries webhook notifications only twice, with delays of 10
+    and then 100 seconds. If your webhook is ever offline for more than
+    a couple minutes, you many miss some tracking events. You can use
+    MailerSend's activity API to query for events that may have been missed.
 
 MailerSend will report these Anymail
 :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
@@ -477,7 +492,7 @@ Inbound routing
 
 If you want to receive email from MailerSend through Anymail's normalized
 :ref:`inbound <inbound>` handling, follow MailerSend's guide to
-`How to set up an inbound route`_:
+`How to set up an inbound route`_.
 
 *   For "Route to" (in their step 8), enter this Anymail inbound route endpoint URL
     (where *yoursite.example.com* is your Django site):
@@ -486,8 +501,9 @@ If you want to receive email from MailerSend through Anymail's normalized
 
     Because MailerSend signs its inbound notifications, it's not necessary to use Anymail's
     shared webhook secret for security with MailerSend inbound routing. However, it doesn't
-    hurt to use both. If you *have* set an :setting:`ANYMAIL_WEBHOOK_SECRET`, include
-    that *random:random* Anymail webhook secret in the inbound route endpoint URL:
+    hurt to use both. If you *have* set an Anymail
+    :setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>`, include that *random:random*
+    shared secret in the inbound route endpoint URL:
 
     :samp:`https://{random}:{random}@{yoursite.example.com}/anymail/mailersend/inbound/`
 
@@ -505,7 +521,7 @@ If you want to receive email from MailerSend through Anymail's normalized
         }
 
     Note that this is a *different* secret from the
-    :setting:`MAILERSEND_WEBHOOK_SIGNING_SECRET <ANYMAIL_MAILERSEND_WEBHOOK_SIGNING_SECRET>`
+    :setting:`MAILERSEND_SIGNING_SECRET <ANYMAIL_MAILERSEND_SIGNING_SECRET>`
     used to verify activity tracking webhooks. If you are using both features,
     be sure to include both settings.
 
@@ -517,13 +533,12 @@ in their docs for more details.
 
     MailerSend imposes a three second limit on all notifications.
     If your inbound signal receiver function takes too long,
-    MailerSend may think the notification failed and retry it.
-    To avoid duplicate notifications, it's essential any lengthy
-    operations are offloaded to a background task.
+    MailerSend may think the notification failed. To avoid problems,
+    it's essential you offload any lengthy operations to a background task.
 
-    MailerSend will only attempt two retries for failed inbound notifications,
-    at 10 and 100 seconds. If your inbound webhook is ever unreachable for more
-    than about two minutes, **you may miss inbound mail.**
+    MailerSend does not retry failed inbound notifications.
+    If your Django app is ever unreachable for any reason,
+    **you will miss inbound mail** that arrives during that time.
 
 .. _How to set up an inbound route:
    https://www.mailersend.com/help/inbound-route

@@ -33,6 +33,7 @@ class MailerSendBaseWebhookView(AnymailBaseWebhookView):
         )
         # hmac.new requires bytes key:
         self.signing_secret = signing_secret.encode("ascii")
+        self._secret_setting_name = f"{self.esp_name}_{_secret_name}".upper()
         super().__init__(**kwargs)
 
     def validate_request(self, request):
@@ -51,7 +52,8 @@ class MailerSendBaseWebhookView(AnymailBaseWebhookView):
         ).hexdigest()
         if not constant_time_compare(signature, expected_signature):
             raise AnymailWebhookValidationFailure(
-                "MailerSend webhook called with incorrect signature"
+                f"MailerSend webhook called with incorrect signature"
+                f" (check Anymail {self._secret_setting_name} setting)"
             )
 
 
@@ -61,10 +63,10 @@ class MailerSendTrackingWebhookView(MailerSendBaseWebhookView):
     signal = tracking
 
     # (Declaring class attr allows override by kwargs in View.as_view.)
-    webhook_signing_secret = None
+    signing_secret = None
 
     def __init__(self, **kwargs):
-        super().__init__(_secret_name="webhook_signing_secret", **kwargs)
+        super().__init__(_secret_name="signing_secret", **kwargs)
 
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
@@ -183,9 +185,12 @@ class MailerSendInboundWebhookView(MailerSendBaseWebhookView):
             pass
 
         try:
-            # is it possible to have more than one rcptTo?
-            rcpt_to = message_data["recipients"]["rcptTo"]
-            message.envelope_recipient = rcpt_to[0]["email"]
+            # There can be multiple rcptTo if the same message is sent
+            # to multiple inbound recipients. Just use the first.
+            envelope_recipients = [
+                recipient["email"] for recipient in message_data["recipients"]["rcptTo"]
+            ]
+            message.envelope_recipient = envelope_recipients[0]
         except (KeyError, IndexError):
             pass
 
