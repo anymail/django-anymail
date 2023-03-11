@@ -40,6 +40,7 @@ jobs:
         # combination, to avoid rapidly consuming the testing accounts' entire send allotments.
         config:
           - { tox: django41-py310-amazon_ses, python: "3.10" }
+          - { tox: django41-py310-mailersend, python: "3.10" }
           - { tox: django41-py310-mailgun, python: "3.10" }
           - { tox: django41-py310-mailjet, python: "3.10" }
           - { tox: django41-py310-mandrill, python: "3.10" }
@@ -74,6 +75,8 @@ jobs:
           ANYMAIL_TEST_AMAZON_SES_DOMAIN: ${{ secrets.ANYMAIL_TEST_AMAZON_SES_DOMAIN }}
           ANYMAIL_TEST_AMAZON_SES_REGION_NAME: ${{ secrets.ANYMAIL_TEST_AMAZON_SES_REGION_NAME }}
           ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY: ${{ secrets.ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY }}
+          ANYMAIL_TEST_MAILERSEND_API_TOKEN: ${{ secrets.ANYMAIL_TEST_MAILERSEND_API_TOKEN }}
+          ANYMAIL_TEST_MAILERSEND_DOMAIN: ${{ secrets.ANYMAIL_TEST_MAILERSEND_DOMAIN }}
           ANYMAIL_TEST_MAILGUN_API_KEY: ${{ secrets.ANYMAIL_TEST_MAILGUN_API_KEY }}
           ANYMAIL_TEST_MAILGUN_DOMAIN: ${{ secrets.ANYMAIL_TEST_MAILGUN_DOMAIN }}
           ANYMAIL_TEST_MAILJET_API_KEY: ${{ secrets.ANYMAIL_TEST_MAILJET_API_KEY }}
