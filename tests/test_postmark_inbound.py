@@ -165,6 +165,16 @@ class PostmarkInboundTestCase(WebhookTestCase):
                     "ContentType": 'message/rfc822; charset="us-ascii"',
                     "ContentLength": len(email_content),
                 },
+                # This is an attachement like send by the test webhook
+                # A workaround is implemented to handle it.
+                # Once Postmark solves the bug on their side this workaround
+                # can be reverted.
+                {
+                    "Name": "test.txt",
+                    "ContentType": "text/plain",
+                    "Data": "VGhpcyBpcyBhdHRhY2htZW50IGNvbnRlbnRzLCBiYXNlLTY0IGVuY29kZWQu",
+                    "ContentLength": 45,
+                },
             ]
         }
 
@@ -183,13 +193,21 @@ class PostmarkInboundTestCase(WebhookTestCase):
         event = kwargs["event"]
         message = event.message
         attachments = message.attachments  # AnymailInboundMessage convenience accessor
-        self.assertEqual(len(attachments), 2)
+        self.assertEqual(len(attachments), 3)
         self.assertEqual(attachments[0].get_filename(), "test.txt")
         self.assertEqual(attachments[0].get_content_type(), "text/plain")
         self.assertEqual(attachments[0].get_content_text(), "test attachment")
         self.assertEqual(attachments[1].get_content_type(), "message/rfc822")
         self.assertEqualIgnoringHeaderFolding(
             attachments[1].get_content_bytes(), email_content
+        )
+
+        # Attachment of test webhook
+        self.assertEqual(attachments[2].get_filename(), "test.txt")
+        self.assertEqual(attachments[2].get_content_type(), "text/plain")
+        self.assertEqual(
+            attachments[2].get_content_text(),
+            "This is attachment contents, base-64 encoded.",
         )
 
         inlines = message.inline_attachments

@@ -169,7 +169,13 @@ class PostmarkInboundWebhookView(PostmarkBaseWebhookView):
         attachments = [
             AnymailInboundMessage.construct_attachment(
                 content_type=attachment["ContentType"],
-                content=attachment["Content"],
+                content=(
+                    attachment.get("Content")
+                    # WORKAROUND:
+                    # The test webhooks are not like their real webhooks
+                    # This allows the test webhooks to be parsed.
+                    or attachment["Data"]
+                ),
                 base64=True,
                 filename=attachment.get("Name", "") or None,
                 content_id=attachment.get("ContentID", "") or None,

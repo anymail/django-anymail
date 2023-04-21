@@ -30,6 +30,12 @@ vNext
 
 *Unreleased changes*
 
+Fixes
+~~~~~
+
+* **Postmark:** Workaround for handling inbound test webhooks.
+  (`More info <https://github.com/anymail/django-anymail/issues/304>`__)
+
 Other
 ~~~~~
 
