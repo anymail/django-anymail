@@ -4,7 +4,7 @@ from unittest.mock import ANY
 
 from django.test import tag
 
-from anymail.exceptions import AnymailConfigurationError
+from anymail.exceptions import AnymailConfigurationError, AnymailWarning
 from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent
 from anymail.webhooks.postmark import PostmarkInboundWebhookView
@@ -178,11 +178,14 @@ class PostmarkInboundTestCase(WebhookTestCase):
             ]
         }
 
-        response = self.client.post(
-            "/anymail/postmark/inbound/",
-            content_type="application/json",
-            data=json.dumps(raw_event),
-        )
+        with self.assertWarnsRegex(
+            AnymailWarning, r"Received a test webhook attachment. "
+        ):
+            response = self.client.post(
+                "/anymail/postmark/inbound/",
+                content_type="application/json",
+                data=json.dumps(raw_event),
+            )
         self.assertEqual(response.status_code, 200)
         kwargs = self.assert_handler_called_once_with(
             self.inbound_handler,

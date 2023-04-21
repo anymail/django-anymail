@@ -1,8 +1,9 @@
 import json
+import warnings
 
 from django.utils.dateparse import parse_datetime
 
-from ..exceptions import AnymailConfigurationError
+from ..exceptions import AnymailConfigurationError, AnymailWarning
 from ..inbound import AnymailInboundMessage
 from ..signals import (
     AnymailInboundEvent,
@@ -182,6 +183,18 @@ class PostmarkInboundWebhookView(PostmarkBaseWebhookView):
             )
             for attachment in esp_event.get("Attachments", [])
         ]
+
+        # Warning to the user regarding the workaround of above.
+        for attachment in esp_event.get("Attachments", []):
+            if "Data" in attachment:
+                warnings.warn(
+                    "Received a test webhook attachment. "
+                    "It is recommended to test with real inbound events. "
+                    "See https://github.com/anymail/django-anymail/issues/304 "
+                    "for more information.",
+                    AnymailWarning,
+                )
+                break
 
         message = AnymailInboundMessage.construct(
             from_email=self._address(esp_event.get("FromFull")),
