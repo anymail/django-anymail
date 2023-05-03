@@ -38,6 +38,20 @@ tests regularly. That requires the ESP have a free tier (testing is
 extremely low volume), a sandbox API, or that they offer developer
 accounts for open source projects like Anymail.
 
+## Boilerplate
+
+You should add entries for your ESP in:
+
+- pyproject.toml:
+  - in the `[project]` metadata section under `description` and `keywords`
+  - in the `[project.optional-dependencies]` section
+- integration-test.yml in the test matrix
+- tox.ini:
+  - in the `[tox]` section, in "partial installation" at the bottom of the `envlist`
+  - in the `[testenv]` section under `setenv`
+    (and also under `extras` if your ESP requires any extra dependencies)
+- README.rst in the list of ESPs
+
 ## EmailBackend and payload
 
 Anymail abstracts a lot of common functionality into its base classes;
@@ -98,9 +112,6 @@ Need to parse JSON in the API response? Use `self.deserialize_json_response()`
 ### Base backend (using client lib)
 
 Good starting points: Test backend; SparkPost
-
-Don't forget to add an entry for your ESP in pyproject.toml in the
-`[project.optional-dependencies]` section.
 
 If the client lib supports the notion of a reusable API "connection"
 (or session), you should override `open()` and `close()` to provide
