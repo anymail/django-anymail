@@ -120,10 +120,10 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             "attachment": [
                 {
                     "name": "attachment1.txt",
-                    # URL where Sendinblue can download
-                    # the attachment content while sending:
-                    "url": "https://raw.githubusercontent.com/anymail"
-                    "/django-anymail/main/LICENSE",
+                    # URL where Sendinblue can download the attachment content while
+                    # sending (must be content-type: text/plain):
+                    "url": "https://raw.githubusercontent.com/anymail/django-anymail/"
+                    "main/docs/_readme/template.txt",
                 }
             ]
         }
