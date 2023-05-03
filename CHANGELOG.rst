@@ -33,16 +33,24 @@ vNext
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
+* **Amazon SES:** The "extra name" for installation must now be spelled with
+  a hyphen rather than an underscore: ``django-anymail[amazon-ses]``.
+  Be sure to update any dependencies specification (pip install, requirements.txt,
+  etc.) that had been using ``[amazon_ses]``.
+
 * Require Python 3.7 or later.
+
 * Require urllib3 1.25 or later (released 2019-04-29).
 
 Other
 ~~~~~
 
 * Modernize packaging. (Change from setup.py and setuptools
-  to pyproject.toml and hatchling. This should have no impact,
-  but if you have trouble installing django-anymail v10 where
-  v9 worked, please report an issue and include your pip version.)
+  to pyproject.toml and hatchling.) Other than the ``amazon-ses``
+  naming normalization noted above, the new packaging should have
+  no impact. If you have trouble installing django-anymail v10 where
+  v9 worked, please report an issue including the exact install
+  command and pip version you are using.
 
 
 v9.2

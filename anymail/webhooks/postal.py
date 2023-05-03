@@ -31,7 +31,9 @@ except ImportError:
     # This module gets imported by anymail.urls, so don't complain about cryptography
     # missing unless one of the Postal webhook views is actually used and needs it
     error = _LazyError(
-        AnymailImproperlyInstalled(missing_package="cryptography", backend="postal")
+        AnymailImproperlyInstalled(
+            missing_package="cryptography", install_extra="postal"
+        )
     )
     serialization = error
     hashes = error

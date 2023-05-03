@@ -59,7 +59,8 @@ dependencies = [
 [project.optional-dependencies]
 # ESP-specific additional dependencies.
 # (For simplicity, requests is included in the base dependencies.)
-amazon_ses = ["boto3"]
+# (Do not use underscores in extra names: they get normalized to hyphens.)
+amazon-ses = ["boto3"]
 mailersend = []
 mailgun = []
 mailjet = []

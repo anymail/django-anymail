@@ -13,7 +13,7 @@ try:
     from botocore.exceptions import BotoCoreError, ClientError, ConnectionError
 except ImportError as err:
     raise AnymailImproperlyInstalled(
-        missing_package="boto3", backend="amazon_ses"
+        missing_package="boto3", install_extra="amazon-ses"
     ) from err
 
 

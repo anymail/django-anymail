@@ -33,11 +33,11 @@ except ImportError:
     # This module gets imported by anymail.urls, so don't complain about boto3 missing
     # unless one of the Amazon SES webhook views is actually used and needs it
     boto3 = _LazyError(
-        AnymailImproperlyInstalled(missing_package="boto3", backend="amazon_ses")
+        AnymailImproperlyInstalled(missing_package="boto3", install_extra="amazon-ses")
     )
     ClientError = object
     _get_anymail_boto3_params = _LazyError(
-        AnymailImproperlyInstalled(missing_package="boto3", backend="amazon_ses")
+        AnymailImproperlyInstalled(missing_package="boto3", install_extra="amazon-ses")
     )
 
 

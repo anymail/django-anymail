@@ -7,6 +7,7 @@ from django.core import mail
 from django.core.mail import BadHeaderError
 from django.test import SimpleTestCase, override_settings, tag
 
+from anymail import __version__ as ANYMAIL_VERSION
 from anymail.exceptions import AnymailAPIError, AnymailUnsupportedFeature
 from anymail.inbound import AnymailInboundMessage
 from anymail.message import AnymailMessage, attach_inline_image_file
@@ -812,8 +813,9 @@ class AmazonSESBackendConfigurationTests(AmazonSESBackendMockAPITestCase):
         config = client_params.pop("config")
         # no additional params passed to session.client('ses'):
         self.assertEqual(client_params, {})
-        self.assertRegex(
-            config.user_agent_extra, r"django-anymail/\d(\.\w+){1,}-amazon-ses"
+        self.assertIn(
+            f"django-anymail/{ANYMAIL_VERSION}-amazon-ses",
+            config.user_agent_extra,
         )
 
     @override_settings(

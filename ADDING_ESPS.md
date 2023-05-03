@@ -46,10 +46,10 @@ You should add entries for your ESP in:
   - in the `[project]` metadata section under `description` and `keywords`
   - in the `[project.optional-dependencies]` section
 - integration-test.yml in the test matrix
-- tox.ini:
-  - in the `[tox]` section, in "partial installation" at the bottom of the `envlist`
-  - in the `[testenv]` section under `setenv`
-    (and also under `extras` if your ESP requires any extra dependencies)
+- tox.ini in the `[testenv]` section under `setenv`
+  - if your ESP requires any extra dependencies, also update the tox.ini
+    `[testenv] extras` and the "partial installation" at the bottom of
+    `[tox] envlist`
 - README.rst in the list of ESPs
 
 ## EmailBackend and payload

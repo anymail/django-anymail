@@ -34,13 +34,20 @@ Installation
 ------------
 
 You must ensure the :pypi:`boto3` package is installed to use Anymail's Amazon SES
-backend. Either include the ``amazon_ses`` option when you install Anymail:
+backend. Either include the ``amazon-ses`` option when you install Anymail:
 
     .. code-block:: console
 
-        $ pip install "django-anymail[amazon_ses]"
+        $ pip install "django-anymail[amazon-ses]"
 
 or separately run ``pip install boto3``.
+
+.. versionchanged:: 10.0
+
+    In earlier releases, the "extra name" could use an underscore
+    (``django-anymail[amazon_ses]``). That now causes pip to warn
+    that "django-anymail does not provide the extra 'amazon_ses'",
+    and may result in a broken installation that is missing boto3.
 
 To send mail with Anymail's Amazon SES backend, set:
 
