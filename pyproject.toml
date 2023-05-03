@@ -1,3 +1,102 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "django-anymail"
+dynamic = ["readme", "version"]
+license = {file = "LICENSE"}
+
+authors = [
+    {name = "Mike Edmunds", email = "medmunds@gmail.com"},
+    {name = "Anymail Contributors"},
+]
+description = """\
+    Django email backends and webhooks for Amazon SES, MailerSend, Mailgun, \
+    Mailjet, Mandrill, Postal, Postmark, SendGrid, SendinBlue, and SparkPost\
+    """
+# readme: see tool.hatch.metadata.hooks.custom below
+keywords = [
+    "Django", "email", "email backend",
+    "ESP", "transactional mail",
+    "Amazon SES",
+    "MailerSend", "Mailgun", "Mailjet", "Mandrill",
+    "Postal", "Postmark",
+    "SendGrid", "SendinBlue", "SparkPost",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: BSD License",
+    "Topic :: Communications :: Email",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Intended Audience :: Developers",
+    "Framework :: Django",
+    "Framework :: Django :: 3.0",
+    "Framework :: Django :: 3.1",
+    "Framework :: Django :: 3.2",
+    "Framework :: Django :: 4.0",
+    "Framework :: Django :: 4.1",
+    # not yet registered: "Framework :: Django :: 4.2",
+    "Environment :: Web Environment",
+]
+
+requires-python = ">=3.7"
+dependencies = [
+    "django>=2.0",
+    "requests>=2.4.3",
+    "urllib3>=1.25.0",  # requests dependency: fixes RFC 7578 header encoding
+]
+
+[project.optional-dependencies]
+# ESP-specific additional dependencies.
+# (For simplicity, requests is included in the base dependencies.)
+amazon_ses = ["boto3"]
+mailersend = []
+mailgun = []
+mailjet = []
+mandrill = []
+postmark = []
+sendgrid = []
+sendinblue = []
+sparkpost = []
+postal = [
+    # Postal requires cryptography for verifying webhooks.
+    # Cryptography's wheels are broken on darwin-arm64 before Python 3.9.
+    "cryptography; sys_platform != 'darwin' or platform_machine != 'arm64' or python_version >= '3.9'"
+]
+
+[project.urls]
+Homepage = "https://github.com/anymail/django-anymail"
+Documentation = "https://anymail.dev/en/stable/"
+Source = "https://github.com/anymail/django-anymail"
+Changelog = "https://anymail.dev/en/stable/changelog/"
+Tracker = "https://github.com/anymail/django-anymail/issues"
+
+[tool.hatch.build]
+packages = ["anymail"]
+# Hatch automatically includes pyproject.toml, LICENSE, and hatch_build.py.
+# Help it find the dynamic readme source (otherwise wheel will only build with
+# `hatch build`, not with `python -m build`):
+force-include = {"README.rst" = "README.rst"}
+
+[tool.hatch.metadata.hooks.custom]
+# Provides dynamic readme
+path = "hatch_build.py"
+readme = "README.rst"
+
+[tool.hatch.version]
+path = "anymail/_version.py"
+
+
 [tool.black]
 force-exclude = '^/tests/test_settings/settings_.*\.py'
 max-line-length = 88

@@ -1,7 +1,17 @@
-# Expose package version at root of package
-from django import VERSION as DJANGO_VERSION
+from ._version import VERSION, __version__
 
-from ._version import VERSION, __version__  # NOQA: F401
+__all__ = [
+    "VERSION",
+    "__version__",
+]
 
-if DJANGO_VERSION < (3, 2, 0):
-    default_app_config = "anymail.apps.AnymailBaseConfig"
+try:
+    import django
+except ImportError:
+    # (don't require django just to get package version)
+    pass
+else:
+    if django.VERSION < (3, 2, 0):
+        # (No longer required -- and causes deprecation warning -- in Django 3.2+)
+        default_app_config = "anymail.apps.AnymailBaseConfig"
+        __all__.append("default_app_config")

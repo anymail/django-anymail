@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-# python setup.py test
-#   or
-# runtests.py [tests.test_x tests.test_y.SomeTestCase ...]
+# usage: python runtests.py [tests.test_x tests.test_y.SomeTestCase ...]
 
 import os
 import re

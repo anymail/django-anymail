@@ -1,7 +1,7 @@
-VERSION = (9, 2)
+# Don't import this file directly (unless you are a build system).
+# Instead, load version info from the package root.
 
 #: major.minor.patch or major.minor.devN
-__version__ = ".".join([str(x) for x in VERSION])
+__version__ = "10.0.dev0"
 
-#: Sphinx's X.Y "version"
-__minor_version__ = ".".join([str(x) for x in VERSION[:2]])
+VERSION = __version__.split(",")

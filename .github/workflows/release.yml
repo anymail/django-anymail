@@ -24,19 +24,24 @@ jobs:
     steps:
       - name: Get code
         uses: actions/checkout@v3
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
+      - name: Install build requirements
+        run: |
+          python -m pip install --upgrade build hatch twine
+
       - name: Get version
         # (This will end the workflow if git and source versions don't match.)
         id: version
         run: |
-          VERSION="$(python setup.py --version)"
+          VERSION="$(python -m hatch version)"
           TAG="v$VERSION"
           GIT_TAG="$(git tag -l --points-at "$GITHUB_REF" 'v*')"
-          if [ "$GIT_TAG" != "$TAG" ]; then
+          if [ "x$GIT_TAG" != "x$TAG" ]; then
             echo "::error ::package version '$TAG' does not match git tag '$GIT_TAG'"
             exit 1
           fi
@@ -44,21 +49,18 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "anchor=${TAG//[^[:alnum:]]/-}" >> $GITHUB_OUTPUT
 
-      - name: Install build requirements
-        run: |
-          pip install twine wheel
       - name: Build
         run: |
           rm -rf build dist django_anymail.egg-info
-          python setup.py sdist bdist_wheel
-          twine check dist/*
+          python -m build
+          python -m twine check dist/*
 
       - name: Publish to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          twine upload dist/*
+          python -m twine upload dist/*
 
       - name: Release to GitHub
         env:

@@ -99,8 +99,8 @@ Need to parse JSON in the API response? Use `self.deserialize_json_response()`
 
 Good starting points: Test backend; SparkPost
 
-Don't forget add an `'extras_require'` entry for your ESP in setup.py.
-Also update `'tests_require'`.
+Don't forget to add an entry for your ESP in pyproject.toml in the
+`[project.optional-dependencies]` section.
 
 If the client lib supports the notion of a reusable API "connection"
 (or session), you should override `open()` and `close()` to provide

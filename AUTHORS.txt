@@ -1,5 +1,0 @@
-Anymail
-=======
-
-Please see https://github.com/anymail/django-anymail/graphs/contributors
-for the complete list of Anymail contributors.

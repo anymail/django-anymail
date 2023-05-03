@@ -36,6 +36,14 @@ Breaking changes
 * Require Python 3.7 or later.
 * Require urllib3 1.25 or later (released 2019-04-29).
 
+Other
+~~~~~
+
+* Modernize packaging. (Change from setup.py and setuptools
+  to pyproject.toml and hatchling. This should have no impact,
+  but if you have trouble installing django-anymail v10 where
+  v9 worked, please report an issue and include your pip version.)
+
 
 v9.2
 -----
