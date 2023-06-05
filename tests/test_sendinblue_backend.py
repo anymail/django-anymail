@@ -67,7 +67,7 @@ class SendinBlueBackendStandardEmailTests(SendinBlueBackendMockAPITestCase):
             ["to@example.com"],
             fail_silently=False,
         )
-        self.assert_esp_called("https://api.sendinblue.com/v3/smtp/email")
+        self.assert_esp_called("https://api.brevo.com/v3/smtp/email")
         http_headers = self.get_api_call_headers()
         self.assertEqual(http_headers["api-key"], "test_api_key")
         self.assertEqual(http_headers["Content-Type"], "application/json")

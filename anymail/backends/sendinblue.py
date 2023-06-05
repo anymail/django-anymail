@@ -26,7 +26,7 @@ class EmailBackend(AnymailRequestsBackend):
             "api_url",
             esp_name=esp_name,
             kwargs=kwargs,
-            default="https://api.sendinblue.com/v3/",
+            default="https://api.brevo.com/v3/",
         )
         if not api_url.endswith("/"):
             api_url += "/"
