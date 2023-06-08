@@ -1,24 +1,24 @@
 .. _sendinblue-backend:
 
-Sendinblue
-==========
+Brevo
+=====
 
-Anymail integrates with the `Sendinblue`_ email service, using their `API v3`_.
-Sendinblue's transactional API does not support some basic email features, such as
+Anymail integrates with the `Brevo`_ email service (formerly SendinBlue until 2023), using their `API v3`_.
+Brevo's transactional API does not support some basic email features, such as
 inline images. Be sure to review the :ref:`limitations <sendinblue-limitations>` below.
 
 .. important::
 
     **Troubleshooting:**
-    If your Sendinblue messages aren't being delivered as expected, be sure to look for
-    events in your Sendinblue `logs`_.
+    If your Brevo messages aren't being delivered as expected, be sure to look for
+    events in your Brevo `logs`_.
 
-    Sendinblue detects certain types of errors only *after* the send API call reports
+    Brevo detects certain types of errors only *after* the send API call reports
     the message as "queued." These errors appear in the logging dashboard.
 
-.. _Sendinblue: https://www.sendinblue.com/
-.. _API v3: https://developers.sendinblue.com/docs
-.. _logs: https://app-smtp.sendinblue.com/log
+.. _Brevo: https://www.brevo.com/
+.. _API v3: https://developers.brevo.com/docs
+.. _logs: https://app-smtp.brevo.com/log
 
 
 Settings
@@ -26,7 +26,7 @@ Settings
 
 .. rubric:: EMAIL_BACKEND
 
-To use Anymail's Sendinblue backend, set:
+To use Anymail's Brevo backend, set:
 
   .. code-block:: python
 
@@ -39,7 +39,7 @@ in your settings.py.
 
 .. rubric:: SENDINBLUE_API_KEY
 
-The API key can be retrieved from your Sendinblue `SMTP & API settings`_.
+The API key can be retrieved from your Brevo `SMTP & API settings`_.
 Make sure the version column indicates "v3." (v2 keys don't work with
 Anymail. If you don't see a v3 key listed, use "Create a New API Key".)
 Required.
@@ -55,16 +55,16 @@ Anymail will also look for ``SENDINBLUE_API_KEY`` at the
 root of the settings file if neither ``ANYMAIL["SENDINBLUE_API_KEY"]``
 nor ``ANYMAIL_SENDINBLUE_API_KEY`` is set.
 
-.. _SMTP & API settings: https://account.sendinblue.com/advanced/api
+.. _SMTP & API settings: https://app.brevo.com/settings/keys/smtp
 
 
 .. setting:: ANYMAIL_SENDINBLUE_API_URL
 
 .. rubric:: SENDINBLUE_API_URL
 
-The base url for calling the Sendinblue API.
+The base url for calling the Brevo API.
 
-The default is ``SENDINBLUE_API_URL = "https://api.sendinblue.com/v3/"``
+The default is ``SENDINBLUE_API_URL = "https://api.brevo.com/v3/"``
 (It's unlikely you would need to change this.)
 
 
@@ -73,12 +73,12 @@ The default is ``SENDINBLUE_API_URL = "https://api.sendinblue.com/v3/"``
 esp_extra support
 -----------------
 
-To use Sendinblue features not directly supported by Anymail, you can
+To use Brevo features not directly supported by Anymail, you can
 set a message's :attr:`~anymail.message.AnymailMessage.esp_extra` to
-a `dict` that will be merged into the json sent to Sendinblue's
+a `dict` that will be merged into the json sent to Brevo's
 `smtp/email API`_.
 
-For example, you could set Sendinblue's *batchId* for use with
+For example, you could set Brevo's *batchId* for use with
 their `batched scheduled sending`_:
 
     .. code-block:: python
@@ -91,8 +91,8 @@ their `batched scheduled sending`_:
 (You can also set `"esp_extra"` in Anymail's :ref:`global send defaults <send-defaults>`
 to apply it to all messages.)
 
-.. _batched scheduled sending: https://developers.sendinblue.com/docs/schedule-batch-sendings
-.. _smtp/email API: https://developers.sendinblue.com/v3.0/reference#sendtransacemail
+.. _batched scheduled sending: https://developers.brevo.com/docs/schedule-batch-sendings
+.. _smtp/email API: https://developers.brevo.com/reference/getting-started-1#sendtransacemail
 
 
 .. _sendinblue-limitations:
@@ -100,61 +100,61 @@ to apply it to all messages.)
 Limitations and quirks
 ----------------------
 
-Sendinblue's v3 API has several limitations. In most cases below,
+Brevo's v3 API has several limitations. In most cases below,
 Anymail will raise an :exc:`~anymail.exceptions.AnymailUnsupportedFeature`
 error if you try to send a message using missing features. You can
 override this by enabling the :setting:`ANYMAIL_IGNORE_UNSUPPORTED_FEATURES`
 setting, and Anymail will try to limit the API request to features
-Sendinblue can handle.
+Brevo can handle.
 
 **HTML body required**
-  Sendinblue's API returns an error if you attempt to send a message with
+  Brevo's API returns an error if you attempt to send a message with
   only a plain-text body. Be sure to :ref:`include HTML <sending-html>`
   content for your messages if you are not using a template.
 
-  (Sendinblue *does* allow HTML without a plain-text body. This is generally
+  (Brevo *does* allow HTML without a plain-text body. This is generally
   not recommended, though, as some email systems treat HTML-only content as a
   spam signal.)
 
 **Inline images**
-  Sendinblue's v3 API doesn't support inline images, at all.
-  (Confirmed with Sendinblue support Feb 2018.)
+  Brevo's v3 API doesn't support inline images, at all.
+  (Confirmed with Brevo support Feb 2018.)
 
   If you are ignoring unsupported features, Anymail will try to send
   inline images as ordinary image attachments.
 
 **Attachment names must be filenames with recognized extensions**
-  Sendinblue determines attachment content type by assuming the attachment's
+  Brevo determines attachment content type by assuming the attachment's
   name is a filename, and examining that filename's extension (e.g., ".jpg").
 
   Trying to send an attachment without a name, or where the name does not end
-  in a supported filename extension, will result in a Sendinblue API error.
+  in a supported filename extension, will result in a Brevo API error.
   Anymail has no way to communicate an attachment's desired content-type
-  to the Sendinblue API if the name is not set correctly.
+  to the Brevo API if the name is not set correctly.
 
 **Single Reply-To**
-  Sendinblue's v3 API only supports a single Reply-To address.
+  Brevo's v3 API only supports a single Reply-To address.
 
   If you are ignoring unsupported features and have multiple reply addresses,
   Anymail will use only the first one.
 
 **Metadata**
-  Anymail passes :attr:`~anymail.message.AnymailMessage.metadata` to Sendinblue
+  Anymail passes :attr:`~anymail.message.AnymailMessage.metadata` to Brevo
   as a JSON-encoded string using their :mailheader:`X-Mailin-custom` email header.
   The metadata is available in tracking webhooks.
 
 **Delayed sending**
   .. versionadded:: 9.0
      Earlier versions of Anymail did not support :attr:`~anymail.message.AnymailMessage.send_at`
-     with Sendinblue.
+     with Brevo.
 
 **No click-tracking or open-tracking options**
-  Sendinblue does not provide a way to control open or click tracking for individual
+  Brevo does not provide a way to control open or click tracking for individual
   messages. Anymail's :attr:`~anymail.message.AnymailMessage.track_clicks` and
   :attr:`~anymail.message.AnymailMessage.track_opens` settings are unsupported.
 
 **No envelope sender overrides**
-  Sendinblue does not support overriding :attr:`~anymail.message.AnymailMessage.envelope_sender`
+  Brevo does not support overriding :attr:`~anymail.message.AnymailMessage.envelope_sender`
   on individual messages.
 
 
@@ -163,37 +163,37 @@ Sendinblue can handle.
 Batch sending/merge and ESP templates
 -------------------------------------
 
-Sendinblue supports :ref:`ESP stored templates <esp-stored-templates>` populated with
+Brevo supports :ref:`ESP stored templates <esp-stored-templates>` populated with
 global merge data for all recipients, but does not offer :ref:`batch sending <batch-send>`
 with per-recipient merge data. Anymail's :attr:`~anymail.message.AnymailMessage.merge_data`
 and :attr:`~anymail.message.AnymailMessage.merge_metadata` message attributes are not
-supported with the Sendinblue backend, but you can use Anymail's
-:attr:`~anymail.message.AnymailMessage.merge_global_data` with Sendinblue templates.
+supported with the Brevo backend, but you can use Anymail's
+:attr:`~anymail.message.AnymailMessage.merge_global_data` with Brevo templates.
 
-Sendinblue supports two different template styles: a `new template language`_
+Brevo supports two different template styles: a `new template language`_
 that uses Django template syntax (with ``{{ param.NAME }}`` style substitutions),
 and an "old" template language that used percent-delimited ``%NAME%`` style
 substitutions. Anymail v7.0 and later require new style templates.
 
 .. versionchanged:: 7.0
 
-    Anymail switched to a Sendinblue API that supports the new template language
+    Anymail switched to a Brevo API that supports the new template language
     and removes several limitations from the earlier template send API. But the new API
     does not support attachments, and can behave oddly if used with old style templates.
 
 .. caution::
 
-    Anymail v7.0 and later work *only* with Sendinblue's *new* template language. You should
-    follow Sendinblue's instructions to `convert each old template`_ to the new language.
+    Anymail v7.0 and later work *only* with Brevo's *new* template language. You should
+    follow Brevo's instructions to `convert each old template`_ to the new language.
 
     Although unconverted old templates may appear to work with Anymail v7.0, some
     features may not work properly. In particular, ``reply_to`` overrides and recipient
     display names are silently ignored when *old* style templates are sent with the
     *new* API used in Anymail v7.0.
 
-To use a Sendinblue template, set the message's
+To use a Brevo template, set the message's
 :attr:`~anymail.message.AnymailMessage.template_id` to the numeric
-Sendinblue template ID, and supply substitution attributes using
+Brevo template ID, and supply substitution attributes using
 the message's :attr:`~anymail.message.AnymailMessage.merge_global_data`:
 
   .. code-block:: python
@@ -203,7 +203,7 @@ the message's :attr:`~anymail.message.AnymailMessage.merge_global_data`:
           # ...multiple to emails would all get the same message
           # (and would all see each other's emails in the "to" header)
       )
-      message.template_id = 3   # use this Sendinblue template
+      message.template_id = 3   # use this Brevo template
       message.from_email = None  # to use the template's default sender
       message.merge_global_data = {
           'name': "Alice",
@@ -211,7 +211,7 @@ the message's :attr:`~anymail.message.AnymailMessage.merge_global_data`:
           'ship_date': "May 15",
       }
 
-Within your Sendinblue template body and subject, you can refer to merge
+Within your Brevo template body and subject, you can refer to merge
 variables using Django template syntax, like ``{{ params.order_no }}`` or
 ``{{ params.ship_date }}`` for the example above.
 
@@ -225,10 +225,10 @@ using standard :class:`~django.core.mail.EmailMessage` attributes.
 
 
 .. _new template language:
-    https://help.sendinblue.com/hc/en-us/articles/360000268730
+    https://help.brevo.com/hc/en-us/articles/360000268730
 
 .. _convert each old template:
-    https://help.sendinblue.com/hc/en-us/articles/360000991960
+    https://help.brevo.com/hc/en-us/articles/360000991960
 
 
 .. _sendinblue-webhooks:
@@ -237,7 +237,7 @@ Status tracking webhooks
 ------------------------
 
 If you are using Anymail's normalized :ref:`status tracking <event-tracking>`, add
-the url at Sendinblue's site under  `Transactional > Settings > Webhook`_.
+the url at Brevo's site under  `Transactional > Settings > Webhook`_.
 
 The "URL to call" is:
 
@@ -247,26 +247,26 @@ The "URL to call" is:
      * *yoursite.example.com* is your Django site
 
 Be sure to select the checkboxes for all the event types you want to receive. (Also make
-sure you are in the "Transactional" section of their site; Sendinblue has a separate set
+sure you are in the "Transactional" section of their site; Brevo has a separate set
 of "Campaign" webhooks, which don't apply to messages sent through Anymail.)
 
-If you are interested in tracking opens, note that Sendinblue has both a "First opening"
+If you are interested in tracking opens, note that Brevo has both a "First opening"
 and an "Opened" event type, and will generate both the first time a message is opened.
 Anymail normalizes both of these events to "opened." To avoid double counting, you should
 only enable one of the two.
 
-Sendinblue will report these Anymail :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
+Brevo will report these Anymail :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
 queued, rejected, bounced, deferred, delivered, opened (see note above), clicked, complained,
 unsubscribed, subscribed (though this should never occur for transactional email).
 
-For events that occur in rapid succession, Sendinblue frequently delivers them out of order.
+For events that occur in rapid succession, Brevo frequently delivers them out of order.
 For example, it's not uncommon to receive a "delivered" event before the corresponding "queued."
 
 The event's :attr:`~anymail.signals.AnymailTrackingEvent.esp_event` field will be
-a `dict` of raw webhook data received from Sendinblue.
+a `dict` of raw webhook data received from Brevo.
 
 
-.. _Transactional > Settings > Webhook: https://app-smtp.sendinblue.com/webhook
+.. _Transactional > Settings > Webhook: https://app-smtp.brevo.com/webhook
 
 
 .. _sendinblue-inbound:
@@ -274,4 +274,4 @@ a `dict` of raw webhook data received from Sendinblue.
 Inbound webhook
 ---------------
 
-Sendinblue does not support inbound email handling.
+Brevo does not support inbound email handling.

@@ -27,6 +27,7 @@ a consistent API that avoids locking your code to one specific ESP
 Anymail currently supports these ESPs:
 
 * **Amazon SES**
+* **Brevo** (formerly SendinBlue)
 * **MailerSend**
 * **Mailgun**
 * **Mailjet**
@@ -34,7 +35,6 @@ Anymail currently supports these ESPs:
 * **Postal** (self-hosted ESP)
 * **Postmark**
 * **SendGrid**
-* **SendinBlue**
 * **SparkPost**
 
 Anymail includes:
