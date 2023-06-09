@@ -112,7 +112,7 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             metadata={"customer-id": "ZXK9123", "meta2": 2},
         )
 
-        # Normal attachments don't work with Sendinblue templates:
+        # Normal attachments don't work with Brevo templates:
         #   message.attach("attachment1.txt", "Here is some\ntext", "text/plain")
         # If you can host the attachment content on some publicly-accessible URL,
         # this *non-portable* alternative allows sending attachments with templates:
@@ -120,7 +120,7 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             "attachment": [
                 {
                     "name": "attachment1.txt",
-                    # URL where Sendinblue can download the attachment content while
+                    # URL where Brevo can download the attachment content while
                     # sending (must be content-type: text/plain):
                     "url": "https://raw.githubusercontent.com/anymail/django-anymail/"
                     "main/docs/_readme/template.txt",
