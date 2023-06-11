@@ -1,4 +1,4 @@
-.. _sendinblue-backend:
+.. _brevo-backend:
 
 Brevo
 =====

@@ -13,7 +13,7 @@ and notes about any quirks or limitations:
    :maxdepth: 1
 
    amazon_ses
-   sendinblue
+   brevo
    mailersend
    mailgun
    mailjet
@@ -68,7 +68,7 @@ and support for developers. The *number* of extra features an ESP offers is almo
 meaningless. (And even specific features don't matter if you don't plan to use them.)
 
 .. |Amazon SES| replace:: :ref:`amazon-ses-backend`
-.. |Brevo| replace:: :ref:`sendinblue-backend`
+.. |Brevo| replace:: :ref:`brevo-backend`
 .. |MailerSend| replace:: :ref:`mailersend-backend`
 .. |Mailgun| replace:: :ref:`mailgun-backend`
 .. |Mailjet| replace:: :ref:`mailjet-backend`
