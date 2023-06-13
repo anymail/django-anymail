@@ -12,14 +12,14 @@ authors = [
     {name = "Anymail Contributors"},
 ]
 description = """\
-    Django email backends and webhooks for Amazon SES, MailerSend, Mailgun, \
-    Mailjet, Mandrill, Postal, Postmark, SendGrid, SendinBlue, and SparkPost\
+    Django email backends and webhooks for Amazon SES, Brevo (Sendinblue),
+    MailerSend, Mailgun, Mailjet, Mandrill, Postal, Postmark, SendGrid, and SparkPost\
     """
 # readme: see tool.hatch.metadata.hooks.custom below
 keywords = [
     "Django", "email", "email backend",
     "ESP", "transactional mail",
-    "Amazon SES",
+    "Amazon SES", "Brevo",
     "MailerSend", "Mailgun", "Mailjet", "Mandrill",
     "Postal", "Postmark",
     "SendGrid", "SendinBlue", "SparkPost",

@@ -25,6 +25,20 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes*
+
+Other
+~~~~~
+
+* **Brevo (Sendinblue):** Sendinblue has rebranded to "Brevo." Change default
+  API endpoint to ``api.brevo.com``, and update docs to reflect new name. Anymail
+  still uses ``sendinblue`` in the backend name, for settings, etc., so there
+  should be no impact on your code. (Thanks to `@sblondon`_.)
+
+
 v10.0
 -----
 
@@ -1516,6 +1530,7 @@ Features
 .. _@nuschk: https://github.com/nuschk
 .. _@puru02: https://github.com/puru02
 .. _@RignonNoel: https://github.com/RignonNoel
+.. _@sblondon: https://github.com/sblondon
 .. _@sebashwa: https://github.com/sebashwa
 .. _@sebbacon: https://github.com/sebbacon
 .. _@slinkymanbyday: https://github.com/slinkymanbyday

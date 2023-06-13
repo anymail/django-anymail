@@ -1,11 +1,17 @@
 .. _brevo-backend:
+.. _sendinblue-backend:
 
 Brevo
 =====
 
-Anymail integrates with the `Brevo`_ email service (formerly SendinBlue until 2023), using their `API v3`_.
+Anymail integrates with the `Brevo`_ email service (formerly Sendinblue), using their `API v3`_.
 Brevo's transactional API does not support some basic email features, such as
 inline images. Be sure to review the :ref:`limitations <sendinblue-limitations>` below.
+
+.. versionchanged:: 10.1
+
+   Brevo was called "Sendinblue" until May, 2023. To avoid unnecessary code changes,
+   Anymail still uses the old name in code (settings, backend, webhook urls, etc.).
 
 .. important::
 
@@ -39,10 +45,11 @@ in your settings.py.
 
 .. rubric:: SENDINBLUE_API_KEY
 
-The API key can be retrieved from your Brevo `SMTP & API settings`_.
+The API key can be retrieved from your Brevo `SMTP & API settings`_ on the
+"API Keys" tab (don't try to use an SMTP key). Required.
+
 Make sure the version column indicates "v3." (v2 keys don't work with
 Anymail. If you don't see a v3 key listed, use "Create a New API Key".)
-Required.
 
   .. code-block:: python
 
@@ -55,7 +62,7 @@ Anymail will also look for ``SENDINBLUE_API_KEY`` at the
 root of the settings file if neither ``ANYMAIL["SENDINBLUE_API_KEY"]``
 nor ``ANYMAIL_SENDINBLUE_API_KEY`` is set.
 
-.. _SMTP & API settings: https://app.brevo.com/settings/keys/smtp
+.. _SMTP & API settings: https://app.brevo.com/settings/keys/api
 
 
 .. setting:: ANYMAIL_SENDINBLUE_API_URL
@@ -66,6 +73,10 @@ The base url for calling the Brevo API.
 
 The default is ``SENDINBLUE_API_URL = "https://api.brevo.com/v3/"``
 (It's unlikely you would need to change this.)
+
+.. versionchanged:: 10.1
+
+   Earlier Anymail releases used ``https://api.sendinblue.com/v3/``.
 
 
 .. _sendinblue-esp-extra:
@@ -92,7 +103,7 @@ their `batched scheduled sending`_:
 to apply it to all messages.)
 
 .. _batched scheduled sending: https://developers.brevo.com/docs/schedule-batch-sendings
-.. _smtp/email API: https://developers.brevo.com/reference/getting-started-1#sendtransacemail
+.. _smtp/email API: https://developers.brevo.com/reference/sendtransacemail
 
 
 .. _sendinblue-limitations:
@@ -170,27 +181,6 @@ and :attr:`~anymail.message.AnymailMessage.merge_metadata` message attributes ar
 supported with the Brevo backend, but you can use Anymail's
 :attr:`~anymail.message.AnymailMessage.merge_global_data` with Brevo templates.
 
-Brevo supports two different template styles: a `new template language`_
-that uses Django template syntax (with ``{{ param.NAME }}`` style substitutions),
-and an "old" template language that used percent-delimited ``%NAME%`` style
-substitutions. Anymail v7.0 and later require new style templates.
-
-.. versionchanged:: 7.0
-
-    Anymail switched to a Brevo API that supports the new template language
-    and removes several limitations from the earlier template send API. But the new API
-    does not support attachments, and can behave oddly if used with old style templates.
-
-.. caution::
-
-    Anymail v7.0 and later work *only* with Brevo's *new* template language. You should
-    follow Brevo's instructions to `convert each old template`_ to the new language.
-
-    Although unconverted old templates may appear to work with Anymail v7.0, some
-    features may not work properly. In particular, ``reply_to`` overrides and recipient
-    display names are silently ignored when *old* style templates are sent with the
-    *new* API used in Anymail v7.0.
-
 To use a Brevo template, set the message's
 :attr:`~anymail.message.AnymailMessage.template_id` to the numeric
 Brevo template ID, and supply substitution attributes using
@@ -212,8 +202,9 @@ the message's :attr:`~anymail.message.AnymailMessage.merge_global_data`:
       }
 
 Within your Brevo template body and subject, you can refer to merge
-variables using Django template syntax, like ``{{ params.order_no }}`` or
-``{{ params.ship_date }}`` for the example above.
+variables using Django-like template syntax, like ``{{ params.order_no }}`` or
+``{{ params.ship_date }}`` for the example above. See Brevo's guide to the
+`Brevo Template Language`_.
 
 The message's :class:`from_email <django.core.mail.EmailMessage>` (which defaults to
 your :setting:`DEFAULT_FROM_EMAIL` setting) will override the template's default sender.
@@ -223,9 +214,32 @@ If you want to use the template's sender, be sure to set ``from_email`` to ``Non
 You can also override the template's subject and reply-to address (but not body)
 using standard :class:`~django.core.mail.EmailMessage` attributes.
 
+.. caution::
 
-.. _new template language:
-    https://help.brevo.com/hc/en-us/articles/360000268730
+    **Sendinblue "old template language" not supported**
+
+    Sendinblue once supported two different template styles: a "new" template
+    language that uses Django-like template syntax (with ``{{ param.NAME }}``
+    substitutions), and an "old" template language that used percent-delimited
+    ``%NAME%`` substitutions.
+
+    Anymail 7.0 and later work *only* with new style templates, now known as the
+    "Brevo Template Language."
+
+    Although unconverted old templates may appear to work with Anymail, there can be
+    subtle bugs. In particular, ``reply_to`` overrides and recipient display names
+    are silently ignored when *old* style templates are sent with Anymail 7.0 or later.
+    If you still have old style templates, follow Brevo's instructions to
+    `convert each old template`_ to the new language.
+
+    .. versionchanged:: 7.0
+
+        Dropped support for Sendinblue old template language
+
+
+
+.. _Brevo Template Language:
+    https://help.brevo.com/hc/en-us/articles/360000946299
 
 .. _convert each old template:
     https://help.brevo.com/hc/en-us/articles/360000991960
@@ -237,7 +251,7 @@ Status tracking webhooks
 ------------------------
 
 If you are using Anymail's normalized :ref:`status tracking <event-tracking>`, add
-the url at Brevo's site under  `Transactional > Settings > Webhook`_.
+the url at Brevo's site under  `Transactional > Email > Settings > Webhook`_.
 
 The "URL to call" is:
 
@@ -266,7 +280,7 @@ The event's :attr:`~anymail.signals.AnymailTrackingEvent.esp_event` field will b
 a `dict` of raw webhook data received from Brevo.
 
 
-.. _Transactional > Settings > Webhook: https://app-smtp.brevo.com/webhook
+.. _Transactional > Email > Settings > Webhook: https://app-smtp.brevo.com/webhook
 
 
 .. _sendinblue-inbound:
@@ -274,4 +288,7 @@ a `dict` of raw webhook data received from Brevo.
 Inbound webhook
 ---------------
 
-Brevo does not support inbound email handling.
+Anymail does not currently support `Brevo's inbound parsing`_.
+
+.. _Brevo's inbound parsing:
+    https://developers.brevo.com/docs/inbound-parse-webhooks
