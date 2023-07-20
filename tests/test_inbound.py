@@ -540,6 +540,33 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
         self.assertEqual(attachments[1].get_filename(), "../static/index.html")
         self.assertEqual(attachments[1].as_uploaded_file().name, "index.html")
 
+    def test_attachment_issued_by_apple_mail(self):
+        # Attachments issued by Apple Mail client are sometimes included as inline
+        # attachments without Content-ID. They should then be considered as regular
+        # attachments.
+        raw = dedent(
+            """\
+            MIME-Version: 1.0
+            Subject: Attachment test
+            Content-Type: multipart/mixed; boundary="this_is_a_boundary"
+
+            --this_is_a_boundary
+            Content-Disposition: inline; filename=pixel.png
+            Content-Type: image/png; x-unix-mode=0644; name="pixel.png"
+            Content-Transfer-Encoding: base64
+
+            iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA
+            AXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAQSURBVHgBAQUA+v8AAAAA/wEEAQB5fl4xAAAA
+            AElFTkSuQmCC
+            --this_is_a_boundary
+            """
+        )
+        msg = AnymailInboundMessage.parse_raw_mime(raw)
+        attachments = msg.attachments
+
+        self.assertEqual(attachments[0].get_filename(), "pixel.png")
+        self.assertEqual(attachments[0].get_content_type(), "image/png")
+
 
 class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
     # message/rfc822 attachments should get parsed recursively

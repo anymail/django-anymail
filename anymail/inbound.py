@@ -145,7 +145,9 @@ class AnymailInboundMessage(Message):
 
     # Hoisted from email.message.MIMEPart
     def is_attachment(self):
-        return self.get_content_disposition() == "attachment"
+        return self.get_content_disposition() == "attachment" or (
+            self.get_content_disposition() == "inline" and self["Content-ID"] is None
+        )
 
     # New for Anymail
     def is_inline_attachment(self):
