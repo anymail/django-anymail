@@ -136,10 +136,10 @@ Normalized inbound message
 .. class:: anymail.inbound.AnymailInboundMessage
 
     The :attr:`~AnymailInboundEvent.message` attribute of an :class:`AnymailInboundEvent`
-    is an AnymailInboundMessage---an extension of Python's standard :class:`email.message.Message`
+    is an AnymailInboundMessage---an extension of Python's standard :class:`email.message.EmailMessage`
     with additional features to simplify inbound handling.
 
-    In addition to the base :class:`~email.message.Message` functionality, it includes these attributes:
+    In addition to the base :class:`~email.message.EmailMessage` functionality, it includes these attributes:
 
     .. attribute:: envelope_sender
 
@@ -374,7 +374,7 @@ have these methods:
 
     An Anymail inbound attachment is actually just an :class:`AnymailInboundMessage` instance,
     following the Python email package's usual recursive representation of MIME messages.
-    All :class:`AnymailInboundMessage` and :class:`email.message.Message` functionality
+    All :class:`AnymailInboundMessage` and :class:`email.message.EmailMessage` functionality
     is available on attachment objects (though of course not all features are meaningful in all contexts).
 
     This can be helpful for, e.g., parsing email messages that are forwarded as attachments

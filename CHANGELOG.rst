@@ -33,6 +33,9 @@ vNext
 Other
 ~~~~~
 
+* **Inbound:** `AnymailInboundMessage` now derives from `email.parse.EmailMessage` which
+  implements more features.
+
 * **Brevo (Sendinblue):** Sendinblue has rebranded to "Brevo." Change default
   API endpoint to ``api.brevo.com``, and update docs to reflect new name. Anymail
   still uses ``sendinblue`` in the backend name, for settings, etc., so there

@@ -1,5 +1,5 @@
 from base64 import b64decode
-from email.message import Message
+from email.message import EmailMessage
 from email.parser import BytesParser, Parser
 from email.policy import default as default_policy
 from email.utils import unquote
@@ -9,7 +9,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from .utils import angle_wrap, parse_address_list, parse_rfc2822date
 
 
-class AnymailInboundMessage(Message):
+class AnymailInboundMessage(EmailMessage):
     """
     A normalized, parsed inbound email message.
 
@@ -143,9 +143,6 @@ class AnymailInboundMessage(Message):
                 return part.get_content_text()
         return None
 
-    # Hoisted from email.message.MIMEPart
-    def is_attachment(self):
-        return self.get_content_disposition() == "attachment"
 
     # New for Anymail
     def is_inline_attachment(self):
