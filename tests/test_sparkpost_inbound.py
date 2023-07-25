@@ -205,7 +205,7 @@ class SparkpostInboundTestCase(WebhookTestCase):
         self.assertEqual(att_message["Subject"], "Test email")
         self.assertEqual(att_message.text, "Hi Bob, This is a message. Thanks!\n")
 
-        inlines = message.inline_attachments
+        inlines = message.content_id_map
         self.assertEqual(len(inlines), 1)
         inline = inlines["abc123"]
         self.assertEqual(inline.get_filename(), "image.png")

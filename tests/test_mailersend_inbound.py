@@ -323,7 +323,7 @@ class MailerSendInboundTestCase(MailerSendWebhookTestCase):
             ],
         )
 
-        inlines = message.inline_attachments
+        inlines = message.content_id_map
         self.assertEqual(len(inlines), 1)
         inline = inlines["ii_letc8ro50"]
         self.assertEqual(inline.get_filename(), "sample_image.png")

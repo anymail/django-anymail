@@ -30,6 +30,19 @@ vNext
 
 *Unreleased changes*
 
+Features
+~~~~~~~~
+
+* **Inbound:** Introduce `inlines` property to better handle message's inline parts, especially
+  inline attachments that are not featured with a `Content-ID` header. This better complies with
+  [RFC 2183 sections 2.1-2.2](https://datatracker.ietf.org/doc/html/rfc2183#section-2.1).
+
+Deprecations
+~~~~~~~~~~~~
+
+* **Inbound:** `inline_attachments` now aliases to `inlines` as well as `is_inline_attachment()`
+  aliases to `is_inline()`. They will both be removed in the future.
+
 Other
 ~~~~~
 

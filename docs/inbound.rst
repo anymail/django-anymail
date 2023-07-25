@@ -231,7 +231,16 @@ Normalized inbound message
         A `list` of all (non-inline) attachments to the message, or an empty list if there are
         no attachments. See :ref:`inbound-attachments` below for the contents of each list item.
 
+    .. attribute:: content_id_map
+
+        A `dict` mapping inline Content-ID references to attachment content. Each key is an
+        "unquoted" cid without angle brackets. E.g., if the :attr:`html` body contains
+        ``<img src="cid:abc123...">``, you could get that inline image using
+        ``message.content_id_map["abc123..."]``.
+
     .. attribute:: inline_attachments
+
+        *Deprecated*, use :attr:`content_id_map` instead.
 
         A `dict` mapping inline Content-ID references to attachment content. Each key is an
         "unquoted" cid without angle brackets. E.g., if the :attr:`html` body contains
@@ -343,7 +352,14 @@ have these methods:
 
         Returns `True` for a (non-inline) attachment, `False` otherwise.
 
+    .. method:: is_inline()
+
+        Returns `True` for an inline attachment (one with :mailheader:`Content-Disposition` "inline"),
+        `False` otherwise.
+
     .. method:: is_inline_attachment()
+
+        *Deprecated*, use :meth:`is_inline()` instead.
 
         Returns `True` for an inline attachment (one with :mailheader:`Content-Disposition` "inline"),
         `False` otherwise.

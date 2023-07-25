@@ -182,7 +182,7 @@ class MailgunInboundTestCase(WebhookTestCase):
             attachments[1].get_content_bytes(), email_content
         )
 
-        inlines = message.inline_attachments
+        inlines = message.content_id_map
         self.assertEqual(len(inlines), 1)
         inline = inlines["abc123"]
         self.assertEqual(inline.get_filename(), "image.png")
@@ -266,7 +266,7 @@ class MailgunInboundTestCase(WebhookTestCase):
         event = kwargs["event"]
         message = event.message
         self.assertEqual(len(message.attachments), 0)  # all inlines
-        inlines = [part for part in message.walk() if part.is_inline_attachment()]
+        inlines = [part for part in message.walk() if part.is_inline()]
         self.assertEqual(len(inlines), 4)
         self.assertEqual(inlines[0]["Content-ID"], "")
         self.assertEqual(inlines[1]["Content-ID"], "")

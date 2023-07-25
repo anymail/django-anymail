@@ -1,3 +1,4 @@
+import warnings
 from base64 import b64decode
 from email.message import EmailMessage
 from email.parser import BytesParser, Parser
@@ -6,6 +7,7 @@ from email.utils import unquote
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 
+from .exceptions import AnymailDeprecationWarning
 from .utils import angle_wrap, parse_address_list, parse_rfc2822date
 
 
@@ -104,12 +106,29 @@ class AnymailInboundMessage(EmailMessage):
         return [part for part in self.walk() if part.is_attachment()]
 
     @property
+    def inlines(self):
+        """list of inline parts (as MIMEPart objects)"""
+        return [part for part in self.walk() if part.is_inline()]
+
+    @property
     def inline_attachments(self):
         """dict of Content-ID: attachment (as MIMEPart objects)"""
+        warnings.warn(
+            "inline_attachments has been renamed to content_id_map and will be removed"
+            " in the near future.",
+            AnymailDeprecationWarning,
+        )
+
+        return self.content_id_map
+
+    @property
+    def content_id_map(self):
+        """dict of Content-ID: attachment (as MIMEPart objects)"""
+
         return {
             unquote(part["Content-ID"]): part
             for part in self.walk()
-            if part.is_inline_attachment() and part["Content-ID"] is not None
+            if part.is_inline() and part["Content-ID"] is not None
         }
 
     def get_address_header(self, header):
@@ -143,10 +162,18 @@ class AnymailInboundMessage(EmailMessage):
                 return part.get_content_text()
         return None
 
+    def is_inline(self):
+        return self.get_content_disposition() == "inline"
 
     # New for Anymail
     def is_inline_attachment(self):
-        return self.get_content_disposition() == "inline"
+        warnings.warn(
+            "is_inline_attachment has been renamed to is_inline and will be removed"
+            " in the near future.",
+            AnymailDeprecationWarning,
+        )
+
+        return self.is_inline()
 
     def get_content_bytes(self):
         """Return the raw payload bytes"""
@@ -328,7 +355,7 @@ class AnymailInboundMessage(EmailMessage):
 
         if attachments is not None:
             for attachment in attachments:
-                if attachment.is_inline_attachment():
+                if attachment.is_inline():
                     related.attach(attachment)
                 else:
                     msg.attach(attachment)

@@ -6,6 +6,7 @@ from textwrap import dedent
 from django.core.mail import SafeMIMEText
 from django.test import SimpleTestCase
 
+from anymail.exceptions import AnymailDeprecationWarning
 from anymail.inbound import AnymailInboundMessage
 
 from .utils import SAMPLE_IMAGE_FILENAME, sample_email_path, sample_image_content
@@ -200,7 +201,7 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
             content_id="inline-id",
         )
         self.assertEqual(att.get_filename(), "Simulácia.txt")
-        self.assertTrue(att.is_inline_attachment())
+        self.assertTrue(att.is_inline())
         self.assertEqual(att.get_content_text(), "Unicode ✓")
 
     def test_parse_raw_mime(self):
@@ -446,7 +447,7 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
         # Default empty list
         self.assertEqual(AnymailInboundMessage().attachments, [])
 
-    def test_inline_attachments_prop(self):
+    def test_content_id_map_prop(self):
         att = AnymailInboundMessage.construct_attachment(
             "image/png",
             SAMPLE_IMAGE_CONTENT,
@@ -455,10 +456,17 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
         )
 
         msg = AnymailInboundMessage.construct(attachments=[att])
-        self.assertEqual(msg.inline_attachments, {"abc123": att})
+        self.assertEqual(msg.content_id_map, {"abc123": att})
+
+        with self.assertWarnsMessage(
+            AnymailDeprecationWarning,
+            "inline_attachments has been renamed to content_id_map and will be removed "
+            "in the near future.",
+        ):
+            self.assertEqual(msg.inline_attachments, {"abc123": att})
 
         # Default empty dict
-        self.assertEqual(AnymailInboundMessage().inline_attachments, {})
+        self.assertEqual(AnymailInboundMessage().content_id_map, {})
 
     def test_attachment_as_uploaded_file(self):
         raw = dedent(
@@ -609,8 +617,15 @@ class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
 
         orig_inline_att = orig_msg.get_payload(1)
         self.assertEqual(orig_inline_att.get_content_type(), "image/png")
-        self.assertTrue(orig_inline_att.is_inline_attachment())
+        self.assertTrue(orig_inline_att.is_inline())
         self.assertEqual(orig_inline_att.get_payload(decode=True), SAMPLE_IMAGE_CONTENT)
+
+        with self.assertWarnsMessage(
+            AnymailDeprecationWarning,
+            "is_inline_attachment has been renamed to is_inline and will be removed in "
+            "the near future.",
+        ):
+            self.assertTrue(orig_inline_att.is_inline_attachment())
 
     def test_construct_rfc822_attachment_from_data(self):
         # constructed message/rfc822 attachment should end up as parsed message

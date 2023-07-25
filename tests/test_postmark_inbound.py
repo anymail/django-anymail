@@ -191,7 +191,7 @@ class PostmarkInboundTestCase(WebhookTestCase):
             attachments[1].get_content_bytes(), email_content
         )
 
-        inlines = message.inline_attachments
+        inlines = message.content_id_map
         self.assertEqual(len(inlines), 1)
         inline = inlines["abc123"]
         self.assertEqual(inline.get_filename(), "image.png")

@@ -267,7 +267,7 @@ class AmazonSESBackendStandardEmailTests(AmazonSESBackendMockAPITestCase):
 
         self.assertEqual(sent_message.html, html_content)
 
-        inlines = sent_message.inline_attachments
+        inlines = sent_message.content_id_map
         self.assertEqual(len(inlines), 1)
         self.assertEqual(inlines[cid].get_content_type(), "image/png")
         self.assertEqual(inlines[cid].get_filename(), image_filename)
