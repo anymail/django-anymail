@@ -468,6 +468,53 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
         # Default empty dict
         self.assertEqual(AnymailInboundMessage().content_id_map, {})
 
+    def test_inlines_prop(self):
+        raw = dedent(
+            """\
+            MIME-Version: 1.0
+            Subject: Message with inline parts
+            Content-Type: multipart/mixed; boundary="boundary-orig"
+
+            --boundary-orig
+            Content-Type: text/html; charset="UTF-8"
+
+            <img src="cid:abc123"> Here is a message!
+
+            --boundary-orig
+            Content-Type: image/png; name="sample_image.png"
+            Content-Disposition: inline
+            Content-ID: <abc123>
+            Content-Transfer-Encoding: base64
+
+            {image_content_base64}
+
+            --boundary-orig
+            Content-Type: image/png; name="sample_image_without_cid.png"
+            Content-Disposition: inline
+            Content-Transfer-Encoding: base64
+
+            {image_content_base64}
+
+            --boundary-orig--
+            """
+        ).format(image_content_base64=b64encode(SAMPLE_IMAGE_CONTENT).decode("ascii"))
+
+        msg = AnymailInboundMessage.parse_raw_mime(raw)
+        inlines = msg.inlines
+
+        self.assertEqual(len(inlines), 2)
+
+        self.assertEqual(inlines[0].get_content_type(), "image/png")
+        self.assertEqual(inlines[0].as_uploaded_file().name, "sample_image.png")
+
+        self.assertEqual(inlines[1].get_content_type(), "image/png")
+        self.assertEqual(
+            inlines[1].as_uploaded_file().name, "sample_image_without_cid.png"
+        )
+
+        self.assertEqual(len(msg.content_id_map.items()), 1)
+        self.assertIn("abc123", msg.content_id_map)
+
     def test_attachment_as_uploaded_file(self):
         raw = dedent(
             """\
