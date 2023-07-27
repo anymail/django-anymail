@@ -139,7 +139,14 @@ Normalized inbound message
     is an AnymailInboundMessage---an extension of Python's standard :class:`email.message.EmailMessage`
     with additional features to simplify inbound handling.
 
-    In addition to the base :class:`~email.message.EmailMessage` functionality, it includes these attributes:
+    .. versionchanged:: 10.1
+
+        Earlier releases extended Python's legacy :class:`email.message.Message` class.
+        :class:`~email.message.EmailMessage` is a superset that fixes bugs and improves
+        compatibility with email standards.
+
+    In addition to the base :class:`~email.message.EmailMessage` functionality,
+    :class:`!AnymailInboundMessage` includes these attributes:
 
     .. attribute:: envelope_sender
 
@@ -221,6 +228,10 @@ Normalized inbound message
         The message's plaintext message body as a `str`, or `None` if the
         message doesn't include a plaintext body.
 
+        For certain messages that are sent as plaintext with inline images
+        (such as those sometimes composed by the Apple Mail app), this will
+        include only the text before the first inline image.
+
     .. attribute:: html
 
         The message's HTML message body as a `str`, or `None` if the
@@ -228,26 +239,36 @@ Normalized inbound message
 
     .. attribute:: attachments
 
-        A `list` of all (non-inline) attachments to the message, or an empty list if there are
-        no attachments. See :ref:`inbound-attachments` below for the contents of each list item.
+        A `list` of all attachments to the message, or an empty list if there are
+        no attachments. See :ref:`inbound-attachments` below a description of the values.
+
+        If the inbound message includes an attached message, :attr:`!attachments`
+        will include the attached message and all of *its* attachments, recursively.
+        Consider Python's :meth:`~email.message.EmailMessage.iter_attachments` as an
+        alternative that doesn't descend into attached messages.
+
+    .. attribute:: inlines
+
+        A `list` of all inline content parts in the message, or an empty list if none.
+        See :ref:`inbound-attachments` below for a description of the values.
+
+        Like :attr:`attachments`, this will recursively descend into any attached messages.
+
+        .. versionadded:: 10.1
 
     .. attribute:: content_id_map
 
-        A `dict` mapping inline Content-ID references to attachment content. Each key is an
+        A `dict` mapping inline Content-ID references to inline content. Each key is an
         "unquoted" cid without angle brackets. E.g., if the :attr:`html` body contains
         ``<img src="cid:abc123...">``, you could get that inline image using
         ``message.content_id_map["abc123..."]``.
 
-    .. attribute:: inline_attachments
+        The value of each item is described in :ref:`inbound-attachments` below.
 
-        *Deprecated*, use :attr:`content_id_map` instead.
+        .. versionadded:: 10.1
 
-        A `dict` mapping inline Content-ID references to attachment content. Each key is an
-        "unquoted" cid without angle brackets. E.g., if the :attr:`html` body contains
-        ``<img src="cid:abc123...">``, you could get that inline image using
-        ``message.inline_attachments["abc123..."]``.
-
-        The content of each attachment is described in :ref:`inbound-attachments` below.
+            This property was previously available as :attr:`!inline_attachments`.
+            The old name still works, but is deprecated.
 
     .. attribute:: spam_score
 
@@ -276,38 +297,39 @@ Normalized inbound message
 
     .. rubric:: Other headers, complex messages, etc.
 
-    You can use all of Python's :class:`email.message.Message` features with an
+    You can use all of Python's :class:`email.message.EmailMessage` features with an
     AnymailInboundMessage. For example, you can access message headers using
-    Message's :meth:`mapping interface <email.message.Message.__getitem__>`:
+    EmailMessage's :meth:`mapping interface <email.message.EmailMessage.__getitem__>`:
 
     .. code-block:: python
 
         message['reply-to']  # the Reply-To header (header keys are case-insensitive)
         message.getall('DKIM-Signature')  # list of all DKIM-Signature headers
 
-    And you can use Message methods like :meth:`~email.message.Message.walk` and
-    :meth:`~email.message.Message.get_content_type` to examine more-complex
+    And you can use Message methods like :meth:`~email.message.EmailMessage.walk` and
+    :meth:`~email.message.EmailMessage.get_content_type` to examine more-complex
     multipart MIME messages (digests, delivery reports, or whatever).
 
 
 .. _inbound-attachments:
 
-Handling Inbound Attachments
-----------------------------
+Attached and inline content
+---------------------------
 
-Anymail converts each inbound attachment to a specialized MIME object with
+Anymail converts each inbound attachment and inline content to a specialized MIME object with
 additional methods for handling attachments and integrating with Django.
 
-The attachment objects in an AnymailInboundMessage's
-:attr:`~AnymailInboundMessage.attachments` list and
-:attr:`~AnymailInboundMessage.inline_attachments` dict
+The objects in an AnymailInboundMessage's
+:attr:`~anymail.inbound.AnymailInboundMessage.attachments`,
+:attr:`~anymail.inbound.AnymailInboundMessage.inlines`,
+and :attr:`~anymail.inbound.AnymailInboundMessage.content_id_map`
 have these methods:
 
 .. class:: AnymailInboundMessage
 
     .. method:: as_uploaded_file()
 
-        Returns the attachment converted to a Django :class:`~django.core.files.uploadedfile.UploadedFile`
+        Returns the content converted to a Django :class:`~django.core.files.uploadedfile.UploadedFile`
         object. This is suitable for assigning to a model's :class:`~django.db.models.FileField`
         or :class:`~django.db.models.ImageField`:
 
@@ -331,9 +353,9 @@ have these methods:
         attachments are essentially user-uploaded content, so you should
         :ref:`never trust the sender <inbound-security>`.)
 
-        See the Python docs for more info on :meth:`email.message.Message.get_content_type`,
-        :meth:`~email.message.Message.get_content_maintype`, and
-        :meth:`~email.message.Message.get_content_subtype`.
+        See the Python docs for more info on :meth:`email.message.EmailMessage.get_content_type`,
+        :meth:`~email.message.EmailMessage.get_content_maintype`, and
+        :meth:`~email.message.EmailMessage.get_content_subtype`.
 
         (Note that you *cannot* determine the attachment type using code like
         ``issubclass(attachment, email.mime.image.MIMEImage)``. You should instead use something
@@ -350,19 +372,18 @@ have these methods:
 
     .. method:: is_attachment()
 
-        Returns `True` for a (non-inline) attachment, `False` otherwise.
+        Returns `True` for attachment content (with :mailheader:`Content-Disposition` "attachment"),
+        `False` otherwise.
 
     .. method:: is_inline()
 
-        Returns `True` for an inline attachment (one with :mailheader:`Content-Disposition` "inline"),
+        Returns `True` for inline content (with :mailheader:`Content-Disposition` "inline"),
         `False` otherwise.
 
-    .. method:: is_inline_attachment()
+        .. versionchanged:: 10.1
 
-        *Deprecated*, use :meth:`is_inline()` instead.
-
-        Returns `True` for an inline attachment (one with :mailheader:`Content-Disposition` "inline"),
-        `False` otherwise.
+            This method was previously named :meth:`!is_inline_attachment`;
+            the old name still works, but is deprecated.
 
     .. method:: get_content_disposition()
 

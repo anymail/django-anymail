@@ -15,19 +15,19 @@ class AnymailInboundMessage(EmailMessage):
     """
     A normalized, parsed inbound email message.
 
-    A subclass of email.message.Message, with some additional
-    convenience properties, plus helpful methods backported
-    from Python 3.6+ email.message.EmailMessage (or really, MIMEPart)
+    A subclass of email.message.EmailMessage, with some additional
+    convenience properties.
     """
 
-    # Why Python email.message.Message rather than django.core.mail.EmailMessage?
+    # Why Python email.message.EmailMessage rather than django.core.mail.EmailMessage?
     # Django's EmailMessage is really intended for constructing a (limited subset of)
-    # Message to send; Message is better designed for representing arbitrary messages:
+    # an EmailMessage to send; Python's EmailMessage is better designed for representing
+    # arbitrary messages:
     #
-    # * Message is easily parsed from raw mime (which is an inbound format provided
-    #   by many ESPs), and can accurately represent any mime email received
-    # * Message can represent repeated header fields (e.g., "Received") which
-    #   are common in inbound messages
+    # * Python's EmailMessage is easily parsed from raw mime (which is an inbound format
+    #   provided by many ESPs), and can accurately represent any mime email received
+    # * Python's EmailMessage can represent repeated header fields (e.g., "Received")
+    #   which are common in inbound messages
     # * Django's EmailMessage defaults a bunch of properties in ways that aren't helpful
     #   (e.g., from_email from settings)
 
@@ -112,7 +112,7 @@ class AnymailInboundMessage(EmailMessage):
 
     @property
     def inline_attachments(self):
-        """dict of Content-ID: attachment (as MIMEPart objects)"""
+        """DEPRECATED: use content_id_map instead"""
         warnings.warn(
             "inline_attachments has been renamed to content_id_map and will be removed"
             " in the near future.",
@@ -167,6 +167,7 @@ class AnymailInboundMessage(EmailMessage):
 
     # New for Anymail
     def is_inline_attachment(self):
+        """DEPRECATED: use in_inline instead"""
         warnings.warn(
             "is_inline_attachment has been renamed to is_inline and will be removed"
             " in the near future.",

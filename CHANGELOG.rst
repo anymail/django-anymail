@@ -33,21 +33,32 @@ vNext
 Features
 ~~~~~~~~
 
-* **Inbound:** Introduce `inlines` property to better handle message's inline parts, especially
-  inline attachments that are not featured with a `Content-ID` header. This better complies with
-  [RFC 2183 sections 2.1-2.2](https://datatracker.ietf.org/doc/html/rfc2183#section-2.1).
+* **Inbound:** Improve `AnymailInboundMessage`'s handling of inline content:
+
+  * Rename `inline_attachments` to `content_id_map`, more accurately reflecting its function.
+  * Add new `inlines` property that provides a complete list of inline content,
+    whether or not it includes a *Content-ID*. This is helpful for accessing
+    inline images that appear directly in a *multipart/mixed* body, such as those
+    created by the Apple Mail app.
+  * Rename `is_inline_attachment()` to just `is_inline()`.
+
+  The renamed items are still available, but deprecated, under their old names.
+  See `docs <http://anymail.dev/en/latest/inbound/#anymail.inbound.AnymailInboundMessage>`__.
+  (Thanks to `@martinezleoml`_.)
+
+* **Inbound:** `AnymailInboundMessage` now derives from Python's
+  `email.message.EmailMessage`, which provides improved compatibility with
+  email standards. (Thanks to `@martinezleoml`_.)
+
 
 Deprecations
 ~~~~~~~~~~~~
 
-* **Inbound:** `inline_attachments` now aliases to `inlines` as well as `is_inline_attachment()`
-  aliases to `is_inline()`. They will both be removed in the future.
+* **Inbound:** `AnymailInboundMessage.inline_attachments` and `.is_inline_attachment()`
+  have been renamed---see above.
 
 Other
 ~~~~~
-
-* **Inbound:** `AnymailInboundMessage` now derives from `email.parse.EmailMessage` which
-  implements more features.
 
 * **Brevo (Sendinblue):** Sendinblue has rebranded to "Brevo." Change default
   API endpoint to ``api.brevo.com``, and update docs to reflect new name. Anymail
@@ -1541,6 +1552,7 @@ Features
 .. _@Lekensteyn: https://github.com/Lekensteyn
 .. _@lewistaylor: https://github.com/lewistaylor
 .. _@mark-mishyn: https://github.com/mark-mishyn
+.. _@martinezleoml: https://github.com/martinezleoml
 .. _@mbk-ok: https://github.com/mbk-ok
 .. _@mwheels: https://github.com/mwheels
 .. _@nuschk: https://github.com/nuschk
