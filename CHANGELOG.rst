@@ -50,6 +50,9 @@ Features
   `email.message.EmailMessage`, which provides improved compatibility with
   email standards. (Thanks to `@martinezleoml`_.)
 
+* **Brevo (Sendinblue):** Add support for inbound email. (See
+  `docs <https://anymail.dev/en/latest/esps/sendinblue/#sendinblue-inbound>`_.)
+
 
 Deprecations
 ~~~~~~~~~~~~

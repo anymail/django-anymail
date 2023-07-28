@@ -4,6 +4,7 @@ from unittest.mock import ANY
 
 from django.test import tag
 
+from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.sendinblue import SendinBlueTrackingWebhookView
 
@@ -390,3 +391,15 @@ class SendinBlueDeliveryTestCase(WebhookTestCase):
         )
         event = kwargs["event"]
         self.assertEqual(event.event_type, "unsubscribed")
+
+    def test_misconfigured_inbound(self):
+        errmsg = (
+            "You seem to have set SendinBlue's *inbound* webhook URL"
+            " to Anymail's SendinBlue *tracking* webhook URL."
+        )
+        with self.assertRaisesMessage(AnymailConfigurationError, errmsg):
+            self.client.post(
+                "/anymail/sendinblue/tracking/",
+                content_type="application/json",
+                data={"items": []},
+            )

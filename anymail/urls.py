@@ -14,7 +14,10 @@ from .webhooks.mandrill import MandrillCombinedWebhookView
 from .webhooks.postal import PostalInboundWebhookView, PostalTrackingWebhookView
 from .webhooks.postmark import PostmarkInboundWebhookView, PostmarkTrackingWebhookView
 from .webhooks.sendgrid import SendGridInboundWebhookView, SendGridTrackingWebhookView
-from .webhooks.sendinblue import SendinBlueTrackingWebhookView
+from .webhooks.sendinblue import (
+    SendinBlueInboundWebhookView,
+    SendinBlueTrackingWebhookView,
+)
 from .webhooks.sparkpost import (
     SparkPostInboundWebhookView,
     SparkPostTrackingWebhookView,
@@ -60,6 +63,11 @@ urlpatterns = [
         "sendgrid/inbound/",
         SendGridInboundWebhookView.as_view(),
         name="sendgrid_inbound_webhook",
+    ),
+    path(
+        "sendinblue/inbound/",
+        SendinBlueInboundWebhookView.as_view(),
+        name="sendinblue_inbound_webhook",
     ),
     path(
         "sparkpost/inbound/",

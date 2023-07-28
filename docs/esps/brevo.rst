@@ -288,7 +288,29 @@ a `dict` of raw webhook data received from Brevo.
 Inbound webhook
 ---------------
 
-Anymail does not currently support `Brevo's inbound parsing`_.
+.. versionadded:: 10.1
 
-.. _Brevo's inbound parsing:
+If you want to receive email from Brevo through Anymail's normalized
+:ref:`inbound <inbound>` handling, follow Brevo's `Inbound parsing webhooks`_
+guide to enable inbound service and add Anymail's inbound webhook.
+
+At the "Creating the webhook" step, set the ``"url"`` param to:
+
+   :samp:`https://{random}:{random}@{yoursite.example.com}/anymail/sendinblue/inbound/`
+
+     * *random:random* is an :setting:`ANYMAIL_WEBHOOK_SECRET` shared secret
+     * *yoursite.example.com* is your Django site
+
+Brevo does not currently seem to have a dashboard for managing or monitoring
+inbound service. However, you can run API calls directly from their documentation
+by entering your API key in "Header" field above the example, and then clicking
+"Try It!". The `webhooks management APIs`_ and `inbound events list API`_ can
+be helpful for diagnosing inbound issues.
+
+
+.. _Inbound parsing webhooks:
     https://developers.brevo.com/docs/inbound-parse-webhooks
+.. _webhooks management APIs:
+    https://developers.brevo.com/reference/getwebhooks-1
+.. _inbound events list API:
+    https://developers.brevo.com/reference/getinboundemailevents

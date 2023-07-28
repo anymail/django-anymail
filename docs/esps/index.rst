@@ -58,7 +58,7 @@ Email Service Provider                        |Amazon SES|  |Brevo|  |MailerSend
 |AnymailTrackingEvent| from webhooks          Yes           Yes      Yes           Yes          Yes         Yes          Yes         Yes         Yes         Yes
 .. rubric:: :ref:`Inbound handling <inbound>`
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-|AnymailInboundEvent| from webhooks           Yes           No       Yes           Yes          Yes         Yes          Yes         Yes         Yes         Yes
+|AnymailInboundEvent| from webhooks           Yes           Yes      Yes           Yes          Yes         Yes          Yes         Yes         Yes         Yes
 ============================================  ============  =======  ============  ===========  ==========  ===========  ==========  ==========  ==========  ===========
 
 

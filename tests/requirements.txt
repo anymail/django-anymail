@@ -1,1 +1,2 @@
 # Additional packages needed only for running tests
+responses
