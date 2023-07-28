@@ -202,14 +202,6 @@ Limitations and quirks
       webhook :attr:`message_id` will fall back to "smtp-id" when "anymail_id"
       isn't present.)
 
-**Single Reply-To**
-  SendGrid's v3 API only supports a single Reply-To address.
-
-  If your message has multiple reply addresses, you'll get an
-  :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error---or
-  if you've enabled :setting:`ANYMAIL_IGNORE_UNSUPPORTED_FEATURES`,
-  Anymail will use only the first one.
-
 **Invalid Addresses**
   SendGrid will accept *and send* just about anything as
   a message's :attr:`from_email`. (And email protocols are

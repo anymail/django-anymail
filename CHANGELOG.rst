@@ -53,6 +53,8 @@ Features
 * **Brevo (Sendinblue):** Add support for inbound email. (See
   `docs <https://anymail.dev/en/latest/esps/sendinblue/#sendinblue-inbound>`_.)
 
+* **SendGrid:** Support for multiple ``reply_to`` addresses.
+  (Thanks to `@gdvalderrama`_ for pointing out the new API.)
 
 Deprecations
 ~~~~~~~~~~~~
@@ -1546,6 +1548,7 @@ Features
 .. _@ewingrj: https://github.com/ewingrj
 .. _@fdemmer: https://github.com/fdemmer
 .. _@Flexonze: https://github.com/Flexonze
+.. _@gdvalderrama: https://github.com/gdvalderrama
 .. _@Honza-m: https://github.com/Honza-m
 .. _@janneThoft: https://github.com/janneThoft
 .. _@jc-ee: https://github.com/jc-ee

@@ -187,7 +187,7 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         self.assertEqual(
             data["content"], [{"type": "text/plain", "value": "Body goes here"}]
         )
-        self.assertEqual(data["reply_to"], {"email": "another@example.com"})
+        self.assertEqual(data["reply_to_list"], [{"email": "another@example.com"}])
         self.assertEqual(
             data["headers"],
             {
@@ -243,7 +243,8 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         # Reply-To must be moved to separate param
         self.assertNotIn("Reply-To", data["headers"])
         self.assertEqual(
-            data["reply_to"], {"name": "Do Not Reply", "email": "noreply@example.com"}
+            data["reply_to_list"],
+            [{"name": "Do Not Reply", "email": "noreply@example.com"}],
         )
 
     def test_extra_headers_serialization_error(self):
@@ -252,26 +253,6 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
             self.message.send()
 
     def test_reply_to(self):
-        self.message.reply_to = ['"Reply recipient" <reply@example.com']
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["reply_to"], {"name": "Reply recipient", "email": "reply@example.com"}
-        )
-
-    def test_multiple_reply_to(self):
-        # SendGrid v3 prohibits Reply-To in custom headers,
-        # and only allows a single reply address
-        self.message.reply_to = [
-            '"Reply recipient" <reply@example.com',
-            "reply2@example.com",
-        ]
-        with self.assertRaises(AnymailUnsupportedFeature):
-            self.message.send()
-
-    @override_settings(ANYMAIL_IGNORE_UNSUPPORTED_FEATURES=True)
-    def test_multiple_reply_to_ignore_unsupported(self):
-        # Should use first Reply-To if ignoring unsupported features
         self.message.reply_to = [
             '"Reply recipient" <reply@example.com',
             "reply2@example.com",
@@ -279,8 +260,13 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(
-            data["reply_to"], {"name": "Reply recipient", "email": "reply@example.com"}
+            data["reply_to_list"],
+            [
+                {"name": "Reply recipient", "email": "reply@example.com"},
+                {"email": "reply2@example.com"},
+            ],
         )
+        self.assertNotIn("reply_to", data)  # not allowed with reply_to_list
 
     def test_attachments(self):
         text_content = "* Item one\n* Item two\n* Item three"
@@ -1050,6 +1036,8 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         self.assertNotIn("headers", data)
         self.assertNotIn("ip_pool_name", data)
         self.assertNotIn("mail_settings", data)
+        self.assertNotIn("reply_to", data)
+        self.assertNotIn("reply_to_list", data)
         self.assertNotIn("sections", data)
         self.assertNotIn("send_at", data)
         self.assertNotIn("template_id", data)

@@ -254,11 +254,8 @@ class SendGridPayload(RequestsPayload):
             self.data["subject"] = subject
 
     def set_reply_to(self, emails):
-        # SendGrid only supports a single address in the reply_to API param.
-        if len(emails) > 1:
-            self.unsupported_feature("multiple reply_to addresses")
-        if len(emails) > 0:
-            self.data["reply_to"] = self.email_object(emails[0])
+        if emails:
+            self.data["reply_to_list"] = [self.email_object(email) for email in emails]
 
     def set_extra_headers(self, headers):
         # SendGrid requires header values to be strings -- not integers.

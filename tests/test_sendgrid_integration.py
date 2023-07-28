@@ -82,8 +82,7 @@ class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             to=["to1@sink.sendgrid.net", '"Recipient 2, OK?" <to2@sink.sendgrid.net>'],
             cc=["cc1@sink.sendgrid.net", "Copy 2 <cc2@sink.sendgrid.net>"],
             bcc=["bcc1@sink.sendgrid.net", "Blind Copy 2 <bcc2@sink.sendgrid.net>"],
-            # v3 only supports single reply-to:
-            reply_to=['"Reply, with comma" <reply@example.com>'],
+            reply_to=['"Reply, with comma" <reply@example.com>', "reply2@example.com"],
             headers={"X-Anymail-Test": "value", "X-Anymail-Count": 3},
             metadata={"meta1": "simple string", "meta2": 2},
             send_at=send_at,
