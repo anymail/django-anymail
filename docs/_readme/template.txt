@@ -1,6 +1,6 @@
 %(head_prefix)s
 <!--
-  This approximates PyPI.org project page styling as of 5/2023,
+  This approximates PyPI.org project page styling as of 8/2023,
   and loads their compiled CSS that was in use at that time.
 
   (Styling seems to change more often than basic page structure,
@@ -17,9 +17,9 @@
 %(head)s
 <!-- template (stylesheet) omitted -->
 
-<link rel="stylesheet" href="/static/css/warehouse-ltr.a42ccb04.css">
-<link rel="stylesheet" href="/static/css/fontawesome.d37999f3.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,400italic,600,600italic,700,700italic|Source+Code+Pro:500">
+<link rel="stylesheet" href="/static/css/warehouse-ltr.1dcaa944.css">
+<link rel="stylesheet" href="/static/css/fontawesome.b50b476c.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+3:400,400italic,600,600italic,700,700italic|Source+Code+Pro:500">
 <noscript>
   <link rel="stylesheet" href="/static/css/noscript.0673c9ea.css">
 </noscript>
