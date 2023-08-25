@@ -25,6 +25,19 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*unreleased changes*
+
+Other
+~~~~~
+
+* **Mailgun (docs):** Clarify account-level "Mailgun API keys" vs.
+  domain-level "sending API keys." (Thanks to `@sdarwin`_ for
+  reporting the issue.)
+
+
 v10.1
 -----
 
@@ -1562,6 +1575,7 @@ Features
 .. _@puru02: https://github.com/puru02
 .. _@RignonNoel: https://github.com/RignonNoel
 .. _@sblondon: https://github.com/sblondon
+.. _@sdarwin: https://github.com/sdarwin
 .. _@sebashwa: https://github.com/sebashwa
 .. _@sebbacon: https://github.com/sebbacon
 .. _@slinkymanbyday: https://github.com/slinkymanbyday
