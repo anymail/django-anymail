@@ -36,6 +36,7 @@ Other
 * **Mailgun (docs):** Clarify account-level "Mailgun API keys" vs.
   domain-level "sending API keys." (Thanks to `@sdarwin`_ for
   reporting the issue.)
+* Test against prerelease versions of Django 5.0 and Python 3.12.
 
 
 v10.1
