@@ -462,7 +462,7 @@ class BasePayload:
                 dt = datetime(value.year, value.month, value.day)  # naive, midnight
             else:
                 try:
-                    dt = datetime.utcfromtimestamp(value).replace(tzinfo=timezone.utc)
+                    dt = datetime.fromtimestamp(value, timezone.utc)
                 except (TypeError, ValueError):
                     return value
         if is_naive(dt):
