@@ -34,6 +34,7 @@ Anymail currently supports these ESPs:
 * **Mandrill** (MailChimp transactional)
 * **Postal** (self-hosted ESP)
 * **Postmark**
+* **Resend**
 * **SendGrid**
 * **SparkPost**
 
