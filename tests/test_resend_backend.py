@@ -94,6 +94,40 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
             data["bcc"], ["Blind Copy <bcc1@example.com>", "bcc2@example.com"]
         )
 
+    def test_quoted_display_names(self):
+        # Resend's API has a bug that rejects a display-name in double quotes
+        # (per RFC 5322 section 3.4). Attempting to omit the quotes works, unless
+        # the display-name also contains a comma. Try to avoid the whole problem
+        # by using RFC 2047 encoded words for addresses Resend will parse incorrectly.
+        msg = mail.EmailMessage(
+            "Subject",
+            "Message",
+            '"From, comma" <from@example.com>',
+            [
+                '"To, comma" <to1@example.com>',
+                "non–ascii <to2@example.com>",
+                "=?utf-8?q?pre_encoded?= <to3@example.com>",
+            ],
+            reply_to=['"Reply, comma" <reply1@example.com>'],
+        )
+        msg.send()
+        data = self.get_api_call_json()
+        # TODO: Resend gives a "security error" for RFC 2047 in the 'from' param,
+        #       so leave as is. (Will cause "invalid parameter" error in actual use.)
+        # self.assertEqual(data["from"], "=?utf-8?q?From=2C_comma?= <from@example.com>")
+        self.assertEqual(data["from"], '"From, comma" <from@example.com>')
+        self.assertEqual(
+            data["to"],
+            [
+                "=?utf-8?q?To=2C_comma?= <to1@example.com>",
+                "=?utf-8?b?bm9u4oCTYXNjaWk=?= <to2@example.com>",
+                "=?utf-8?q?pre_encoded?= <to3@example.com>",
+            ],
+        )
+        self.assertEqual(
+            data["reply_to"], ["=?utf-8?q?Reply=2C_comma?= <reply1@example.com>"]
+        )
+
     def test_email_message(self):
         email = mail.EmailMessage(
             "Subject",

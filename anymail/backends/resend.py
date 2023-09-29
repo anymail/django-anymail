@@ -1,8 +1,15 @@
 import mimetypes
+from email.charset import QP, Charset
+from email.utils import formataddr
 
 from ..message import AnymailRecipientStatus
 from ..utils import CaseInsensitiveCasePreservingDict, get_anymail_setting
 from .base_requests import AnymailRequestsBackend, RequestsPayload
+
+# Used to force RFC-2047 encoded word
+# in address formatting workaround
+QP_CHARSET = Charset("utf-8")
+QP_CHARSET.header_encoding = QP
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -69,14 +76,38 @@ class ResendPayload(RequestsPayload):
     def init_payload(self):
         self.data = {}  # becomes json
 
+    @staticmethod
+    def _resend_email_address(address):
+        """
+        Return EmailAddress address formatted for use with Resend.
+
+        Works around a Resend bug that rejects properly formatted RFC 5322
+        addresses that have the display-name enclosed in double quotes (e.g.,
+        any display-name containing a comma).
+        """
+        formatted = address.address
+        if formatted.startswith('"'):
+            # Workaround: force RFC-2047 encoded word
+            formatted = formataddr(
+                (QP_CHARSET.header_encode(address.display_name), address.addr_spec)
+            )
+        return formatted
+
     def set_from_email(self, email):
+        # Can't use the address header workaround for the `from` field:
+        #   self.data["from"] = self._resend_email_address(email)
+        # (If `from` uses RFC-2047 encoding, Resend returns a "security_error"
+        # status 451, "The email payload contain invalid characters".)
+        # Just use the RFC-5322 formatted address, and document that some
+        # display-names will cause invalid_parameter or security_error errors.
+        # TODO: update `from` handling after hearing back from Resend support
         self.data["from"] = email.address
 
     def set_recipients(self, recipient_type, emails):
         assert recipient_type in ["to", "cc", "bcc"]
         if emails:
             field = recipient_type
-            self.data[field] = [email.address for email in emails]
+            self.data[field] = [self._resend_email_address(email) for email in emails]
             self.recipients += emails
 
     def set_subject(self, subject):
@@ -84,7 +115,9 @@ class ResendPayload(RequestsPayload):
 
     def set_reply_to(self, emails):
         if emails:
-            self.data["reply_to"] = [email.address for email in emails]
+            self.data["reply_to"] = [
+                self._resend_email_address(email) for email in emails
+            ]
 
     def set_extra_headers(self, headers):
         self.data.setdefault("headers", {}).update(headers)
