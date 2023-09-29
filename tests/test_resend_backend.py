@@ -1,8 +1,8 @@
+import json
 from base64 import b64encode
 from decimal import Decimal
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
-from unittest import skip
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
@@ -343,8 +343,8 @@ class ResendBackendAnymailFeatureTests(ResendBackendMockAPITestCase):
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(
-            data["tags"],
-            [{"name": "user_id", "value": "12345"}, {"name": "items", "value": "6"}],
+            json.loads(data["headers"]["X-Metadata"]),
+            {"user_id": "12345", "items": 6},
         )
 
     def test_send_at(self):
@@ -353,9 +353,29 @@ class ResendBackendAnymailFeatureTests(ResendBackendMockAPITestCase):
             self.message.send()
 
     def test_tags(self):
-        self.message.tags = ["receipt"]
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "tags"):
-            self.message.send()
+        self.message.tags = ["receipt", "reorder test 12"]
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["headers"]["X-Tag"],
+            ["receipt", "reorder test 12"],
+        )
+
+    def test_headers_metadata_tags_interaction(self):
+        # Test three features that use custom headers don't clobber each other
+        self.message.extra_headers = {"X-Custom": "custom value"}
+        self.message.metadata = {"user_id": "12345"}
+        self.message.tags = ["receipt", "reorder test 12"]
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["headers"],
+            {
+                "X-Custom": "custom value",
+                "X-Tag": ["receipt", "reorder test 12"],
+                "X-Metadata": '{"user_id": "12345"}',
+            },
+        )
 
     def test_track_opens(self):
         self.message.track_opens = True
@@ -382,11 +402,11 @@ class ResendBackendAnymailFeatureTests(ResendBackendMockAPITestCase):
 
     def test_esp_extra(self):
         self.message.esp_extra = {
-            "future_resend_option": "some-value",
+            "tags": [{"name": "my_tag", "value": "my_tag_value"}],
         }
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(data["future_resend_option"], "some-value")
+        self.assertEqual(data["tags"], [{"name": "my_tag", "value": "my_tag_value"}])
 
     # noinspection PyUnresolvedReferences
     def test_send_attaches_anymail_status(self):
@@ -440,7 +460,6 @@ class ResendBackendAnymailFeatureTests(ResendBackendMockAPITestCase):
         self.assertEqual(self.message.anymail_status.recipients, {})
         self.assertEqual(self.message.anymail_status.esp_response, mock_response)
 
-    @skip("TODO")  # TODO: for X-Metadata header
     def test_json_serialization_errors(self):
         """Try to provide more information about non-json-serializable data"""
         self.message.metadata = {"price": Decimal("19.99")}  # yeah, don't do this

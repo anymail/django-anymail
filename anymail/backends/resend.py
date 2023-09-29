@@ -87,7 +87,7 @@ class ResendPayload(RequestsPayload):
             self.data["reply_to"] = [email.address for email in emails]
 
     def set_extra_headers(self, headers):
-        self.data["headers"] = headers
+        self.data.setdefault("headers", {}).update(headers)
 
     def set_text_body(self, body):
         self.data["text"] = body
@@ -123,17 +123,20 @@ class ResendPayload(RequestsPayload):
             ]
 
     def set_metadata(self, metadata):
-        # TODO: optionally use custom header
-        self.data["tags"] = [
-            {"name": key, "value": str(value)} for key, value in metadata.items()
-        ]
+        # Send metadata as json in a custom X-Metadata header.
+        # (Resend's own "tags" are severely limited in character set)
+        self.data.setdefault("headers", {})["X-Metadata"] = self.serialize_json(
+            metadata
+        )
 
     # Resend doesn't support delayed sending
     # def set_send_at(self, send_at):
 
     def set_tags(self, tags):
-        # TODO: optionally use tag or custom header
-        super().set_tags(tags)
+        # Send tags using a custom X-Tag header.
+        # (Resend's own "tags" are severely limited in character set)
+        # This will result in one X-Tag header per tag:
+        self.data.setdefault("headers", {})["X-Tag"] = tags
 
     # Resend doesn't support changing click/open tracking per message
     # def set_track_clicks(self, track_clicks):
