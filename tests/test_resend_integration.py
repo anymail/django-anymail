@@ -64,11 +64,11 @@ class ResendBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message = AnymailMessage(
             subject="Anymail Resend all-options integration test",
             body="This is the text body",
-            # TODO: Resend can't handle a comma in the `from_email` display-name
-            #   (and rejects our RFC 2047 workaround, only in the "from" parameter).
-            #   Revisit after hearing back from Resend support.
-            # from_email=formataddr(("Test From, with comma", self.from_email)),
-            from_email=formataddr(("Test From with NO comma", self.from_email)),
+            # Resend can't handle a comma in the `from_email` display-name,
+            # and rejects our RFC 2047 workaround (only in the "from" parameter):
+            #   from_email=formataddr(("Test From, with comma", self.from_email)),
+            # Check at least that non-ascii display-name works:
+            from_email=formataddr(("Test «Från» utan komma", self.from_email)),
             to=["test+to1@anymail.dev", '"Recipient 2, OK?" <test+to2@anymail.dev>'],
             cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
             bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],

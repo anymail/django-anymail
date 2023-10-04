@@ -3,6 +3,7 @@ from base64 import b64encode
 from decimal import Decimal
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
+from email.utils import formataddr
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
@@ -94,7 +95,7 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
             data["bcc"], ["Blind Copy <bcc1@example.com>", "bcc2@example.com"]
         )
 
-    def test_quoted_display_names(self):
+    def test_display_name_workarounds(self):
         # Resend's API has a bug that rejects a display-name in double quotes
         # (per RFC 5322 section 3.4). Attempting to omit the quotes works, unless
         # the display-name also contains a comma. Try to avoid the whole problem
@@ -102,7 +103,7 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         msg = mail.EmailMessage(
             "Subject",
             "Message",
-            '"From, comma" <from@example.com>',
+            formataddr(("Félix Företag", "from@example.com")),
             [
                 '"To, comma" <to1@example.com>',
                 "non–ascii <to2@example.com>",
@@ -112,10 +113,11 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         )
         msg.send()
         data = self.get_api_call_json()
-        # TODO: Resend gives a "security error" for RFC 2047 in the 'from' param,
-        #       so leave as is. (Will cause "invalid parameter" error in actual use.)
-        # self.assertEqual(data["from"], "=?utf-8?q?From=2C_comma?= <from@example.com>")
-        self.assertEqual(data["from"], '"From, comma" <from@example.com>')
+        self.assertEqual(
+            data["from"],
+            # for `from` field only, no double quotes, retain non-ASCII characters:
+            "Félix Företag <from@example.com>",
+        )
         self.assertEqual(
             data["to"],
             [
@@ -127,6 +129,37 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         self.assertEqual(
             data["reply_to"], ["=?utf-8?q?Reply=2C_comma?= <reply1@example.com>"]
         )
+
+    @override_settings(ANYMAIL_RESEND_WORKAROUND_DISPLAY_NAME_BUGS=False)
+    def test_undocumented_workaround_setting(self):
+        # Same test as above, but workarounds disabled
+        msg = mail.EmailMessage(
+            "Subject",
+            "Message",
+            '"Félix Företag" <from@example.com>',
+            [
+                '"To, comma" <to1@example.com>',
+                "non–ascii <to2@example.com>",
+                "=?utf-8?q?pre_encoded?= <to3@example.com>",
+            ],
+            reply_to=['"Reply, comma" <reply1@example.com>'],
+        )
+        msg.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["from"],
+            # (Django uses base64 encoded word unless QP is shorter)
+            "=?utf-8?b?RsOpbGl4IEbDtnJldGFn?= <from@example.com>",
+        )
+        self.assertEqual(
+            data["to"],
+            [
+                '"To, comma" <to1@example.com>',
+                "=?utf-8?b?bm9u4oCTYXNjaWk=?= <to2@example.com>",
+                "=?utf-8?q?pre_encoded?= <to3@example.com>",
+            ],
+        )
+        self.assertEqual(data["reply_to"], ['"Reply, comma" <reply1@example.com>'])
 
     def test_email_message(self):
         email = mail.EmailMessage(
