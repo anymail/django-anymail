@@ -30,6 +30,12 @@ vNext
 
 *unreleased changes*
 
+Features
+~~~~~~~~
+
+* **Resend**: Add support for this ESP
+  (`docs <https://anymail.dev/en/latest/esps/resend/>`__).
+
 Fixes
 ~~~~~
 
