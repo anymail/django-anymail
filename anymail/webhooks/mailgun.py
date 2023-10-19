@@ -21,8 +21,8 @@ from ..signals import (
 )
 from ..utils import (
     UNSET,
-    combine,
     get_anymail_setting,
+    merge_dicts_shallow,
     parse_single_address,
     querydict_getfirst,
 )
@@ -341,7 +341,9 @@ class MailgunTrackingWebhookView(MailgunBaseWebhookView):
             if len(variables) >= 1:
                 # Each X-Mailgun-Variables value is JSON. Parse and merge them all into
                 # single dict:
-                metadata = combine(*[json.loads(value) for value in variables])
+                metadata = merge_dicts_shallow(
+                    *[json.loads(value) for value in variables]
+                )
 
         elif event_type in self._known_legacy_event_fields:
             # For other events, we must extract from the POST fields, ignoring known

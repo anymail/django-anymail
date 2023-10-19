@@ -1,5 +1,5 @@
 # Tests for the anymail/utils.py module
-# (not to be confused with utilities for testing found in in tests/utils.py)
+# (not to be confused with utilities for testing found in tests/utils.py)
 import base64
 import copy
 import pickle
@@ -17,12 +17,17 @@ from anymail.utils import (
     Attachment,
     CaseInsensitiveCasePreservingDict,
     EmailAddress,
+    concat_lists,
     force_non_lazy,
     force_non_lazy_dict,
     force_non_lazy_list,
     get_request_basic_auth,
     get_request_uri,
     is_lazy,
+    last,
+    merge_dicts_deep,
+    merge_dicts_one_level,
+    merge_dicts_shallow,
     parse_address_list,
     parse_rfc2822date,
     parse_single_address,
@@ -559,3 +564,133 @@ class UnsetValueTests(SimpleTestCase):
     def test_equality(self):
         # `is UNSET` is preferred to `== UNSET`, but both should work
         self.assertEqual(UNSET, UNSET)
+
+
+class CombinerTests(SimpleTestCase):
+    def test_concat_lists(self):
+        for args, expected in [
+            (([1, 2], [3, 4]), [1, 2, 3, 4]),
+            # Does not flatten:
+            (([1, [11, 12]], [2]), [1, [11, 12], 2]),
+            # UNSET args ignored:
+            ((UNSET, [1, 2], UNSET, [3, 4], UNSET), [1, 2, 3, 4]),
+            # None clears previous:
+            (([1, 2], None, [3, 4]), [3, 4]),
+            # Works with other sequence-like types:
+            (([1], (2, 3), {4}), [1, 2, 3, 4]),
+            # Degenerate cases:
+            ((), UNSET),
+            ((UNSET,), UNSET),
+            ((None,), UNSET),
+            (([], None), UNSET),
+        ]:
+            with self.subTest(repr(args)):
+                original_args = copy.deepcopy(args)
+                merged = concat_lists(*args)
+                self.assertEqual(merged, expected)
+                # Verify args were not modified:
+                self.assertEqual(args, original_args)
+
+    def test_merge_dicts_shallow(self):
+        for args, expected in [
+            (({"a": 1}, {"b": 2}), {"a": 1, "b": 2}),
+            (
+                ({"a": 1, "b": 2}, {"a": 11, "c": 33}, {"c": 3}),
+                {"a": 11, "b": 2, "c": 3},
+            ),
+            # shallow merge:
+            (({"a": {"a1": 1}, "b": 2}, {"a": {"a2": 2}}), {"a": {"a2": 2}, "b": 2}),
+            # UNSET args ignored:
+            ((UNSET, {"a": 1}, UNSET, {"b": 2}, UNSET), {"a": 1, "b": 2}),
+            # None clears previous:
+            (({"a": 1}, None, {"b": 2}), {"b": 2}),
+            # Degenerate cases:
+            ((), UNSET),
+            ((UNSET,), UNSET),
+            ((None,), UNSET),
+            (({}, None), UNSET),
+        ]:
+            with self.subTest(repr(args)):
+                original_args = copy.deepcopy(args)
+                merged = merge_dicts_shallow(*args)
+                self.assertEqual(merged, expected)
+                # Verify args were not modified:
+                self.assertEqual(args, original_args)
+
+    def test_merge_dicts_deep(self):
+        for args, expected in [
+            (({"a": 1}, {"b": 2}), {"a": 1, "b": 2}),
+            (
+                ({"a": 1, "b": 2}, {"a": 11, "c": 33}, {"c": 3}),
+                {"a": 11, "b": 2, "c": 3},
+            ),
+            # deep merge:
+            (
+                (
+                    {"a": {"a1": 1, "a3": {"a3a": 31}}},
+                    {"a": {"a2": 2, "a3": {"a3b": 32}}},
+                ),
+                {"a": {"a1": 1, "a2": 2, "a3": {"a3a": 31, "a3b": 32}}},
+            ),
+            # UNSET (top-level) args ignored:
+            ((UNSET, {"a": 1}, UNSET, {"b": 2}, UNSET), {"a": 1, "b": 2}),
+            # None clears previous:
+            (({"a": 1}, None, {"b": 2}), {"b": 2}),
+            # Degenerate cases:
+            ((), UNSET),
+            ((UNSET,), UNSET),
+            ((None,), UNSET),
+            (({}, None), UNSET),
+        ]:
+            with self.subTest(repr(args)):
+                original_args = copy.deepcopy(args)
+                merged = merge_dicts_deep(*args)
+                self.assertEqual(merged, expected)
+                # Verify args were not modified:
+                self.assertEqual(args, original_args)
+
+    def test_merge_dicts_one_level(self):
+        for args, expected in [
+            # one-level merge:
+            (
+                (
+                    {"a": {"a1": 1, "a3": {"a3a": 31}}},
+                    {"a": {"a2": 2, "a3": {"a3b": 32}}},
+                ),
+                {"a": {"a1": 1, "a2": 2, "a3": {"a3b": 32}}},  # but not a3a
+            ),
+            # UNSET (top-level) args ignored:
+            ((UNSET, {"a": {}}, UNSET, {"b": {}}, UNSET), {"a": {}, "b": {}}),
+            # None clears previous:
+            (({"a": {}}, None, {"b": {}}), {"b": {}}),
+            # Degenerate cases:
+            ((), UNSET),
+            ((UNSET,), UNSET),
+            ((None,), UNSET),
+            (({}, None), UNSET),
+        ]:
+            with self.subTest(repr(args)):
+                original_args = copy.deepcopy(args)
+                merged = merge_dicts_one_level(*args)
+                self.assertEqual(merged, expected)
+                # Verify args were not modified:
+                self.assertEqual(args, original_args)
+
+    def test_last(self):
+        for args, expected in [
+            ((1, 2, 3), 3),
+            # UNSET args ignored:
+            ((UNSET, 1, UNSET, 2, UNSET), 2),
+            # None clears previous:
+            ((1, 2, None), UNSET),
+            # Degenerate cases:
+            ((), UNSET),
+            ((UNSET,), UNSET),
+            ((None,), UNSET),
+        ]:
+            with self.subTest(repr(args)):
+                original_args = copy.deepcopy(args)
+                merged = last(*args)
+                self.assertEqual(merged, expected)
+                # Verify args were not modified:
+                self.assertEqual(args, original_args)

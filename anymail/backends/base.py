@@ -18,13 +18,16 @@ from ..signals import post_send, pre_send
 from ..utils import (
     UNSET,
     Attachment,
-    combine,
+    concat_lists,
     force_non_lazy,
     force_non_lazy_dict,
     force_non_lazy_list,
     get_anymail_setting,
     is_lazy,
     last,
+    merge_dicts_deep,
+    merge_dicts_one_level,
+    merge_dicts_shallow,
     parse_address_list,
     parse_single_address,
 )
@@ -253,8 +256,7 @@ class BasePayload:
     #   attr: the property name
     #   combiner: optional function(default_value, value) -> value
     #     to combine settings defaults with the EmailMessage property value
-    #     (usually `combine` to merge, or `last` for message value to override default;
-    #     use `None` if settings defaults aren't supported)
+    #     (use `None` if settings defaults aren't supported)
     #   converter: optional function(value) -> value transformation
     #     (can be a callable or the string name of a Payload method, or `None`)
     #     The converter must force any Django lazy translation strings to text.
@@ -263,29 +265,29 @@ class BasePayload:
     base_message_attrs = (
         # Standard EmailMessage/EmailMultiAlternatives props
         ("from_email", last, parse_address_list),  # multiple from_emails are allowed
-        ("to", combine, parse_address_list),
-        ("cc", combine, parse_address_list),
-        ("bcc", combine, parse_address_list),
+        ("to", concat_lists, parse_address_list),
+        ("cc", concat_lists, parse_address_list),
+        ("bcc", concat_lists, parse_address_list),
         ("subject", last, force_non_lazy),
-        ("reply_to", combine, parse_address_list),
-        ("extra_headers", combine, force_non_lazy_dict),
+        ("reply_to", concat_lists, parse_address_list),
+        ("extra_headers", merge_dicts_shallow, force_non_lazy_dict),
         ("body", last, force_non_lazy),  # set_body handles content_subtype
-        ("alternatives", combine, "prepped_alternatives"),
-        ("attachments", combine, "prepped_attachments"),
+        ("alternatives", concat_lists, "prepped_alternatives"),
+        ("attachments", concat_lists, "prepped_attachments"),
     )
     anymail_message_attrs = (
         # Anymail expando-props
         ("envelope_sender", last, parse_single_address),
-        ("metadata", combine, force_non_lazy_dict),
+        ("metadata", merge_dicts_shallow, force_non_lazy_dict),
         ("send_at", last, "aware_datetime"),
-        ("tags", combine, force_non_lazy_list),
+        ("tags", concat_lists, force_non_lazy_list),
         ("track_clicks", last, None),
         ("track_opens", last, None),
         ("template_id", last, force_non_lazy),
-        ("merge_data", combine, force_non_lazy_dict),
-        ("merge_global_data", combine, force_non_lazy_dict),
-        ("merge_metadata", combine, force_non_lazy_dict),
-        ("esp_extra", combine, force_non_lazy_dict),
+        ("merge_data", merge_dicts_one_level, force_non_lazy_dict),
+        ("merge_global_data", merge_dicts_shallow, force_non_lazy_dict),
+        ("merge_metadata", merge_dicts_one_level, force_non_lazy_dict),
+        ("esp_extra", merge_dicts_deep, force_non_lazy_dict),
     )
     esp_message_attrs = ()  # subclasses can override
 

@@ -30,6 +30,14 @@ vNext
 
 *unreleased changes*
 
+Fixes
+~~~~~
+
+* Correctly merge global ``SEND_DEFAULTS`` with message ``esp_extra``
+  for ESP APIs that use a nested structure (including Mandrill and SparkPost).
+  Clarify intent of global defaults merging code for other message properties.
+  (Thanks to `@mounirmesselmeni`_ for reporting the issue.)
+
 Other
 ~~~~~
 
@@ -1571,6 +1579,7 @@ Features
 .. _@mark-mishyn: https://github.com/mark-mishyn
 .. _@martinezleoml: https://github.com/martinezleoml
 .. _@mbk-ok: https://github.com/mbk-ok
+.. _@mounirmesselmeni: https://github.com/mounirmesselmeni
 .. _@mwheels: https://github.com/mwheels
 .. _@nuschk: https://github.com/nuschk
 .. _@puru02: https://github.com/puru02

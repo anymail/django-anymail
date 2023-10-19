@@ -209,7 +209,10 @@ class SendDefaultsTests(TestBackendTestCase):
                 "tags": ["globaltag"],
                 "track_clicks": True,
                 "track_opens": False,
-                "esp_extra": {"globalextra": "globalsetting"},
+                "esp_extra": {
+                    "globalextra": "globalsetting",
+                    "deepextra": {"deep1": "globaldeep1", "deep2": "globaldeep2"},
+                },
             }
         }
     )
@@ -218,7 +221,10 @@ class SendDefaultsTests(TestBackendTestCase):
         self.message.metadata = {"message": "messagevalue", "other": "override"}
         self.message.tags = ["messagetag"]
         self.message.track_clicks = False
-        self.message.esp_extra = {"messageextra": "messagesetting"}
+        self.message.esp_extra = {
+            "messageextra": "messagesetting",
+            "deepextra": {"deep2": "messagedeep2", "deep3": "messagedeep3"},
+        }
 
         self.message.send()
         params = self.get_send_params()
@@ -234,8 +240,13 @@ class SendDefaultsTests(TestBackendTestCase):
         self.assertEqual(params["tags"], ["globaltag", "messagetag"])
         self.assertEqual(params["track_clicks"], False)  # message overrides
         self.assertEqual(params["track_opens"], False)  # (no message setting)
+        # esp_extra is deep merged:
         self.assertEqual(params["globalextra"], "globalsetting")
         self.assertEqual(params["messageextra"], "messagesetting")
+        self.assertEqual(
+            params["deepextra"],
+            {"deep1": "globaldeep1", "deep2": "messagedeep2", "deep3": "messagedeep3"},
+        )
 
         # Send another message to make sure original SEND_DEFAULTS unchanged
         send_mail("subject", "body", "from@example.com", ["to@example.com"])
@@ -247,6 +258,9 @@ class SendDefaultsTests(TestBackendTestCase):
         self.assertEqual(params["track_clicks"], True)
         self.assertEqual(params["track_opens"], False)
         self.assertEqual(params["globalextra"], "globalsetting")
+        self.assertEqual(
+            params["deepextra"], {"deep1": "globaldeep1", "deep2": "globaldeep2"}
+        )
 
     @override_settings(
         ANYMAIL={

@@ -2,6 +2,7 @@ import base64
 import mimetypes
 from base64 import b64encode
 from collections.abc import Mapping, MutableMapping
+from copy import copy, deepcopy
 from email.mime.base import MIMEBase
 from email.utils import formatdate, getaddresses, parsedate_to_datetime, unquote
 from urllib.parse import urlsplit, urlunsplit
@@ -20,17 +21,16 @@ BASIC_NUMERIC_TYPES = (int, float)
 UNSET = type("UNSET", (object,), {})  # Used as non-None default value
 
 
-def combine(*args):
+def concat_lists(*args):
     """
-    Combines all non-UNSET args, by shallow merging mappings and concatenating sequences
+    Combines all non-UNSET args, by concatenating lists (or sequence-like types).
+    Does not modify any args.
 
-    >>> combine({'a': 1, 'b': 2}, UNSET, {'b': 3, 'c': 4}, UNSET)
-    {'a': 1, 'b': 3, 'c': 4}
-    >>> combine([1, 2], UNSET, [3, 4], UNSET)
+    >>> concat_lists([1, 2], UNSET, [3, 4], UNSET)
     [1, 2, 3, 4]
-    >>> combine({'a': 1}, None, {'b': 2})  # None suppresses earlier args
-    {'b': 2}
-    >>> combine()
+    >>> concat_lists([1, 2], None, [3, 4])  # None suppresses earlier args
+    [3, 4]
+    >>> concat_lists()
     UNSET
 
     """
@@ -41,22 +41,92 @@ def combine(*args):
             result = UNSET
         elif value is not UNSET:
             if result is UNSET:
-                try:
-                    result = value.copy()  # will shallow merge if dict-like
-                except AttributeError:
-                    result = value  # will concatenate if sequence-like
+                result = list(value)
             else:
-                try:
-                    result.update(value)  # shallow merge if dict-like
-                except AttributeError:
-                    result = result + value  # concatenate if sequence-like
+                result = result + list(value)  # concatenate sequence-like
+    return result
+
+
+def merge_dicts_shallow(*args):
+    """
+    Shallow-merges all non-UNSET args.
+    Does not modify any args.
+
+    >>> merge_dicts_shallow({'a': 1, 'b': 2}, UNSET, {'b': 3, 'c': 4}, UNSET)
+    {'a': 1, 'b': 3, 'c': 4}
+    >>> merge_dicts_shallow({'a': {'a1': 1, 'a2': 2}}, {'a': {'a1': 11, 'a3': 33}})
+    {'a': {'a1': 11, 'a3': 33}}
+    >>> merge_dicts_shallow({'a': 1}, None, {'b': 2})  # None suppresses earlier args
+    {'b': 2}
+    >>> merge_dicts_shallow()
+    UNSET
+
+    """
+    result = UNSET
+    for value in args:
+        if value is None:
+            # None is a request to suppress any earlier values
+            result = UNSET
+        elif value is not UNSET:
+            if result is UNSET:
+                result = copy(value)
+            else:
+                result.update(value)
+    return result
+
+
+def merge_dicts_deep(*args):
+    """
+    Deep-merges all non-UNSET args.
+    Does not modify any args.
+
+    >>> merge_dicts_deep({'a': 1, 'b': 2}, UNSET, {'b': 3, 'c': 4}, UNSET)
+    {'a': 1, 'b': 3, 'c': 4}
+    >>> merge_dicts_deep({'a': {'a1': 1, 'a2': 2}}, {'a': {'a1': 11, 'a3': 33}})
+    {'a': {'a1': 11, 'a2': 2, 'a3': 33}}
+    >>> merge_dicts_deep({'a': 1}, None, {'b': 2})  # None suppresses earlier args
+    {'b': 2}
+    >>> merge_dicts_deep()
+    UNSET
+
+    """
+    result = UNSET
+    for value in args:
+        if value is None:
+            # None is a request to suppress any earlier values
+            result = UNSET
+        elif value is not UNSET:
+            if result is UNSET:
+                result = deepcopy(value)
+            else:
+                update_deep(result, value)
+    return result
+
+
+def merge_dicts_one_level(*args):
+    """
+    Mixture of merge_dicts_deep and merge_dicts_shallow:
+    Deep merges first level, shallow merges second level.
+    Does not modify any args.
+
+    (Useful for {"email": {options...}, ...} style dicts,
+    like merge_data: shallow merges the options for each email.)
+    """
+    result = UNSET
+    for value in args:
+        if value is None:
+            # None is a request to suppress any earlier values
+            result = UNSET
+        elif value is not UNSET:
+            if result is UNSET:
+                result = {}
+            for k, v in value.items():
+                result.setdefault(k, {}).update(v)
     return result
 
 
 def last(*args):
     """Returns the last of its args which is not UNSET.
-
-    (Essentially `combine` without the merge behavior)
 
     >>> last(1, 2, UNSET, 3, UNSET, UNSET)
     3
