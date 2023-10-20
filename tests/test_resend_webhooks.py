@@ -157,8 +157,7 @@ class ResendTestCase(ResendWebhookTestCase):
                 "from": "Sender <from@example.com>",
                 "headers": [
                     {"name": "Reply-To", "value": "reply@example.com"},
-                    {"name": "X-Tag", "value": "tag1"},
-                    {"name": "X-Tag", "value": "Tag 2"},
+                    {"name": "X-Tags", "value": '["tag1", "Tag 2"]'},
                     {
                         "name": "X-Metadata",
                         "value": '{"cohort": "2018-08-B", "user_id": 123456}',
@@ -203,7 +202,7 @@ class ResendTestCase(ResendWebhookTestCase):
         self.assertEqual(event.metadata, {"cohort": "2018-08-B", "user_id": 123456})
         self.assertEqual(event.esp_event, raw_event)
 
-        # You can retrieve Resend tags (which are different from Anymail tags)
+        # You can retrieve Resend native tags (which are different from Anymail tags)
         # from esp_event:
         resend_tags = event.esp_event["data"].get("tags", {})
         self.assertEqual(resend_tags, {"tag1": "Tag_1_value", "tag2": "Tag_2_value"})

@@ -4,7 +4,11 @@ from email.header import decode_header
 from email.utils import formataddr
 
 from ..message import AnymailRecipientStatus
-from ..utils import CaseInsensitiveCasePreservingDict, get_anymail_setting
+from ..utils import (
+    BASIC_NUMERIC_TYPES,
+    CaseInsensitiveCasePreservingDict,
+    get_anymail_setting,
+)
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 
 # Used to force RFC-2047 encoded word
@@ -157,7 +161,14 @@ class ResendPayload(RequestsPayload):
             ]
 
     def set_extra_headers(self, headers):
-        self.data.setdefault("headers", {}).update(headers)
+        # Resend requires header values to be strings (not integers) as of 2023-10-20.
+        # Stringify ints and floats; anything else is the caller's responsibility.
+        self.data.setdefault("headers", {}).update(
+            {
+                k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
+                for k, v in headers.items()
+            }
+        )
 
     def set_text_body(self, body):
         self.data["text"] = body
@@ -203,10 +214,9 @@ class ResendPayload(RequestsPayload):
     # def set_send_at(self, send_at):
 
     def set_tags(self, tags):
-        # Send tags using a custom X-Tag header.
+        # Send tags using a custom X-Tags header.
         # (Resend's own "tags" are severely limited in character set)
-        # This will result in one X-Tag header per tag:
-        self.data.setdefault("headers", {})["X-Tag"] = tags
+        self.data.setdefault("headers", {})["X-Tags"] = self.serialize_json(tags)
 
     # Resend doesn't support changing click/open tracking per message
     # def set_track_clicks(self, track_clicks):

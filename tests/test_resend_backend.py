@@ -219,7 +219,8 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         self.message.extra_headers = {"X-Custom": "string", "X-Num": 123}
         self.message.send()
         data = self.get_api_call_json()
-        self.assertCountEqual(data["headers"], {"X-Custom": "string", "X-Num": "123"})
+        # header values must be strings (or they'll cause an "invalid literal" API error)
+        self.assertEqual(data["headers"], {"X-Custom": "string", "X-Num": "123"})
 
     def test_extra_headers_serialization_error(self):
         self.message.extra_headers = {"X-Custom": Decimal(12.5)}
@@ -424,7 +425,7 @@ class ResendBackendAnymailFeatureTests(ResendBackendMockAPITestCase):
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(
-            data["headers"]["X-Tag"],
+            json.loads(data["headers"]["X-Tags"]),
             ["receipt", "reorder test 12"],
         )
 
@@ -439,7 +440,7 @@ class ResendBackendAnymailFeatureTests(ResendBackendMockAPITestCase):
             data["headers"],
             {
                 "X-Custom": "custom value",
-                "X-Tag": ["receipt", "reorder test 12"],
+                "X-Tags": '["receipt", "reorder test 12"]',
                 "X-Metadata": '{"user_id": "12345"}',
             },
         )

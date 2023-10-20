@@ -149,8 +149,11 @@ class ResendTrackingWebhookView(SvixWebhookValidationMixin, AnymailBaseWebhookVi
         else:
             for header in headers:
                 name = header["name"].lower()
-                if name == "x-tag":
-                    tags.append(header["value"])
+                if name == "x-tags":
+                    try:
+                        tags = json.loads(header["value"])
+                    except (ValueError, TypeError):
+                        pass
                 elif name == "x-metadata":
                     try:
                         metadata = json.loads(header["value"])
