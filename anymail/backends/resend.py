@@ -119,9 +119,9 @@ class ResendPayload(RequestsPayload):
             if formatted.startswith('"') or formatted.startswith("=?"):
                 # Workaround: use an *unquoted*, *unencoded* (Unicode) display-name.
                 #
-                # This allows use of non-ASCII characters (which Resend rejects
-                # if encoded with RFC 2047). Commas and some other punctuation
-                # will still cause an "invalid `from` field" 422 error, but there's
+                # This allows use of non-ASCII characters (which Resend rejects when
+                # encoded with RFC 2047). Some punctuation will still result in unusual
+                # behavior or cause an "invalid `from` field" 422 error, but there's
                 # nothing we can do about that.
                 display_name = email.display_name
                 if display_name.startswith("=?"):

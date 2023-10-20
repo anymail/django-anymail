@@ -109,8 +109,8 @@ The default is ``RESEND_API_URL = "https://api.resend.com/"``.
 Limitations and quirks
 ----------------------
 
-Resend does not support several features offered by some other ESPs,
-and has some unexpected behavior for a few common use cases.
+Resend does not support a few features offered by some other ESPs,
+and can have unexpected behavior for some common use cases.
 
 Anymail normally raises an :exc:`~anymail.exceptions.AnymailUnsupportedFeature`
 error when you try to send a message using features that Resend doesn't support.
@@ -127,12 +127,11 @@ anyway---see :ref:`unsupported-features`.
 
   These characters will cause problems in a *From* address display name:
 
-      * Commas, double quotes (``"``), or certain other characters
-        that must be quoted or escaped in address headers will cause
-        a "Resend API response 422" error complaining of an
-        "Invalid \`from\` field".
-      * Parentheses will not cause an API error, but anything
-        enclosed in parentheses may be omitted from the resulting email.
+      * Double quotes (``"``) and some other punctuation characters
+        can cause a "Resend API response 422" error complaining of an
+        "Invalid \`from\` field", or can result in a garbled *From* name
+        (missing segments, additional punctuation inserted) in the
+        resulting message.
       * A question mark immediately followed by any alphabetic character
         (e.g., ``?u``) will cause a "Resend API response 451" security error
         complaining that "The email payload contain invalid characters".
@@ -141,8 +140,8 @@ anyway---see :ref:`unsupported-features`.
         for other address fields.)
 
   There may be other character combinations that also cause problems.
-  The only known solution is to avoid using the problematic characters
-  in *From* names. (The issues were reported to Resend in October, 2023.)
+  If you need to include punctuation in a *From* display name, be sure
+  to verify the results. (The issues were reported to Resend in October, 2023.)
 
 **Attachment filename determines content type**
   Resend determines the content type of an attachment from its filename extension.

@@ -103,7 +103,7 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         msg = mail.EmailMessage(
             "Subject",
             "Message",
-            formataddr(("Félix Företag", "from@example.com")),
+            formataddr(("Félix Företag, Inc.", "from@example.com")),
             [
                 '"To, comma" <to1@example.com>',
                 "non–ascii <to2@example.com>",
@@ -116,7 +116,7 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         self.assertEqual(
             data["from"],
             # for `from` field only, no double quotes, retain non-ASCII characters:
-            "Félix Företag <from@example.com>",
+            "Félix Företag, Inc. <from@example.com>",
         )
         self.assertEqual(
             data["to"],
