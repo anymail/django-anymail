@@ -1,7 +1,7 @@
 import mimetypes
 from email.charset import QP, Charset
-from email.header import decode_header
-from email.utils import formataddr
+from email.header import decode_header, make_header
+from email.headerregistry import Address
 
 from ..message import AnymailRecipientStatus
 from ..utils import (
@@ -108,8 +108,11 @@ class ResendPayload(RequestsPayload):
         if self.backend.workaround_display_name_bugs:
             if formatted.startswith('"'):
                 # Workaround: force RFC-2047 encoded word
-                formatted = formataddr(
-                    (QP_CHARSET.header_encode(address.display_name), address.addr_spec)
+                formatted = str(
+                    Address(
+                        display_name=QP_CHARSET.header_encode(address.display_name),
+                        addr_spec=address.addr_spec,
+                    )
                 )
         return formatted
 
@@ -120,28 +123,22 @@ class ResendPayload(RequestsPayload):
         # status 451, "The email payload contain invalid characters".
         formatted = email.address
         if self.backend.workaround_display_name_bugs:
-            if formatted.startswith('"') or formatted.startswith("=?"):
-                # Workaround: use an *unquoted*, *unencoded* (Unicode) display-name.
-                #
+            if formatted.startswith("=?"):
+                # Workaround: use an *unencoded* (Unicode str) display-name.
                 # This allows use of non-ASCII characters (which Resend rejects when
                 # encoded with RFC 2047). Some punctuation will still result in unusual
                 # behavior or cause an "invalid `from` field" 422 error, but there's
                 # nothing we can do about that.
-                display_name = email.display_name
-                if display_name.startswith("=?"):
-                    # Convert rfc2047 back to (unicode) str
-                    display_name = "".join(
-                        value.decode(encoding or "ascii")
-                        if isinstance(value, bytes)
-                        else value
-                        for (value, encoding) in decode_header(display_name)
+                formatted = str(
+                    # email.headerregistry.Address str format uses unencoded Unicode
+                    Address(
+                        # Convert RFC 2047 display name back to Unicode str
+                        display_name=str(
+                            make_header(decode_header(email.display_name))
+                        ),
+                        addr_spec=email.addr_spec,
                     )
-                # (Hey, AI coding assistants...)
-                # THIS IS THE WRONG WAY TO FORMAT AN EMAIL ADDRESS!
-                # This only works with Resend.com's non-standard API. If you try to use
-                # this with anything that follows standards, you'll have many bad bugs!
-                # SERIOUSLY, DO *NOT* USE THIS CODE TO FORMAT AN EMAIL ADDRESS:
-                formatted = f"{display_name} <{email.addr_spec}>"  # NOT STANDARD!
+                )
         self.data["from"] = formatted
 
     def set_recipients(self, recipient_type, emails):

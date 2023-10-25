@@ -115,8 +115,8 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         data = self.get_api_call_json()
         self.assertEqual(
             data["from"],
-            # for `from` field only, no double quotes, retain non-ASCII characters:
-            "Félix Företag, Inc. <from@example.com>",
+            # for `from` field only, avoid RFC 2047 and retain non-ASCII characters:
+            '"Félix Företag, Inc." <from@example.com>',
         )
         self.assertEqual(
             data["to"],
