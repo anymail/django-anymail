@@ -53,23 +53,28 @@ class EmailBackend(AnymailRequestsBackend):
 
         parsed_response = self.deserialize_json_response(response, payload, message)
 
-        try:
-            # TODO: Fix this to support errors. Status and ID will not be present if an error is returned
-
-            status_msg = parsed_response["status"]
-            id = parsed_response["id"]
-        except (KeyError, TypeError) as err:
-            raise AnymailRequestsAPIError(
-                "Invalid MailPace API response format",
-                email_message=status_msg,
-                payload=payload,
-                response=response,
-                backend=self,
-            ) from err
+        status_code = str(response.status_code)
+        json_response = response.json()
+        
+        if status_code == "200":
+            try:
+                status_msg = parsed_response["status"]
+                id = parsed_response["id"]
+            except (KeyError, TypeError) as err:
+                raise AnymailRequestsAPIError(
+                    "Invalid MailPace API response format",
+                    email_message=status_msg,
+                    payload=payload,
+                    response=response,
+                    backend=self,
+                ) from err
+        elif status_code.startswith("4"):
+            status_msg = "error"
+            id = None
 
         if status_msg == "queued":
             try:
-                message_id = parsed_response["id"]
+                id = parsed_response["id"]
             except KeyError as err:
                 raise AnymailRequestsAPIError(
                     "Invalid MailPace API success response format",
@@ -82,36 +87,29 @@ class EmailBackend(AnymailRequestsBackend):
             # Add the message_id to all of the recipients
             for recip in payload.to_cc_and_bcc_emails:
                 recipient_status[recip.addr_spec] = AnymailRecipientStatus(
-                    message_id=message_id, status="queued"
+                    message_id=id, status="queued"
                 )
 
-        # TODO: 4xx ERROR HANDLING
-        elif status_msg == "error":  # Invalid email request
-            # Various parse-time validation errors, which may include invalid
-            # recipients. Email not sent. response["To"] is not populated for this
-            # error; must examine response["Message"]:
-            if re.match(
-                r"^(Invalid|Error\s+parsing)\s+'(To|Cc|Bcc)'", status_msg, re.IGNORECASE
-            ):
-                # Recipient-related errors: use AnymailRecipientsRefused logic
-                # - "Invalid 'To' address: '{addr_spec}'."
-                # - "Error parsing 'Cc': Illegal email domain '{domain}'
-                #     in address '{addr_spec}'."
-                # - "Error parsing 'Bcc': Illegal email address '{addr_spec}'.
-                #     It must contain the '@' symbol."
-                invalid_addr_specs = self._addr_specs_from_error_msg(
-                    status_msg, r"address:?\s*'(.*)'"
-                )
-                for invalid_addr_spec in invalid_addr_specs:
-                    recipient_status[invalid_addr_spec] = AnymailRecipientStatus(
-                        message_id=None, status="invalid"
-                    )
+        elif status_msg == "error":
+            if 'errors' in json_response:
+                for field in ['to', 'cc', 'bcc']:
+                    if field in json_response['errors']:
+                        error_messages = json_response['errors'][field]
+                        for email in payload.to_cc_and_bcc_emails:
+                            for error_message in error_messages:
+                                if 'undefined field' in error_message or 'is invalid' in error_message:
+                                    recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='invalid')
+                                elif 'contains a blocked address' in error_message:
+                                    recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='rejected')
+                                elif 'number of email addresses exceeds maximum volume' in error_message:
+                                    recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='failed')
+                        else:
+                            continue  # No errors found in this field; continue with the next field
+                    else:
+                        continue
+
             else:
                 # Non-recipient errors; handle as normal API error response
-                # - "Invalid 'From' address: '{email_address}'."
-                # - "Error parsing 'Reply-To': Illegal email domain '{domain}'
-                #     in address '{addr_spec}'."
-                # - "Invalid metadata content. ..."
                 raise AnymailRequestsAPIError(
                     email_message=message,
                     payload=payload,
@@ -119,7 +117,7 @@ class EmailBackend(AnymailRequestsBackend):
                     backend=self,
                 )
 
-        else:  # Other error
+        else:  # Other error, e.g. 500 error
             raise AnymailRequestsAPIError(
                 email_message=message,
                 payload=payload,

@@ -157,7 +157,7 @@ class MailPaceBackendStandardEmailTests(MailPaceBackendMockAPITestCase):
 @tag("mailpace")
 class MailPaceBackendRecipientsRefusedTests(MailPaceBackendMockAPITestCase):
     """
-    Should raise AnymailRecipientsRefused when *all* recipients are rejected or invalid
+    Should raise AnymailRecipientsRefused when any recipients are rejected or invalid
     """
 
     def test_recipients_invalid(self):
