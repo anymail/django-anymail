@@ -25,6 +25,14 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+*unreleased changes*
+
+Features
+~~~~~~~~
+
+* **MailPace**: Add support for this ESP
+  (`docs <https://anymail.dev/en/stable/esps/mailpace/>`__).
+
 v10.2
 -----
 
