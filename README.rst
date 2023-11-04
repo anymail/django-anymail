@@ -31,6 +31,7 @@ Anymail currently supports these ESPs:
 * **MailerSend**
 * **Mailgun**
 * **Mailjet**
+* **MailPace**
 * **Mandrill** (MailChimp transactional)
 * **Postal** (self-hosted ESP)
 * **Postmark**

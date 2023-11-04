@@ -43,6 +43,7 @@ jobs:
           - { tox: django41-py310-mailersend, python: "3.10" }
           - { tox: django41-py310-mailgun, python: "3.10" }
           - { tox: django41-py310-mailjet, python: "3.10" }
+          - { tox: django41-py310-mailpace, python: "3.10" }
           - { tox: django41-py310-mandrill, python: "3.10" }
           - { tox: django41-py310-postal, python: "3.10" }
           - { tox: django41-py310-postmark, python: "3.10" }
@@ -83,6 +84,8 @@ jobs:
           ANYMAIL_TEST_MAILJET_API_KEY: ${{ secrets.ANYMAIL_TEST_MAILJET_API_KEY }}
           ANYMAIL_TEST_MAILJET_DOMAIN: ${{ secrets.ANYMAIL_TEST_MAILJET_DOMAIN }}
           ANYMAIL_TEST_MAILJET_SECRET_KEY: ${{ secrets.ANYMAIL_TEST_MAILJET_SECRET_KEY }}
+          ANYMAIL_TEST_MAILPACE_DOMAIN: ${{ secrets.ANYMAIL_TEST_MAILPACE_DOMAIN }}
+          ANYMAIL_TEST_MAILPACE_SERVER_TOKEN: ${{ secrets.ANYMAIL_TEST_MAILPACE_SERVER_TOKEN }}
           ANYMAIL_TEST_MANDRILL_API_KEY: ${{ secrets.ANYMAIL_TEST_MANDRILL_API_KEY }}
           ANYMAIL_TEST_MANDRILL_DOMAIN: ${{ secrets.ANYMAIL_TEST_MANDRILL_DOMAIN }}
           ANYMAIL_TEST_POSTMARK_DOMAIN: ${{ secrets.ANYMAIL_TEST_POSTMARK_DOMAIN }}
