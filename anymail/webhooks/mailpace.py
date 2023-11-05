@@ -26,6 +26,7 @@ class MailPaceBaseWebhookView(AnymailBaseWebhookView):
 class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
     """Handler for MailPace delivery webhooks"""
 
+    # Used by base class
     signal = tracking
 
     event_record_types = {
@@ -58,11 +59,33 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
 class MailPaceInboundWebhookView(MailPaceBaseWebhookView):
     """Handler for MailPace inbound webhook"""
 
-    # TODO
-    def esp_to_anymail_event(self, esp_event):
-        headers = esp_event.get("Headers", [])
+    # Used by base class
+    signal = tracking
 
+    def esp_to_anymail_event(self, esp_event):
+        payload = esp_event.get("payload", {})
+        headers = payload.get("headers", [])
+
+        # Extract necessary information from the payload
+        subject = payload.get("subject", "")
+        from_email = payload.get("from", "")
+        to_email = payload.get("to", "")
+        text_body = payload.get("text", "")
+        html_body = payload.get("html", "")
+        message_id = payload.get("message_id", "")
+
+        # Parse date and time
+        created_at = parse_datetime(payload.get("created_at", ""))
+
+        # Construct AnymailInboundEvent
         return AnymailInboundEvent(
             event_type=EventType.INBOUND,
+            timestamp=created_at,
+            message_id=message_id,
+            recipient=to_email,
+            from_email=from_email,
+            subject=subject,
+            text=text_body,
+            html=html_body,
+            headers=headers,
         )
-
