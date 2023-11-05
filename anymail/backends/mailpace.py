@@ -1,11 +1,8 @@
-import re
-
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
 from ..utils import (
     CaseInsensitiveCasePreservingDict,
     get_anymail_setting,
-    parse_address_list,
 )
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 
