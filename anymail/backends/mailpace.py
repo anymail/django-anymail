@@ -56,6 +56,7 @@ class EmailBackend(AnymailRequestsBackend):
         status_code = str(response.status_code)
         json_response = response.json()
         
+        # Set the status_msg and id based on the status_code
         if status_code == "200":
             try:
                 status_msg = parsed_response["status"]
@@ -63,7 +64,7 @@ class EmailBackend(AnymailRequestsBackend):
             except (KeyError, TypeError) as err:
                 raise AnymailRequestsAPIError(
                     "Invalid MailPace API response format",
-                    email_message=status_msg,
+                    email_message=None,
                     payload=payload,
                     response=response,
                     backend=self,
@@ -73,23 +74,11 @@ class EmailBackend(AnymailRequestsBackend):
             id = None
 
         if status_msg == "queued":
-            try:
-                id = parsed_response["id"]
-            except KeyError as err:
-                raise AnymailRequestsAPIError(
-                    "Invalid MailPace API success response format",
-                    email_message=message,
-                    payload=payload,
-                    response=response,
-                    backend=self,
-                ) from err
-
             # Add the message_id to all of the recipients
             for recip in payload.to_cc_and_bcc_emails:
                 recipient_status[recip.addr_spec] = AnymailRecipientStatus(
                     message_id=id, status="queued"
                 )
-
         elif status_msg == "error":
             if 'errors' in json_response:
                 for field in ['to', 'cc', 'bcc']:
@@ -102,28 +91,16 @@ class EmailBackend(AnymailRequestsBackend):
                                 elif 'contains a blocked address' in error_message:
                                     recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='rejected')
                                 elif 'number of email addresses exceeds maximum volume' in error_message:
-                                    recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='failed')
+                                    recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='invalid')
                         else:
                             continue  # No errors found in this field; continue with the next field
-                    else:
-                        continue
-
             else:
-                # Non-recipient errors; handle as normal API error response
                 raise AnymailRequestsAPIError(
                     email_message=message,
                     payload=payload,
                     response=response,
                     backend=self,
                 )
-
-        else:  # Other error, e.g. 500 error
-            raise AnymailRequestsAPIError(
-                email_message=message,
-                payload=payload,
-                response=response,
-                backend=self,
-            )
 
         return dict(recipient_status)
 
@@ -147,11 +124,6 @@ class MailPacePayload(RequestsPayload):
 
     def serialize_data(self):
         return self.serialize_json(self.data)
-
-    def data_for_recipient(self, to):
-        data = self.data.copy()
-        data["to"] = to.address
-        return data
 
     #
     # Payload construction
@@ -202,5 +174,8 @@ class MailPacePayload(RequestsPayload):
             ]
 
     def set_tags(self, tags):
-        if len(tags) > 0:
-            self.data["tags"] = tags if len(tags) > 1 else tags[0]
+        if tags:
+            if len(tags) == 1:
+                self.data["tags"] = tags[0]
+            else:
+                self.data["tags"] = tags
