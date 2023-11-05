@@ -1,8 +1,4 @@
-import json
 from base64 import b64encode
-from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
@@ -10,13 +6,10 @@ from django.test import SimpleTestCase, override_settings, tag
 
 from anymail.exceptions import (
     AnymailAPIError,
-    AnymailInvalidAddress,
     AnymailRecipientsRefused,
     AnymailRequestsAPIError,
-    AnymailSerializationError,
-    AnymailUnsupportedFeature,
 )
-from anymail.message import AnymailMessage, attach_inline_image_file
+from anymail.message import attach_inline_image_file
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
