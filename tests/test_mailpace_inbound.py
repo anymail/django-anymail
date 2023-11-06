@@ -19,138 +19,178 @@ from .webhook_cases import WebhookTestCase
 @tag("mailpace")
 class MailPaceInboundTestCase(WebhookTestCase):
     def test_inbound_basics(self):
-        # Create a MailPace webhook payload with minimal information for testing
+        # Only raw is used by Anymail
         mailpace_payload = {
-            "event": "inbound",
-            "payload": {
-                "id": "unique-event-id",
-                "created_at": "2023-11-05T12:34:56Z",
-                "from": "sender@example.com",
-                "to": "recipient@example.com",
-                "subject": "Test Subject",
-                "text": "Test message body",
-            }
+            "from": "Person A <person_a@test.com>",
+            "headers": [
+                "Received: from localhost...",
+                "DKIM-Signature: v=1 a=rsa...;"
+            ],
+            "messageId": "<3baf4caf-948a-41e6-bc5c-2e99058e6461@mailer.mailpace.com>",
+            "raw": dedent(
+                """\
+                From: A tester <test@example.org>
+                Date: Thu, 12 Oct 2017 18:03:30 -0700
+                Message-ID: <CAEPk3RKEx@mail.example.org>
+                Subject: Raw MIME test
+                To: test@inbound.example.com
+                MIME-Version: 1.0
+                Content-Type: multipart/alternative; boundary="boundary1"
+
+                --boundary1
+                Content-Type: text/plain; charset="UTF-8"
+                Content-Transfer-Encoding: quoted-printable
+
+                It's a body=E2=80=A6
+
+                --boundary1
+                Content-Type: text/html; charset="UTF-8"
+                Content-Transfer-Encoding: quoted-printable
+
+                <div dir=3D"ltr">It's a body=E2=80=A6</div
+
+                --boundary1--
+                """  # NOQA: E501
+            ),
+            "to": "Person B <person_b@test.com>",
+            "subject": "Email Subject",
+            "cc": "Person C <person_c@test.com>",
+            "bcc": "Person D <person_d@test.com>",
+            "inReplyTo": "<3baf4caf-948a-41e6-bc5c-2e99058e6461@mailer.mailpace.com>",
+            "replyTo": "bounces+abcd@test.com",
+            "html": "<h1>Email Contents Here</h1>",
+            "text": "Text Email Contents",
+            "attachments": [
+                {
+                    "filename": "example.pdf",
+                    "content_type": "application/pdf",
+                    "content": "base64_encoded_content_of_the_attachment",
+                },
+            ]
         }
-
-        # Serialize the payload to JSON
-        mailpace_payload_json = json.dumps(mailpace_payload)
-
-        # Simulate a POST request to the MailPace webhook view
-        response = self.client.post(
-            "/anymail/mailpace/inbound/",
-            content_type="application/json",
-            data=mailpace_payload_json,
-        )
-
-        # Check the response status code (assuming 200 OK is expected)
-        self.assertEqual(response.status_code, 200)
-
-        # Check if the AnymailInboundEvent signal was dispatched
-        # self.assertSignalSent(
-        #     AnymailInboundEvent,
-        #     event_type=ANY,
-        #     timestamp=timezone.now(),
-        #     event_id='unique-event-id',
-        #     message_id=ANY,
-        #     recipient='recipient@example.com',
-        #     from_email='sender@example.com',
-        #     subject='Test Subject',
-        #     text='Test message body',
-        #     html=None,  # Adjust this if HTML content is expected
-        #     headers=ANY,  # Define the expected headers
-        # )
-
-    def test_attachments(self):
-        # Create a MailPace webhook payload with attachments for testing
-        mailpace_payload = {
-            "event": "inbound",
-            "payload": {
-                "id": "unique-event-id",
-                "created_at": "2023-11-05T12:34:56Z",
-                "from": "sender@example.com",
-                "to": "recipient@example.com",
-                "subject": "Test Subject",
-                "text": "Test message body",
-                "attachments": [
-                    {
-                        "filename": "test.txt",
-                        "content": "abc",
-                        "content_type": "text/plain",
-                    },
-                ],
-            }
-        }
-
-        # Serialize the payload to JSON
-        mailpace_payload_json = json.dumps(mailpace_payload)
-
-        # Simulate a POST request to the MailPace webhook view
-        response = self.client.post(
-            "/anymail/mailpace/inbound/",
-            content_type="application/json",
-            data=mailpace_payload_json,
-        )
-
-        # Check the response status code (assuming 200 OK is expected)
-        self.assertEqual(response.status_code, 200)
-
-        # Check if the AnymailInboundEvent signal was dispatched with attachments
-        # self.assertSignalSent(
-        #     AnymailInboundEvent,
-        #     event_type=ANY,
-        #     timestamp=timezone.now(),
-        #     event_id='unique-event-id',
-        #     message_id=ANY,
-        #     recipient='recipient@example.com',
-        #     from_email='sender@example.com',
-        #     subject='Test Subject',
-        #     text='Test message body',
-        #     attachments=[
-        #         AnymailInboundMessage.Attachment(
-        #             content_type='text/plain',
-        #             content=test_file_content(),
-        #             filename='test.txt',
-        #         ),
-        #     ],
-        #     headers=ANY,  # Define the expected headers
-        # )
-
-    def test_inbound_with_raw_email(self):
-        # Create a MailPace webhook payload with a raw email for testing
-        mailpace_payload = {
-            "event": "inbound",
-            "payload": {
-                "id": "unique-event-id",
-                "created_at": "2023-11-05T12:34:56Z",
-                "from": "sender@example.com",
-                "to": "recipient@example.com",
-                "raw_email": b64encode(sample_email_content()).decode('utf-8'),
-            }
-        }
-
-        # Serialize the payload to JSON
-        mailpace_payload_json = json.dumps(mailpace_payload)
 
         response = self.client.post(
             "/anymail/mailpace/inbound/",
             content_type="application/json",
-            data=mailpace_payload_json,
+            data=json.dumps(mailpace_payload),
         )
 
-        # Check the response status code (assuming 200 OK is expected)
         self.assertEqual(response.status_code, 200)
 
-        # Check if the AnymailInboundEvent signal was dispatched with raw_email
-        # self.assertSignalSent(
-        #     AnymailInboundEvent,
-        #     event_type=ANY,
-        #     timestamp=timezone.now(),
-        #     event_id='unique-event-id',
-        #     message_id=ANY,
-        #     recipient='recipient@example.com',
-        #     from_email='sender@example.com',
-        #     subject=None,  # Adjust this if the subject is expected
-        #     text=None,  # Adjust this if text content is expected
-        #     raw_email=sample_email_content(),
-        #     headers=ANY,  # Define the expected headers
-        # )
+        kwargs = self.assert_handler_called_once_with(
+            self.inbound_handler,
+            sender=MailPaceInboundWebhookView,
+            event=ANY,
+            esp_name="MailPace",
+        )
+
+        event = kwargs["event"]
+
+        self.assertIsInstance(event, AnymailInboundEvent)
+        self.assertEqual(event.event_type, "inbound")
+
+        message = event.message
+
+        self.assertEqual(message.to[0].address, "test@inbound.example.com")
+        self.assertEqual(message["from"], "A tester <test@example.org>")
+        self.assertEqual(message.subject, "Raw MIME test")
+
+        self.assertEqual(len(message._headers), 7)
+
+
+    def test_inbound_attachments(self):
+        image_content = sample_image_content()
+        email_content = sample_email_content()
+        raw_mime = dedent(
+            """\
+            MIME-Version: 1.0
+            From: from@example.org
+            Subject: Attachments
+            To: test@inbound.example.com
+            Content-Type: multipart/mixed; boundary="boundary0"
+
+            --boundary0
+            Content-Type: multipart/related; boundary="boundary1"
+
+            --boundary1
+            Content-Type: text/html; charset="UTF-8"
+
+            <div>This is the HTML body. It has an inline image: <img src="cid:abc123">.</div>
+
+            --boundary1
+            Content-Type: image/png
+            Content-Disposition: inline; filename="image.png"
+            Content-ID: <abc123>
+            Content-Transfer-Encoding: base64
+
+            {image_content_base64}
+            --boundary1--
+            --boundary0
+            Content-Type: text/plain; charset="UTF-8"
+            Content-Disposition: attachment; filename="test.txt"
+
+            test attachment
+            --boundary0
+            Content-Type: message/rfc822; charset="US-ASCII"
+            Content-Disposition: attachment
+            X-Comment: (the only valid transfer encodings for message/* are 7bit, 8bit, and binary)
+
+            {email_content}
+            --boundary0--
+            """  # NOQA: E501
+        ).format(
+            image_content_base64=b64encode(image_content).decode("ascii"),
+            email_content=email_content.decode("ascii"),
+        )
+
+        # Only raw is used by Anymail
+        mailpace_payload = {
+            "from": "Person A <person_a@test.com>",
+            "headers": [
+                "Received: from localhost...",
+                "DKIM-Signature: v=1 a=rsa...;"
+            ],
+            "messageId": "<3baf4caf-948a-41e6-bc5c-2e99058e6461@mailer.mailpace.com>",
+            "raw": raw_mime,
+            "to": "Person B <person_b@test.com>",
+            "subject": "Email Subject",
+            "cc": "Person C <person_c@test.com>",
+            "bcc": "Person D <person_d@test.com>",
+            "inReplyTo": "<3baf4caf-948a-41e6-bc5c-2e99058e6461@mailer.mailpace.com>",
+            "replyTo": "bounces+abcd@test.com",
+            "html": "<h1>Email Contents Here</h1>",
+            "text": "Text Email Contents",
+            "attachments": [
+                {
+                    "filename": "example.pdf",
+                    "content_type": "application/pdf",
+                    "content": "base64_encoded_content_of_the_attachment",
+                },
+            ]
+        }
+
+        response = self.client.post(
+            "/anymail/mailpace/inbound/",
+            content_type="application/json",
+            data=json.dumps(mailpace_payload),
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        kwargs = self.assert_handler_called_once_with(
+            self.inbound_handler,
+            sender=MailPaceInboundWebhookView,
+            event=ANY,
+            esp_name="MailPace",
+        )
+
+        event = kwargs["event"]
+
+        self.assertIsInstance(event, AnymailInboundEvent)
+
+        message = event.message
+
+        self.assertEqual(message.to[0].address, "test@inbound.example.com")
+
+        self.assertEqual(len(message._headers), 5)
+        self.assertEqual(len(message.attachments), 2)

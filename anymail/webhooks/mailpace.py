@@ -2,6 +2,7 @@ import json
 from email.utils import unquote
 
 from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 
 from ..signals import (
     AnymailInboundEvent,
@@ -11,6 +12,8 @@ from ..signals import (
     inbound,
     tracking,
 )
+from ..inbound import AnymailInboundMessage
+
 from .base import AnymailBaseWebhookView
 
 
@@ -22,6 +25,9 @@ class MailPaceBaseWebhookView(AnymailBaseWebhookView):
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
         return [self.esp_to_anymail_event(esp_event)]
+    
+    # TODO:
+    # def validate_request(self, request):
 
 class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
     """Handler for MailPace delivery webhooks"""
@@ -59,33 +65,17 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
 class MailPaceInboundWebhookView(MailPaceBaseWebhookView):
     """Handler for MailPace inbound webhook"""
 
-    # Used by base class
-    signal = tracking
+    signal = inbound
 
     def esp_to_anymail_event(self, esp_event):
-        payload = esp_event.get("payload", {})
-        headers = payload.get("headers", [])
+        # Use Raw MIME based on guidance here:
+        # https://github.com/anymail/django-anymail/blob/main/ADDING_ESPS.md
+        message = AnymailInboundMessage.parse_raw_mime(esp_event.get("raw", None))
 
-        # Extract necessary information from the payload
-        subject = payload.get("subject", "")
-        from_email = payload.get("from", "")
-        to_email = payload.get("to", "")
-        text_body = payload.get("text", "")
-        html_body = payload.get("html", "")
-        message_id = payload.get("message_id", "")
-
-        # Parse date and time
-        created_at = parse_datetime(payload.get("created_at", ""))
-
-        # Construct AnymailInboundEvent
         return AnymailInboundEvent(
             event_type=EventType.INBOUND,
-            timestamp=created_at,
-            message_id=message_id,
-            recipient=to_email,
-            from_email=from_email,
-            subject=subject,
-            text=text_body,
-            html=html_body,
-            headers=headers,
+            timestamp=timezone.now(),
+            event_id=esp_event.get("id", None),
+            esp_event=esp_event,
+            message=message
         )
