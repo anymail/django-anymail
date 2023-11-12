@@ -1,8 +1,13 @@
+import binascii
 import json
-from email.utils import unquote
+import base64
+from anymail.exceptions import AnymailWebhookValidationFailure
+from anymail.utils import get_anymail_setting
 
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
+from nacl.signing import VerifyKey
+from nacl.exceptions import CryptoError, ValueError
 
 from ..signals import (
     AnymailInboundEvent,
@@ -25,12 +30,19 @@ class MailPaceBaseWebhookView(AnymailBaseWebhookView):
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
         return [self.esp_to_anymail_event(esp_event)]
-    
-    # TODO:
-    # def validate_request(self, request):
 
 class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
     """Handler for MailPace delivery webhooks"""
+
+    webhook_key = None
+
+    #TODO: make this optional
+    def __init__(self, **kwargs):
+        self.webhook_key = get_anymail_setting(
+            "webhook_key", esp_name=self.esp_name, kwargs=kwargs, allow_bare=True
+        )
+
+        super().__init__(**kwargs)
 
     # Used by base class
     signal = tracking
@@ -43,6 +55,30 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
         "email.bounced": EventType.BOUNCED,
         "email.spam": EventType.REJECTED
     }
+
+    # MailPace doesn't send a signature for inbound webhooks, yet
+    # When/if MailPace does this, move this to the parent class    
+    def validate_request(self, request):
+        try:
+            signature_base64 = request.headers["X-MailPace-Signature"]
+            signature = base64.b64decode(signature_base64)
+        except (KeyError, binascii.Error):
+            raise AnymailWebhookValidationFailure(
+                "MailPace webhook called with invalid or missing signature"
+            )
+        
+        verify_key_base64 = self.webhook_key
+
+        verify_key = VerifyKey(base64.b64decode(verify_key_base64))
+
+        message = request.body
+
+        try:
+            verify_key.verify(message, signature)
+        except (CryptoError, ValueError):
+            raise AnymailWebhookValidationFailure(
+                "MailPace webhook called with incorrect signature"
+            )
 
     def esp_to_anymail_event(self, esp_event):
         event_type = self.event_record_types.get(esp_event["event"], EventType.UNKNOWN)
