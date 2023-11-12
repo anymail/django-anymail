@@ -1,4 +1,6 @@
 import json
+import unittest
+from base64 import b64encode
 from unittest.mock import ANY
 
 from django.test import tag
@@ -6,29 +8,58 @@ from django.test import tag
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.mailpace import MailPaceTrackingWebhookView
 
+from .utils_mailpace import ClientWithMailPaceSignature, make_key
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 
 
 @tag("mailpace")
-class MailPaceWebhookSecurityTestCase(WebhookBasicAuthTestCase):
-    def call_webhook(self):
-        return self.client.post(
+@unittest.skipUnless(
+    ClientWithMailPaceSignature, "Install 'pynacl' to run mailpace webhook tests"
+)
+class MailPaceWebhookSecurityTestCase(WebhookTestCase):
+    client_class = ClientWithMailPaceSignature
+
+    def setUp(self):
+        super().setUp()
+        self.clear_basic_auth()
+
+        self.client.set_private_key(make_key())
+
+    def test_failed_signature_check(self):
+        response = self.client.post(
             "/anymail/mailpace/tracking/",
             content_type="application/json",
-            data=json.dumps({ "event": "email.queued", "payload": {
-                "created_at": "2021-11-16T14:50:15.445Z",
-                "id": "1",
-                "message_id": "string",
-                "to": "example@test.com",
-            }})
+            data=json.dumps({"some": "data"}),
+            headers={"X-MailPace-Signature": b64encode("invalid".encode("utf-8"))},
         )
+        self.assertEqual(response.status_code, 400)
 
-    # Actual tests are in WebhookBasicAuthTestCase
-    # TODO: add tests for MailPace webhook signing
+        response = self.client.post(
+            "/anymail/mailpace/tracking/",
+            content_type="application/json",
+            data=json.dumps({"some": "data"}),
+            headers={"X-MailPace-Signature": "garbage"},
+        )
+        self.assertEqual(response.status_code, 400)
 
+        response = self.client.post(
+            "/anymail/mailpace/tracking/",
+            content_type="application/json",
+            data=json.dumps({"some": "data"}),
+            headers={"X-MailPace-Signature": ""},
+        )
+        self.assertEqual(response.status_code, 400)
 
 @tag("mailpace")
 class MailPaceDeliveryTestCase(WebhookTestCase):
+    client_class = ClientWithMailPaceSignature
+
+    def setUp(self):
+        super().setUp()
+        self.clear_basic_auth()
+
+        self.client.set_private_key(make_key())
+
     def test_queued_event(self):
         raw_event = {
             "event": "email.queued",

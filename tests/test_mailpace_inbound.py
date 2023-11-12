@@ -11,7 +11,7 @@ from anymail.signals import AnymailInboundEvent
 from anymail.webhooks.mailpace import MailPaceInboundWebhookView
 
 from .utils import sample_email_content, sample_image_content, test_file_content
-from .webhook_cases import WebhookTestCase
+from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 
 from .utils import sample_email_content, sample_image_content, test_file_content
 from .webhook_cases import WebhookTestCase
@@ -194,3 +194,5 @@ class MailPaceInboundTestCase(WebhookTestCase):
 
         self.assertEqual(len(message._headers), 5)
         self.assertEqual(len(message.attachments), 2)
+        attachment = message.attachments[0]
+        self.assertEqual(attachment.get_filename(), "test.txt")
