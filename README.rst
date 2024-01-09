@@ -37,6 +37,7 @@ Anymail currently supports these ESPs:
 * **Resend**
 * **SendGrid**
 * **SparkPost**
+* **Unisender Go**
 
 Anymail includes:
 
