@@ -25,6 +25,16 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*unreleased changes*
+
+Features
+~~~~~~~~
+* **Unisender GO**: Add support for this ESP
+  (`docs <https://godocs.unisender.ru/>`__).
+
 v10.2
 -----
 
