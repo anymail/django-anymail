@@ -1,7 +1,7 @@
 .. _sparkpost-backend:
 
 Unisender Go
-=========
+=============
 
 Anymail integrates with the `Unisender Go`_ email service, using their API.
 
@@ -93,6 +93,7 @@ Status tracking webhooks
 ------------------------
 
 * Target URL: :samp:`https://{yoursite.example.com}/anymail/unisender_go/tracking/`
+
 Unisender Go provides two event types. They differ with event_name and event_data.
 
 `transactional_email_status` - event of email delivery status change.
@@ -109,54 +110,54 @@ You also may want to know, what exactly lays in webhook api callback.
 
   .. code-block:: python
 
-  {
-    "auth":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "events_by_user":
-      [
-        {
-          "user_id":456,
-          "project_id":"6432890213745872",
-          "project_name":"MyProject",
-          "events":
+      {
+        "auth":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "events_by_user":
           [
             {
-              "event_name":"transactional_email_status",
-              "event_data":
-              {
-                "job_id":"1a3Q2V-0000OZ-S0",
-                "metadata":
+              "user_id":456,
+              "project_id":"6432890213745872",
+              "project_name":"MyProject",
+              "events":
+              [
                 {
-                  "key1":"val1",
-                  "key2":"val2"
+                  "event_name":"transactional_email_status",
+                  "event_data":
+                  {
+                    "job_id":"1a3Q2V-0000OZ-S0",
+                    "metadata":
+                    {
+                      "key1":"val1",
+                      "key2":"val2"
+                    },
+                    "email":"recipient.email@example.com",
+                    "status":"sent",
+                    "event_time":"2015-11-30 15:09:42",
+                    "url":"http://some.url.com",
+                    "delivery_info":
+                    {
+                      "delivery_status": "err_delivery_failed",
+                      "destination_response": "550 Spam rejected",
+                      "user_agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36",
+                      "ip":"111.111.111.111"
+                    }
+                  }
                 },
-                "email":"recipient.email@example.com",
-                "status":"sent",
-                "event_time":"2015-11-30 15:09:42",
-                "url":"http://some.url.com",
-                "delivery_info":
                 {
-                  "delivery_status": "err_delivery_failed",
-                  "destination_response": "550 Spam rejected",
-                  "user_agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36",
-                  "ip":"111.111.111.111"
+                  "event_name":"transactional_spam_block",
+                  "event_data":
+                  {
+                    "block_time":"YYYY-MM-DD HH:MM:SS",
+                    "block_type":"one_smtp",
+                    "domain":"domain_name",
+                    "SMTP_blocks_count":8,
+                    "domain_status":"blocked"
+                  }
                 }
-              }
-            },
-            {
-              "event_name":"transactional_spam_block",
-              "event_data":
-              {
-                "block_time":"YYYY-MM-DD HH:MM:SS",
-                "block_type":"one_smtp",
-                "domain":"domain_name",
-                "SMTP_blocks_count":8,
-                "domain_status":"blocked"
-              }
+              ]
             }
           ]
-        }
-      ]
-  }
+      }
 
 .. _unisender-inbound:
 
