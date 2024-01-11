@@ -19,11 +19,10 @@ SUBSTITUTION_TWO = {"arg2": "arg2"}
 
 
 class TestUnisenderGoPayload(SimpleTestCase):
-    @classmethod
-    def _add_databases_failures(cls):
-        ...
-
-    @override_settings(ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=False)
+    @override_settings(
+        ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=False,
+        ANYMAIL_UNISENDERGO_API_KEY=None,
+    )
     def test_unisender_go_payload__full(self):
         substitutions = {TO_EMAIL: SUBSTITUTION_ONE, OTHER_TO_EMAIL: SUBSTITUTION_TWO}
         email = AnymailMessageMixin(
@@ -58,7 +57,10 @@ class TestUnisenderGoPayload(SimpleTestCase):
 
         self.assertEqual(payload.data, expected_payload)
 
-    @override_settings(ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=False)
+    @override_settings(
+        ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=False,
+        ANYMAIL_UNISENDERGO_API_KEY=None,
+    )
     def test_unisender_go_payload__parse_from__with_name(self):
         email = AnymailMessageMixin(
             subject=SUBJECT,
@@ -80,7 +82,10 @@ class TestUnisenderGoPayload(SimpleTestCase):
 
         self.assertEqual(payload.data, expected_payload)
 
-    @override_settings(ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=False)
+    @override_settings(
+        ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=False,
+        ANYMAIL_UNISENDERGO_API_KEY=None,
+    )
     def test_unisender_go_payload__parse_from__without_name(self):
         email = AnymailMessageMixin(
             subject=SUBJECT,
@@ -102,7 +107,10 @@ class TestUnisenderGoPayload(SimpleTestCase):
 
         self.assertEqual(payload.data, expected_payload)
 
-    @override_settings(ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=True)
+    @override_settings(
+        ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=True,
+        ANYMAIL_UNISENDERGO_API_KEY=None,
+    )
     def test_unisender_go_payload__parse_from__with_unsub(self):
         email = AnymailMessageMixin(
             subject=SUBJECT,
