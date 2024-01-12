@@ -1,4 +1,4 @@
-.. _sparkpost-backend:
+.. _unisender-backend:
 
 Unisender Go
 =============

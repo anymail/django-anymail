@@ -80,7 +80,7 @@ meaningless. (And even specific features don't matter if you don't plan to use t
 .. |Postmark| replace:: :ref:`postmark-backend`
 .. |Resend| replace:: :ref:`resend-backend`
 .. |SendGrid| replace:: :ref:`sendgrid-backend`
-.. |Unisender Go|| replace:: :ref:`unisender-backend`
+.. |Unisender Go| replace:: :ref:`unisender-backend`
 .. |SparkPost| replace:: :ref:`sparkpost-backend`
 .. |AnymailTrackingEvent| replace:: :class:`~anymail.signals.AnymailTrackingEvent`
 .. |AnymailInboundEvent| replace:: :class:`~anymail.signals.AnymailInboundEvent`

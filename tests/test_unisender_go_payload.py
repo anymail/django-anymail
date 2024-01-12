@@ -22,6 +22,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
     @override_settings(
         ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=False,
         ANYMAIL_UNISENDERGO_API_KEY=None,
+        ANYMAIL_UNISENDERGO_API_URL="",
     )
     def test_unisender_go_payload__full(self):
         substitutions = {TO_EMAIL: SUBSTITUTION_ONE, OTHER_TO_EMAIL: SUBSTITUTION_TWO}
@@ -60,6 +61,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
     @override_settings(
         ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=False,
         ANYMAIL_UNISENDERGO_API_KEY=None,
+        ANYMAIL_UNISENDERGO_API_URL="",
     )
     def test_unisender_go_payload__parse_from__with_name(self):
         email = AnymailMessageMixin(
@@ -85,6 +87,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
     @override_settings(
         ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=False,
         ANYMAIL_UNISENDERGO_API_KEY=None,
+        ANYMAIL_UNISENDERGO_API_URL="",
     )
     def test_unisender_go_payload__parse_from__without_name(self):
         email = AnymailMessageMixin(
@@ -110,6 +113,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
     @override_settings(
         ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE=True,
         ANYMAIL_UNISENDERGO_API_KEY=None,
+        ANYMAIL_UNISENDERGO_API_URL="",
     )
     def test_unisender_go_payload__parse_from__with_unsub(self):
         email = AnymailMessageMixin(
