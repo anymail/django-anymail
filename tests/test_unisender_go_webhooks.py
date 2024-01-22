@@ -5,7 +5,7 @@ import hashlib
 import uuid
 from datetime import timezone
 
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, override_settings, tag
 
 from anymail.exceptions import AnymailWebhookValidationFailure
 from anymail.signals import EventType, RejectReason
@@ -90,6 +90,7 @@ def _request_json_to_dict_with_hashed_key(request_json: bytes) -> dict[str, str]
     return {"auth": new_auth, "key": "value"}
 
 
+@tag("unisender_go")
 class TestUnisenderGoWebhooks(SimpleTestCase):
     def test_sent_event(self):
         request = RequestFactory().post(
@@ -125,7 +126,7 @@ class TestUnisenderGoWebhooks(SimpleTestCase):
 
         self.assertEqual(len(events), 1)
 
-    @override_settings(ANYMAIL_UNISENDERGO_API_KEY=TEST_API_KEY)
+    @override_settings(ANYMAIL_UNISENDER_GO_API_KEY=TEST_API_KEY)
     def test_check_authorization(self):
         """Asserts that nothing is failing"""
         request_data = _request_json_to_dict_with_hashed_key(
@@ -138,7 +139,7 @@ class TestUnisenderGoWebhooks(SimpleTestCase):
 
         view.validate_request(request)
 
-    @override_settings(ANYMAIL_UNISENDERGO_API_KEY=TEST_API_KEY)
+    @override_settings(ANYMAIL_UNISENDER_GO_API_KEY=TEST_API_KEY)
     def test_check_authorization__fail__ordinar_quoters(self):
         request_json = b"{'auth':'api_key','key':'value'}"
         request_data = _request_json_to_dict_with_hashed_key(request_json)
@@ -150,7 +151,7 @@ class TestUnisenderGoWebhooks(SimpleTestCase):
         with self.assertRaises(AnymailWebhookValidationFailure):
             view.validate_request(request)
 
-    @override_settings(ANYMAIL_UNISENDERGO_API_KEY=TEST_API_KEY)
+    @override_settings(ANYMAIL_UNISENDER_GO_API_KEY=TEST_API_KEY)
     def test_check_authorization__fail__spaces_after_semicolon(self):
         request_json = b'{"auth": "api_key","key": "value"}'
         request_data = _request_json_to_dict_with_hashed_key(request_json)
@@ -162,7 +163,7 @@ class TestUnisenderGoWebhooks(SimpleTestCase):
         with self.assertRaises(AnymailWebhookValidationFailure):
             view.validate_request(request)
 
-    @override_settings(ANYMAIL_UNISENDERGO_API_KEY=TEST_API_KEY)
+    @override_settings(ANYMAIL_UNISENDER_GO_API_KEY=TEST_API_KEY)
     def test_check_authorization__fail__spaces_after_comma(self):
         request_json = b'{"auth":"api_key", "key":"value"}'
         request_data = _request_json_to_dict_with_hashed_key(request_json)

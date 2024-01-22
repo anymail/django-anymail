@@ -69,8 +69,9 @@ Callback API example:
 class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
     """Handler for UniSender delivery and engagement tracking webhooks"""
 
-    esp_name = "UnisenderGo"
+    esp_name = "Unisender Go"
     signal = tracking
+    warn_if_no_basic_auth = False  # because we validate against signature
 
     event_types = {
         "sent": EventType.SENT,
@@ -120,7 +121,7 @@ class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
         """
         request_json = json.loads(request.body.decode("utf-8"))
         request_auth = request_json.get("auth", "")
-        request_json["auth"] = settings.ANYMAIL_UNISENDERGO_API_KEY
+        request_json["auth"] = settings.ANYMAIL_UNISENDER_GO_API_KEY
         json_with_key = json.dumps(request_json, separators=(",", ":"))
 
         expected_auth = md5(json_with_key.encode("utf-8")).hexdigest()
@@ -166,7 +167,7 @@ class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
             mta_response=delivery_info.get("destination_response", ""),
             tags=None,
             metadata=metadata,
-            click_url=None,
-            user_agent=delivery_info.get("use_ragent", ""),
+            click_url=event_data.get("url"),
+            user_agent=delivery_info.get("user_agent", ""),
             esp_event=event_data,
         )
