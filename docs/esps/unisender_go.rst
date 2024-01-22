@@ -18,9 +18,9 @@ To use Anymail's Unisender Go backend, set:
 
 in your settings.py.
 
-.. rubric:: UNISENDERGO_API_KEY
+.. rubric:: UNISENDER_GO_API_KEY
 
-.. setting:: ANYMAIL_UNISENDERGO_API_KEY
+.. setting:: ANYMAIL_UNISENDER_GO_API_KEY
 
 Unisender Go API key
 
@@ -28,16 +28,16 @@ Unisender Go API key
 
       ANYMAIL = {
           ...
-          "UNISENDERG_API_KEY": "<your API key>",
+          "UNISENDER_GO_API_KEY": "<your API key>",
       }
 
-Anymail will also look for ``UNISENDERG_API_KEY`` at the
-root of the settings file if neither ``ANYMAIL["UNISENDERG_API_KEY"]``
-nor ``ANYMAIL_UNISENDERG_API_KEY`` is set.
+Anymail will also look for ``UNISENDER_GO_API_KEY`` at the
+root of the settings file if neither ``ANYMAIL["UNISENDER_GO_API_KEY"]``
+nor ``ANYMAIL_UNISENDER_GO_API_KEY`` is set.
 
-.. setting:: ANYMAIL_UNISENDERGO_API_URL
+.. setting:: ANYMAIL_UNISENDER_GO_API_URL
 
-.. rubric:: UNISENDERGO_API_URL
+.. rubric:: UNISENDER_GO_API_URL
 
 `Unisender GO API endpoint`_ to use. It can depend on server location.
 
@@ -45,7 +45,7 @@ nor ``ANYMAIL_UNISENDERG_API_KEY`` is set.
 
       ANYMAIL = {
           ...
-          "UNISENDERGO_API_URL": "https://go1.unisender.ru/ru/transactional/api/v1/",  # use Unisender Go RU
+          "UNISENDER_GO_API_URL": "https://go1.unisender.ru/ru/transactional/api/v1/",  # use Unisender Go RU
       }
 
 You must specify the full, versioned API endpoint as shown above (not just the base_uri).
@@ -65,16 +65,26 @@ Limitations and quirks
   By default, Unisender Go add in the end of email link to unsubscribe.
   If you want to avoid it, you have to ask tech support to enable this option for you.
   Then you should set it in settings, like this.
+  For flexibility, you can set it in "esp_extra" arg in backend.
 
   .. code-block:: python
 
-    ANYMAIL_UNISENDERGO_SKIP_UNSUBSCRIBE = True
+    ANYMAIL_UNISENDER_GO_SKIP_UNSUBSCRIBE = True
+
+**global_language option**
+  Language for link language and unsubscribe page.
+  Options: 'be', 'de', 'en', 'es', 'fr', 'it', 'pl', 'pt', 'ru', 'ua', 'kz'.
+
+  .. code-block:: python
+
+    ANYMAIL_UNISENDER_GO_GLOBAL_LANGUAGE = 'en'
 
 .. _unisender-templates:
 
 ESP templates
 -------------------------------------
 In Unisender Go you can send email with templates. You just create it and set as `template_id='...'`.
+Also you can choose simple template with just `{{ x }}` substitutions or velocity templates with loops, arrays, etc.
 You will have to put merge data to put it in template gaps. For example:
 
   .. code-block:: python

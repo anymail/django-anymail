@@ -33,7 +33,7 @@ vNext
 Features
 ~~~~~~~~
 * **Unisender GO**: Add support for this ESP
-  (`docs <https://godocs.unisender.ru/>`__).
+  (`docs <https://anymail.dev/en/latest/esps/unisender_go/>`__).
 
 v10.2
 -----
