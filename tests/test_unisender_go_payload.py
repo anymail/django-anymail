@@ -21,7 +21,6 @@ SUBSTITUTION_TWO = {"arg2": "arg2"}
 @tag("unisender_go")
 @override_settings(ANYMAIL_UNISENDER_GO_API_KEY=None, ANYMAIL_UNISENDER_GO_API_URL="")
 class TestUnisenderGoPayload(SimpleTestCase):
-    @override_settings(ANYMAIL_UNISENDER_GO_SKIP_UNSUBSCRIBE=False)
     def test_unisender_go_payload__full(self):
         substitutions = {TO_EMAIL: SUBSTITUTION_ONE, OTHER_TO_EMAIL: SUBSTITUTION_TWO}
         email = AnymailMessageMixin(
@@ -34,7 +33,9 @@ class TestUnisenderGoPayload(SimpleTestCase):
         )
         backend = EmailBackend()
 
-        payload = UnisenderGoPayload(message=email, backend=backend, defaults={})
+        payload = UnisenderGoPayload(
+            message=email, backend=backend, defaults=backend.send_defaults
+        )
         expected_payload = {
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
@@ -56,7 +57,6 @@ class TestUnisenderGoPayload(SimpleTestCase):
 
         self.assertEqual(payload.data, expected_payload)
 
-    @override_settings(ANYMAIL_UNISENDER_GO_SKIP_UNSUBSCRIBE=False)
     def test_unisender_go_payload__parse_from__with_name(self):
         email = AnymailMessageMixin(
             subject=SUBJECT,
@@ -66,7 +66,9 @@ class TestUnisenderGoPayload(SimpleTestCase):
         )
         backend = EmailBackend()
 
-        payload = UnisenderGoPayload(message=email, backend=backend, defaults={})
+        payload = UnisenderGoPayload(
+            message=email, backend=backend, defaults=backend.send_defaults
+        )
         expected_payload = {
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
@@ -78,9 +80,6 @@ class TestUnisenderGoPayload(SimpleTestCase):
 
         self.assertEqual(payload.data, expected_payload)
 
-    @override_settings(
-        ANYMAIL_UNISENDER_GO_SKIP_UNSUBSCRIBE=False,
-    )
     def test_unisender_go_payload__parse_from__without_name(self):
         email = AnymailMessageMixin(
             subject=SUBJECT,
@@ -90,7 +89,9 @@ class TestUnisenderGoPayload(SimpleTestCase):
         )
         backend = EmailBackend()
 
-        payload = UnisenderGoPayload(message=email, backend=backend, defaults={})
+        payload = UnisenderGoPayload(
+            message=email, backend=backend, defaults=backend.send_defaults
+        )
         expected_payload = {
             "from_email": FROM_EMAIL,
             "from_name": "",
@@ -103,7 +104,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         self.assertEqual(payload.data, expected_payload)
 
     @override_settings(
-        ANYMAIL_UNISENDER_GO_SKIP_UNSUBSCRIBE=True,
+        ANYMAIL={"UNISENDER_GO_SEND_DEFAULTS": {"esp_extra": {"skip_unsubscribe": 1}}},
     )
     def test_unisender_go_payload__parse_from__with_unsub__in_settings(self):
         email = AnymailMessageMixin(
@@ -114,31 +115,9 @@ class TestUnisenderGoPayload(SimpleTestCase):
         )
         backend = EmailBackend()
 
-        payload = UnisenderGoPayload(message=email, backend=backend, defaults={})
-        expected_payload = {
-            "from_email": FROM_EMAIL,
-            "from_name": FROM_NAME,
-            "global_substitutions": GLOBAL_DATA,
-            "headers": {},
-            "recipients": [{"email": TO_EMAIL, "substitutions": {"to_name": ""}}],
-            "subject": SUBJECT,
-            "skip_unsubscribe": 1,
-        }
-
-        self.assertEqual(payload.data, expected_payload)
-
-    @override_settings(ANYMAIL_UNISENDER_GO_SKIP_UNSUBSCRIBE=False)
-    def test_unisender_go_payload__parse_from__with_unsub__in_args(self):
-        email = AnymailMessageMixin(
-            subject=SUBJECT,
-            merge_global_data=GLOBAL_DATA,
-            from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
-            to=[TO_EMAIL],
-            esp_extra={"skip_unsubscribe": 1},
+        payload = UnisenderGoPayload(
+            message=email, backend=backend, defaults=backend.send_defaults
         )
-        backend = EmailBackend()
-
-        payload = UnisenderGoPayload(message=email, backend=backend, defaults={})
         expected_payload = {
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
@@ -152,7 +131,37 @@ class TestUnisenderGoPayload(SimpleTestCase):
         self.assertEqual(payload.data, expected_payload)
 
     @override_settings(
-        ANYMAIL_UNISENDER_GO_GLOBAL_LANGUAGE="en",
+        ANYMAIL={"UNISENDER_GO_SEND_DEFAULTS": {"esp_extra": {"skip_unsubscribe": 0}}},
+    )
+    def test_unisender_go_payload__parse_from__with_unsub__in_args(self):
+        email = AnymailMessageMixin(
+            subject=SUBJECT,
+            merge_global_data=GLOBAL_DATA,
+            from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
+            to=[TO_EMAIL],
+            esp_extra={"skip_unsubscribe": 1},
+        )
+        backend = EmailBackend()
+
+        payload = UnisenderGoPayload(
+            message=email, backend=backend, defaults=backend.send_defaults
+        )
+        expected_payload = {
+            "from_email": FROM_EMAIL,
+            "from_name": FROM_NAME,
+            "global_substitutions": GLOBAL_DATA,
+            "headers": {},
+            "recipients": [{"email": TO_EMAIL, "substitutions": {"to_name": ""}}],
+            "subject": SUBJECT,
+            "skip_unsubscribe": 1,
+        }
+
+        self.assertEqual(payload.data, expected_payload)
+
+    @override_settings(
+        ANYMAIL={
+            "UNISENDER_GO_SEND_DEFAULTS": {"esp_extra": {"global_language": "en"}}
+        },
     )
     def test_unisender_go_payload__parse_from__global_language__in_settings(self):
         email = AnymailMessageMixin(
@@ -163,7 +172,9 @@ class TestUnisenderGoPayload(SimpleTestCase):
         )
         backend = EmailBackend()
 
-        payload = UnisenderGoPayload(message=email, backend=backend, defaults={})
+        payload = UnisenderGoPayload(
+            message=email, backend=backend, defaults=backend.send_defaults
+        )
         expected_payload = {
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
@@ -176,7 +187,11 @@ class TestUnisenderGoPayload(SimpleTestCase):
 
         self.assertEqual(payload.data, expected_payload)
 
-    @override_settings(ANYMAIL_UNISENDER_GO_GLOBAL_LANGUAGE="fr")
+    @override_settings(
+        ANYMAIL={
+            "UNISENDER_GO_SEND_DEFAULTS": {"esp_extra": {"global_language": "fr"}}
+        },
+    )
     def test_unisender_go_payload__parse_from__global_language__in_args(self):
         email = AnymailMessageMixin(
             subject=SUBJECT,
@@ -187,7 +202,9 @@ class TestUnisenderGoPayload(SimpleTestCase):
         )
         backend = EmailBackend()
 
-        payload = UnisenderGoPayload(message=email, backend=backend, defaults={})
+        payload = UnisenderGoPayload(
+            message=email, backend=backend, defaults=backend.send_defaults
+        )
         expected_payload = {
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
@@ -215,7 +232,9 @@ class TestUnisenderGoPayload(SimpleTestCase):
         )
         backend = EmailBackend()
 
-        payload = UnisenderGoPayload(message=email, backend=backend, defaults={})
+        payload = UnisenderGoPayload(
+            message=email, backend=backend, defaults=backend.send_defaults
+        )
         expected_payload = {
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,

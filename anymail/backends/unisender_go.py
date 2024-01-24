@@ -11,7 +11,7 @@ from requests.structures import CaseInsensitiveDict
 from anymail.backends.base_requests import AnymailRequestsBackend, RequestsPayload
 from anymail.exceptions import AnymailConfigurationError
 from anymail.message import AnymailRecipientStatus
-from anymail.utils import Attachment, EmailAddress, get_anymail_setting
+from anymail.utils import Attachment, EmailAddress, get_anymail_setting, update_deep
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -42,7 +42,7 @@ class EmailBackend(AnymailRequestsBackend):
     def build_message_payload(
         self, message: EmailMessage, defaults: dict
     ) -> UnisenderGoPayload:
-        return UnisenderGoPayload(message, defaults, self)
+        return UnisenderGoPayload(message=message, defaults=defaults, backend=self)
 
     def parse_recipient_status(
         self, response: Response, payload: UnisenderGoPayload, message: EmailMessage
@@ -165,106 +165,12 @@ class UnisenderGoPayload(RequestsPayload):
     def get_api_endpoint(self) -> str:
         return "email/send.json"
 
-    def set_skip_unsubscribe(self, extra: dict) -> None:
-        """
-        By default, Unisender Go adds unsubscribe link.
-
-        It's needed due to guarantee not abusing users with spam.
-        Before to use this setting, you have to request tech support.
-
-        Expects skip_unsubscribe to be True or False, then transfers it to 0 or 1.
-        Anyway, works if skip_unsubscribe converts to True or False (for flexibility).
-        """
-        if "skip_unsubscribe" in extra and extra["skip_unsubscribe"]:
-            self.data["skip_unsubscribe"] = 1
-
-    def set_global_language(self, extra):
-        """
-        Language for link language and unsubscribe page.
-        Options: 'be', 'de', 'en', 'es', 'fr', 'it', 'pl', 'pt', 'ru', 'ua', 'kz'.
-        """
-        if "global_language" in extra and extra["global_language"]:
-            self.data["global_language"] = extra["global_language"]
-
-    def set_amp(self, extra):
-        """AMP-part of email"""
-        if "amp" in extra and extra["amp"]:
-            self.data["amp"] = extra["amp"]
-
-    def set_bypass_settings(self, extra):
-        """
-        Set extra settings with bypass prefix.
-
-        bypass_global: optional 0/1 (0 by default)
-        If 1: To ignore list of global unavailability.
-        Can be forbidden for some system records.
-
-        bypass_unavailable: optional 0/1 (0 by default)
-        If 1: To ignore current project unavailable addresses.
-        Works only with bypass_global = 1.
-
-        bypass_unsubscribed: optional 0/1 (0 by default)
-        If 1: To ignore list of unsubscribed people.
-        Works only with bypass_global=1 and requires tech support's approve.
-
-        bypass_complained: optional 0/1 (0 by default)
-        If 1: To ignore complainers on project.
-        Works only with bypass_global=1 and requires tech support's approve.
-        """
-        bypass_fields = (
-            "bypass_global",
-            "bypass_unavailable",
-            "bypass_unsubscribed",
-            "bypass_complained",
-        )
-        for field in bypass_fields:
-            if field in extra:
-                self.data[field] = extra[field]
-
-    def set_template_engine(self, extra):
-        """
-        Templating choosing parameter. Can be either 'simple' or 'velocity' or 'none'.
-
-        'simple' by default.
-        'none' available only for emails with
-        ‘track_links’ and ‘track_read’ equal 0 and with turned off unsubscribe block.
-
-        "Simple" templating is for simple substitutions.
-        "Velocity" templating allows loops, arrays, etc.
-        """
-        if "template_engine" in extra and extra["template_engine"]:
-            self.data["template_engine"] = extra["template_engine"]
-
     def set_esp_extra(self, extra: dict) -> None:
         """Set every esp extra parameter with its docstring"""
-        self.set_skip_unsubscribe(extra)
-        self.set_global_language(extra)
-        self.set_template_engine(extra)
-        self.set_amp(extra)
-        self.set_bypass_settings(extra)
-
-    def set_global_settings_from_config(self):
-        """
-        Here we set variables from global config.
-
-        If there is no esp_extra in backend's kwargs, set_esp_extra won't be called.
-        So we have to set default values in init.
-        You can change them with backend's kwarg esp_extra.
-        """
-        if get_anymail_setting(
-            "skip_unsubscribe", esp_name=self.esp_name, default=False
-        ):
-            self.data["skip_unsubscribe"] = 1
-
-        global_language = get_anymail_setting(
-            "global_language", esp_name=self.esp_name, default=None
-        )
-        if global_language:
-            self.data["global_language"] = global_language
+        update_deep(self.data, extra)
 
     def init_payload(self) -> None:
         self.data = {"headers": CaseInsensitiveDict()}  # becomes json
-        self.set_global_settings_from_config()
 
     def serialize_data(self) -> str:
         """Performs any necessary serialization on self.data, and returns the result."""
@@ -323,7 +229,7 @@ class UnisenderGoPayload(RequestsPayload):
             self.data["subject"] = subject
 
     def set_reply_to(self, emails: list[EmailAddress]) -> None:
-        # Unisunder GO only supports a single address in the reply_to API param.
+        # Unisender GO only supports a single address in the reply_to API param.
         if len(emails) > 1:
             self.unsupported_feature("multiple reply_to addresses")
         if len(emails) > 0:

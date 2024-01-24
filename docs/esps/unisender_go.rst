@@ -35,9 +35,9 @@ Anymail will also look for ``UNISENDER_GO_API_KEY`` at the
 root of the settings file if neither ``ANYMAIL["UNISENDER_GO_API_KEY"]``
 nor ``ANYMAIL_UNISENDER_GO_API_KEY`` is set.
 
-.. setting:: ANYMAIL_UNISENDER_GO_API_URL
-
 .. rubric:: UNISENDER_GO_API_URL
+
+.. setting:: ANYMAIL_UNISENDER_GO_API_URL
 
 `Unisender GO API endpoint`_ to use. It can depend on server location.
 
@@ -51,6 +51,53 @@ nor ``ANYMAIL_UNISENDER_GO_API_KEY`` is set.
 You must specify the full, versioned API endpoint as shown above (not just the base_uri).
 
 .. _Unisender GO API Endpoint: https://godocs.unisender.ru/web-api-ref#web-api
+
+**global_language option**
+  Language for link language and unsubscribe page.
+  Options: 'be', 'de', 'en', 'es', 'fr', 'it', 'pl', 'pt', 'ru', 'ua', 'kz'.
+
+  .. code-block:: python
+
+    ANYMAIL={
+        "UNISENDER_GO_SEND_DEFAULTS": {"esp_extra": {"global_language": "en"}}
+    }
+
+.. rubric:: BYPASS OPTIONS
+
+Set extra settings with bypass prefix.
+
+**bypass_global**: optional 0/1 (0 by default)
+If 1: To ignore list of global unavailability. Can be forbidden for some system records.
+
+**bypass_unavailable**: optional 0/1 (0 by default)
+If 1: To ignore current project unavailable addresses. Works only with bypass_global = 1.
+
+**bypass_unsubscribed**: optional 0/1 (0 by default)
+If 1: To ignore list of unsubscribed people. Works only with bypass_global=1 and requires tech support's approve.
+
+**bypass_complained**: optional 0/1 (0 by default)
+If 1: To ignore complainers on project. Works only with bypass_global=1 and requires tech support's approve.
+
+  .. code-block:: python
+
+    # in settings
+    ANYMAIL={
+        "UNISENDER_GO_SEND_DEFAULTS": {
+            "esp_extra": {
+                "bypass_global": 1,
+                "bypass_unavailable": 1,
+                "bypass_unsubscribed": 1,
+                "bypass_complained": 1,
+            }
+        }
+    }
+    # or in Email class call
+    esp_extra={
+        "bypass_global": 1,
+        "bypass_unavailable": 1,
+        "bypass_unsubscribed": 1,
+        "bypass_complained": 1,
+    }
 
 Limitations and quirks
 ----------------------
@@ -69,15 +116,9 @@ Limitations and quirks
 
   .. code-block:: python
 
-    ANYMAIL_UNISENDER_GO_SKIP_UNSUBSCRIBE = True
-
-**global_language option**
-  Language for link language and unsubscribe page.
-  Options: 'be', 'de', 'en', 'es', 'fr', 'it', 'pl', 'pt', 'ru', 'ua', 'kz'.
-
-  .. code-block:: python
-
-    ANYMAIL_UNISENDER_GO_GLOBAL_LANGUAGE = 'en'
+    ANYMAIL={
+        "UNISENDER_GO_SEND_DEFAULTS": {"esp_extra": {"skip_unsubscribe": 1}}
+    }
 
 .. _unisender-templates:
 
