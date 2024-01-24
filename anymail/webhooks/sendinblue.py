@@ -56,7 +56,7 @@ class SendinBlueTrackingWebhookView(SendinBlueBaseWebhookView):
         "unsubscribe": (EventType.UNSUBSCRIBED, None),
         # shouldn't occur for transactional messages:
         "list_addition": (EventType.SUBSCRIBED, None),
-        "unique_opened": (EventType.OPENED, None),  # you'll *also* receive an "opened"
+        "unique_opened": (EventType.OPENED, None),  # first open; see also opened above
     }
 
     def esp_to_anymail_event(self, esp_event):

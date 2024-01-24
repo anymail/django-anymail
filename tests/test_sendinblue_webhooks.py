@@ -294,8 +294,9 @@ class SendinBlueDeliveryTestCase(WebhookTestCase):
         )
 
     def test_opened_event(self):
-        # SendinBlue delivers unique_opened *and* opened on the first open. To avoid
-        # double-counting, you should only enable one of the two events in SendinBlue.
+        # SendinBlue delivers 'unique_opened' only on the first open, and 'opened'
+        # only on the second or later tracking pixel views. (But they used to deliver
+        # both on the first open.)
         raw_event = {
             "event": "opened",
             "email": "recipient@example.com",
@@ -319,8 +320,7 @@ class SendinBlueDeliveryTestCase(WebhookTestCase):
         self.assertIsNone(event.user_agent)  # SendinBlue doesn't report user agent
 
     def test_unique_opened_event(self):
-        # SendinBlue delivers unique_opened *and* opened on the first open. To avoid
-        # double-counting, you should only enable one of the two events in SendinBlue.
+        # See note in test_opened_event above
         raw_event = {
             "event": "unique_opened",
             "email": "recipient@example.com",

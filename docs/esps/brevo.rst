@@ -264,10 +264,13 @@ Be sure to select the checkboxes for all the event types you want to receive. (A
 sure you are in the "Transactional" section of their site; Brevo has a separate set
 of "Campaign" webhooks, which don't apply to messages sent through Anymail.)
 
-If you are interested in tracking opens, note that Brevo has both a "First opening"
-and an "Opened" event type, and will generate both the first time a message is opened.
-Anymail normalizes both of these events to "opened." To avoid double counting, you should
-only enable one of the two.
+If you are interested in tracking opens, note that Brevo has both "First opening"
+and an "Known open" event types. The latter seems to be generated only for the second
+and subsequent opens. Anymail normalizes both types to "opened." To track unique opens
+enable only "First opening," or to track all message opens enable both. (Brevo used to
+deliver both events for the first open, so be sure to check their current behavior
+if duplicate first open events might cause problems for you. You might be able to use
+the event timestamp to de-dupe.)
 
 Brevo will report these Anymail :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
 queued, rejected, bounced, deferred, delivered, opened (see note above), clicked, complained,

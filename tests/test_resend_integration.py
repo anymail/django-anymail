@@ -86,6 +86,7 @@ class ResendBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             len(message.anymail_status.message_id), 0
         )  # non-empty string
 
+    @unittest.skip("Resend has stopped responding to bad/missing API keys (12/2023)")
     @override_settings(ANYMAIL_RESEND_API_KEY="Hey, that's not an API key!")
     def test_invalid_api_key(self):
         with self.assertRaisesMessage(AnymailAPIError, "API key is invalid"):
