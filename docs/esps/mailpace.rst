@@ -66,24 +66,22 @@ nor ``ANYMAIL_MAILPACE_API_KEY`` is set.
 
 .. _MailPace API Keys: https://app.mailpace.com/
 
-.. setting:: ANYMAIL_MAILPACE_SIGNING_SECRET
+.. setting:: MAILPACE_WEBHOOK_KEY
 
-.. rubric:: MAILPACE_SIGNING_SECRET
+.. rubric:: MAILPACE_WEBHOOK_KEY
 
 The MailPace webhook signing secret used to verify webhook posts.
 Recommended if you are using activity tracking, otherwise not necessary.
-(This is separate from Anymail's
+(This is separate from Anymail's :setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>` setting.)
 
-:setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>` setting.)
-
-Find this in your MailPace App `MailPace app`_: by opening your domain,
+Find this in your MailPace App `MailPace app`_ by opening your domain,
 selecting webhooks, and look for the "Public Key Verification" section.
 
   .. code-block:: python
 
       ANYMAIL = {
           ...
-          "MAILPACE_SIGNING_SECRET": "whsec_...",
+          "MAILPACE_WEBHOOK_KEY": "...",
       }
 
 If you provide this setting, the PyNaCl package is required.
@@ -123,7 +121,7 @@ for signature validation (see :ref:`mailpace-installation` above). You have
 three options for securing the status tracking webhook:
 
 * Use MailPace's webhook signature validation, by setting
-  :setting:`MAILPACE_SIGNING_SECRET <ANYMAIL_MAILPACE_SIGNING_SECRET>`
+  :setting:`MAILPACE_WEBHOOK_KEY <ANYMAIL_MAILPACE_WEBHOOK_KEY>`
   (requires the PyNaCl package)
 * Use Anymail's shared secret validation, by setting
   :setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>`
@@ -158,13 +156,13 @@ add the webhook signing secret to your Anymail settings:
 *   Still on the Webhooks page, scroll down to the "Public Key Verification" section.
 
 *   Add that key to your settings.py ``ANYMAIL`` settings as
-    :setting:`MAILPACE_SIGNING_SECRET <ANYMAIL_MAILPACE_SIGNING_SECRET>`:
+    :setting:`MAILPACE_WEBHOOK_KEY <ANYMAIL_MAILPACE_WEBHOOK_KEY>`:
 
     .. code-block:: python
 
         ANYMAIL = {
             # ...
-            "MAILPACE_SIGNING_SECRET": "..."
+            "MAILPACE_WEBHOOK_KEY": "..."
         }
 
 MailPace will report these Anymail
@@ -179,8 +177,8 @@ queued, delivered, deferred, bounced, and spam.
     **Multiple recipients not recommended with tracking**
 
     If you send a message with multiple recipients (to, cc, and/or bcc),
-    you will only one event separate events (delivered, deferred, etc.)
-    for email. MailPace does not send send different events for each 
+    you will only receive one event (delivered, deferred, etc.)
+    per email. MailPace does not send send different events for each 
     recipient.
 
     To avoid confusion, it's best to send each message to exactly one ``to``
@@ -197,13 +195,17 @@ field will be the parsed MailPace webhook payload.
 Inbound
 -------
 
-Anymail's inbound message support works with MailPace's inbound webhooks.
+If you want to receive email from Mailgun through Anymail's normalized :ref:`inbound <inbound>`
+handling, set up a new Inbound route in the MailPace app points to Anymail's inbound webhook.
 
-To configure Anymail inbound for MailPace, add a new inbound endpoint to MailPace app: 
+Use this url as the route's "forward" destination:
 
-MailPace sends both the Raw MIME message, as well as the parsed message
-...
+   :samp:`https://{random}:{random}@{yoursite.example.com}/anymail/mailpace/inbound/`
 
+     * *random:random* is an :setting:`ANYMAIL_WEBHOOK_SECRET` shared secret
+     * *yoursite.example.com* is your Django site
+
+MailPace sends the Raw MIME message by default, and that is what Anymail uses to process the inbound email.
 
 .. _mailpace-troubleshooting:
 
