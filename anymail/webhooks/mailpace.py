@@ -4,11 +4,23 @@ import json
 
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from nacl.exceptions import CryptoError, ValueError
-from nacl.signing import VerifyKey
 
-from anymail.exceptions import AnymailWebhookValidationFailure
+from anymail.exceptions import (
+    AnymailImproperlyInstalled,
+    AnymailWebhookValidationFailure,
+    _LazyError,
+)
 from anymail.utils import get_anymail_setting
+
+try:
+    from nacl.exceptions import CryptoError, ValueError
+    from nacl.signing import VerifyKey
+except ImportError:
+    # This will be raised if verification is attempted (and pynacl wasn't found)
+    VerifyKey = _LazyError(
+        AnymailImproperlyInstalled(missing_package="pynacl", install_extra="mailpace")
+    )
+
 
 from ..inbound import AnymailInboundMessage
 from ..signals import (
@@ -37,7 +49,6 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
 
     webhook_key = None
 
-    # TODO: make this optional
     def __init__(self, **kwargs):
         self.webhook_key = get_anymail_setting(
             "webhook_key", esp_name=self.esp_name, kwargs=kwargs, allow_bare=True
