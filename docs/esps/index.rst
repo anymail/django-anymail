@@ -41,10 +41,10 @@ Email Service Provider                        |Amazon SES|  |Brevo|  |MailerSend
 ============================================  ============  =======  ============  ===========  ==========  ===========  ==========  ==========  ==========  ==========  ===========  ==========
 .. rubric:: :ref:`Anymail send options <anymail-send-options>`
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-:attr:`~AnymailMessage.envelope_sender`       Yes           No       No            Domain only  Yes         Yes          Yes         No          No          No          Yes          No
-:attr:`~AnymailMessage.metadata`              Yes           Yes      No            Yes          Yes         Yes          No          Yes         Yes         Yes         Yes          No
-:attr:`~AnymailMessage.merge_metadata`        No            No       No            Yes          Yes         Yes          No          Yes         No          Yes         Yes          No
-:attr:`~AnymailMessage.send_at`               No            Yes      Yes           Yes          No          Yes          No          No          No          Yes         Yes          No
+:attr:`~AnymailMessage.envelope_sender`       Yes           No       No            Domain only  Yes         No           Yes         No          No          No          Yes          No
+:attr:`~AnymailMessage.metadata`              Yes           Yes      No            Yes          Yes         No           No          Yes         Yes         Yes         Yes          No
+:attr:`~AnymailMessage.merge_metadata`        No            No       No            Yes          Yes         No           No          Yes         No          Yes         Yes          No
+:attr:`~AnymailMessage.send_at`               No            Yes      Yes           Yes          No          No           No          No          No          Yes         Yes          No
 :attr:`~AnymailMessage.tags`                  Yes           Yes      Yes           Yes          Max 1 tag   Yes          Max 1 tag   Max 1 tag   Yes         Yes         Max 1 tag    Yes
 :attr:`~AnymailMessage.track_clicks`          No            No       Yes           Yes          Yes         No           No          Yes         No          Yes         Yes          No
 :attr:`~AnymailMessage.track_opens`           No            No       Yes           Yes          Yes         No           No          Yes         No          Yes         Yes          No
@@ -52,9 +52,9 @@ Email Service Provider                        |Amazon SES|  |Brevo|  |MailerSend
 
 .. rubric:: :ref:`templates-and-merge`
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-:attr:`~AnymailMessage.template_id`           Yes           Yes      Yes           Yes          Yes         Yes          No          Yes         No          Yes         Yes          No
-:attr:`~AnymailMessage.merge_data`            Yes           No       Yes           Yes          Yes         Yes          No          Yes         No          Yes         Yes          No
-:attr:`~AnymailMessage.merge_global_data`     Yes           Yes      (emulated)    (emulated)   Yes         Yes          No          Yes         No          Yes         Yes          No
+:attr:`~AnymailMessage.template_id`           Yes           Yes      Yes           Yes          Yes         No           No          Yes         No          Yes         Yes          No
+:attr:`~AnymailMessage.merge_data`            Yes           No       Yes           Yes          Yes         No           No          Yes         No          Yes         Yes          No
+:attr:`~AnymailMessage.merge_global_data`     Yes           Yes      (emulated)    (emulated)   Yes         No           No          Yes         No          Yes         Yes          No
 .. rubric:: :ref:`Status <esp-send-status>` and :ref:`event tracking <event-tracking>`
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 :attr:`~AnymailMessage.anymail_status`        Yes           Yes      Yes           Yes          Yes         Yes          Yes         Yes         Yes         Yes         Yes          Yes
