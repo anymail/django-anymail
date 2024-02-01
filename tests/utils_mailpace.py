@@ -1,7 +1,8 @@
 from base64 import b64encode
 
 from django.test import override_settings
-from anymail.exceptions import _LazyError, AnymailImproperlyInstalled
+
+from anymail.exceptions import AnymailImproperlyInstalled, _LazyError
 
 try:
     from nacl.signing import SigningKey
