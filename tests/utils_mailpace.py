@@ -1,7 +1,14 @@
 from base64 import b64encode
 
 from django.test import override_settings
-from nacl.signing import SigningKey
+
+try:
+    from nacl.signing import SigningKey
+except ImportError:
+    # This will be raised if signing is attempted (and pynacl wasn't found)
+    VerifyKey = _LazyError(
+        AnymailImproperlyInstalled(missing_package="pynacl", install_extra="mailpace")
+    )
 
 from tests.utils import ClientWithCsrfChecks
 
