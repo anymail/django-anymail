@@ -107,8 +107,8 @@ The default is ``MAILPACE_API_URL = "https://app.mailpace.com/api/v1/send"``.
 Limitations and quirks
 ----------------------
 
-- MailPace does not support open tracking or click tracking.
-  (You can still use Anymail's :ref:`status tracking <event-tracking>` which uses webhooks for tracking)
+- MailPace does not, and will not ever support open tracking or click tracking.
+  (You can still use Anymail's :ref:`status tracking <event-tracking>` which uses webhooks for tracking delivery)
 
 .. _mailpace-webhooks:
 
@@ -201,7 +201,7 @@ Anymail's inbound message support works with MailPace's inbound webhooks.
 
 To configure Anymail inbound for MailPace, add a new inbound endpoint to MailPace app: 
 
-
+MailPace sends both the Raw MIME message, as well as the parsed message
 ...
 
 
