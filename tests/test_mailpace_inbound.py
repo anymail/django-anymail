@@ -5,16 +5,12 @@ from unittest.mock import ANY
 
 from django.test import tag
 
-from anymail.exceptions import AnymailConfigurationError
-from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent
 from anymail.webhooks.mailpace import MailPaceInboundWebhookView
 
-from .utils import sample_email_content, sample_image_content, test_file_content
-from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
-
-from .utils import sample_email_content, sample_image_content, test_file_content
+from .utils import sample_email_content, sample_image_content
 from .webhook_cases import WebhookTestCase
+
 
 @tag("mailpace")
 class MailPaceInboundTestCase(WebhookTestCase):
@@ -22,10 +18,7 @@ class MailPaceInboundTestCase(WebhookTestCase):
         # Only raw is used by Anymail
         mailpace_payload = {
             "from": "Person A <person_a@test.com>",
-            "headers": [
-                "Received: from localhost...",
-                "DKIM-Signature: v=1 a=rsa...;"
-            ],
+            "headers": ["Received: from localhost...", "DKIM-Signature: v=1 a=rsa...;"],
             "messageId": "<3baf4caf-948a-41e6-bc5c-2e99058e6461@mailer.mailpace.com>",
             "raw": dedent(
                 """\
@@ -66,7 +59,7 @@ class MailPaceInboundTestCase(WebhookTestCase):
                     "content_type": "application/pdf",
                     "content": "base64_encoded_content_of_the_attachment",
                 },
-            ]
+            ],
         }
 
         response = self.client.post(
@@ -96,7 +89,6 @@ class MailPaceInboundTestCase(WebhookTestCase):
         self.assertEqual(message.subject, "Raw MIME test")
 
         self.assertEqual(len(message._headers), 7)
-
 
     def test_inbound_attachments(self):
         image_content = sample_image_content()
@@ -146,10 +138,7 @@ class MailPaceInboundTestCase(WebhookTestCase):
         # Only raw is used by Anymail
         mailpace_payload = {
             "from": "Person A <person_a@test.com>",
-            "headers": [
-                "Received: from localhost...",
-                "DKIM-Signature: v=1 a=rsa...;"
-            ],
+            "headers": ["Received: from localhost...", "DKIM-Signature: v=1 a=rsa...;"],
             "messageId": "<3baf4caf-948a-41e6-bc5c-2e99058e6461@mailer.mailpace.com>",
             "raw": raw_mime,
             "to": "Person B <person_b@test.com>",
@@ -166,7 +155,7 @@ class MailPaceInboundTestCase(WebhookTestCase):
                     "content_type": "application/pdf",
                     "content": "base64_encoded_content_of_the_attachment",
                 },
-            ]
+            ],
         }
 
         response = self.client.post(

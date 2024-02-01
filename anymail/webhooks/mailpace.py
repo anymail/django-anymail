@@ -1,14 +1,16 @@
+import base64
 import binascii
 import json
-import base64
+
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from nacl.exceptions import CryptoError, ValueError
+from nacl.signing import VerifyKey
+
 from anymail.exceptions import AnymailWebhookValidationFailure
 from anymail.utils import get_anymail_setting
 
-from django.utils.dateparse import parse_datetime
-from django.utils import timezone
-from nacl.signing import VerifyKey
-from nacl.exceptions import CryptoError, ValueError
-
+from ..inbound import AnymailInboundMessage
 from ..signals import (
     AnymailInboundEvent,
     AnymailTrackingEvent,
@@ -17,8 +19,6 @@ from ..signals import (
     inbound,
     tracking,
 )
-from ..inbound import AnymailInboundMessage
-
 from .base import AnymailBaseWebhookView
 
 
@@ -31,12 +31,13 @@ class MailPaceBaseWebhookView(AnymailBaseWebhookView):
         esp_event = json.loads(request.body.decode("utf-8"))
         return [self.esp_to_anymail_event(esp_event)]
 
+
 class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
     """Handler for MailPace delivery webhooks"""
 
     webhook_key = None
 
-    #TODO: make this optional
+    # TODO: make this optional
     def __init__(self, **kwargs):
         self.webhook_key = get_anymail_setting(
             "webhook_key", esp_name=self.esp_name, kwargs=kwargs, allow_bare=True
@@ -53,11 +54,11 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
         "email.delivered": EventType.DELIVERED,
         "email.deferred": EventType.DEFERRED,
         "email.bounced": EventType.BOUNCED,
-        "email.spam": EventType.REJECTED
+        "email.spam": EventType.REJECTED,
     }
 
     # MailPace doesn't send a signature for inbound webhooks, yet
-    # When/if MailPace does this, move this to the parent class    
+    # When/if MailPace does this, move this to the parent class
     def validate_request(self, request):
         try:
             signature_base64 = request.headers["X-MailPace-Signature"]
@@ -66,7 +67,7 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
             raise AnymailWebhookValidationFailure(
                 "MailPace webhook called with invalid or missing signature"
             )
-        
+
         verify_key_base64 = self.webhook_key
 
         verify_key = VerifyKey(base64.b64decode(verify_key_base64))
@@ -84,7 +85,13 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
         event_type = self.event_record_types.get(esp_event["event"], EventType.UNKNOWN)
         payload = esp_event["payload"]
 
-        reject_reason = RejectReason.SPAM if event_type == EventType.REJECTED else RejectReason.BOUNCED if event_type == EventType.BOUNCED else None
+        reject_reason = (
+            RejectReason.SPAM
+            if event_type == EventType.REJECTED
+            else RejectReason.BOUNCED
+            if event_type == EventType.BOUNCED
+            else None
+        )
         tags = payload.get("tags", [])
 
         return AnymailTrackingEvent(
@@ -113,5 +120,5 @@ class MailPaceInboundWebhookView(MailPaceBaseWebhookView):
             timestamp=timezone.now(),
             event_id=esp_event.get("id", None),
             esp_event=esp_event,
-            message=message
+            message=message,
         )

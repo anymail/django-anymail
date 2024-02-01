@@ -9,7 +9,7 @@ from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.mailpace import MailPaceTrackingWebhookView
 
 from .utils_mailpace import ClientWithMailPaceSignature, make_key
-from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
+from .webhook_cases import WebhookTestCase
 
 
 @tag("mailpace")
@@ -50,6 +50,7 @@ class MailPaceWebhookSecurityTestCase(WebhookTestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+
 @tag("mailpace")
 class MailPaceDeliveryTestCase(WebhookTestCase):
     client_class = ClientWithMailPaceSignature
@@ -79,8 +80,8 @@ class MailPaceDeliveryTestCase(WebhookTestCase):
                 "replyto": "string",
                 "message_id": "string",
                 "list_unsubscribe": "string",
-                "tags": ["string", "string"]
-            }
+                "tags": ["string", "string"],
+            },
         }
         response = self.client.post(
             "/anymail/mailpace/tracking/",
@@ -119,7 +120,7 @@ class MailPaceDeliveryTestCase(WebhookTestCase):
                 "replyto": "string",
                 "message_id": "string",
                 "list_unsubscribe": "string",
-            }
+            },
         }
         response = self.client.post(
             "/anymail/mailpace/tracking/",
@@ -157,7 +158,7 @@ class MailPaceDeliveryTestCase(WebhookTestCase):
                 "replyto": "string",
                 "message_id": "string",
                 "list_unsubscribe": "string",
-            }
+            },
         }
         response = self.client.post(
             "/anymail/mailpace/tracking/",

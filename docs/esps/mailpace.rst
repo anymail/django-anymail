@@ -178,7 +178,7 @@ queued, delivered, deferred, bounced, and spam.
 
     If you send a message with multiple recipients (to, cc, and/or bcc),
     you will only receive one event (delivered, deferred, etc.)
-    per email. MailPace does not send send different events for each 
+    per email. MailPace does not send send different events for each
     recipient.
 
     To avoid confusion, it's best to send each message to exactly one ``to``
@@ -188,7 +188,7 @@ queued, delivered, deferred, bounced, and spam.
 .. _mailpace-esp-event:
 
 The status tracking event's :attr:`~anymail.signals.AnymailTrackingEvent.esp_event`
-field will be the parsed MailPace webhook payload. 
+field will be the parsed MailPace webhook payload.
 
 .. _mailpace-inbound:
 
@@ -219,7 +219,7 @@ isolate the problem, for each Domain you have:
 * MailPace Outbound Emails lists every email accepted by MailPace for delivery
 * MailPace Webhooks page shows every attempt by MailPace to call
   your webhook
-* MailPace Inbound page shows every inbound email received and every attempt 
+* MailPace Inbound page shows every inbound email received and every attempt
   by MailPace to forward it to your Anymail inbound endpoint
 
 

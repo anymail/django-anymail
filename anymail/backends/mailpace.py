@@ -1,9 +1,6 @@
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
-from ..utils import (
-    CaseInsensitiveCasePreservingDict,
-    get_anymail_setting,
-)
+from ..utils import CaseInsensitiveCasePreservingDict, get_anymail_setting
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 
 
@@ -42,17 +39,14 @@ class EmailBackend(AnymailRequestsBackend):
         # Prepare the dict by setting everything to queued without a message id
         unknown_status = AnymailRecipientStatus(message_id=None, status="queued")
         recipient_status = CaseInsensitiveCasePreservingDict(
-            {
-                recip.addr_spec: unknown_status
-                for recip in payload.to_cc_and_bcc_emails
-            }
+            {recip.addr_spec: unknown_status for recip in payload.to_cc_and_bcc_emails}
         )
 
         parsed_response = self.deserialize_json_response(response, payload, message)
 
         status_code = str(response.status_code)
         json_response = response.json()
-        
+
         # Set the status_msg and id based on the status_code
         if status_code == "200":
             try:
@@ -77,20 +71,38 @@ class EmailBackend(AnymailRequestsBackend):
                     message_id=id, status="queued"
                 )
         elif status_msg == "error":
-            if 'errors' in json_response:
-                for field in ['to', 'cc', 'bcc']:
-                    if field in json_response['errors']:
-                        error_messages = json_response['errors'][field]
+            if "errors" in json_response:
+                for field in ["to", "cc", "bcc"]:
+                    if field in json_response["errors"]:
+                        error_messages = json_response["errors"][field]
                         for email in payload.to_cc_and_bcc_emails:
                             for error_message in error_messages:
-                                if 'undefined field' in error_message or 'is invalid' in error_message:
-                                    recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='invalid')
-                                elif 'contains a blocked address' in error_message:
-                                    recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='rejected')
-                                elif 'number of email addresses exceeds maximum volume' in error_message:
-                                    recipient_status[email.addr_spec] = AnymailRecipientStatus(message_id=None, status='invalid')
+                                if (
+                                    "undefined field" in error_message
+                                    or "is invalid" in error_message
+                                ):
+                                    recipient_status[
+                                        email.addr_spec
+                                    ] = AnymailRecipientStatus(
+                                        message_id=None, status="invalid"
+                                    )
+                                elif "contains a blocked address" in error_message:
+                                    recipient_status[
+                                        email.addr_spec
+                                    ] = AnymailRecipientStatus(
+                                        message_id=None, status="rejected"
+                                    )
+                                elif (
+                                    "number of email addresses exceeds maximum volume"
+                                    in error_message
+                                ):
+                                    recipient_status[
+                                        email.addr_spec
+                                    ] = AnymailRecipientStatus(
+                                        message_id=None, status="invalid"
+                                    )
                         else:
-                            continue  # No errors found in this field; continue with the next field
+                            continue  # No errors found in this field; continue to next field
             else:
                 raise AnymailRequestsAPIError(
                     email_message=message,

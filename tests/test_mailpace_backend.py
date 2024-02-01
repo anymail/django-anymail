@@ -138,7 +138,7 @@ class MailPaceBackendStandardEmailTests(MailPaceBackendMockAPITestCase):
             "Body goes here",
             "from@example.com",
             ["to1@example.com"],
-            reply_to=["reply@example.com", "Other <reply2@example.com>"]
+            reply_to=["reply@example.com", "Other <reply2@example.com>"],
         )
         email.send()
         data = self.get_api_call_json()
@@ -149,17 +149,26 @@ class MailPaceBackendStandardEmailTests(MailPaceBackendMockAPITestCase):
     def test_sending_attachment(self):
         """Test sending attachments"""
         email = mail.EmailMessage(
-            "Subject", "content", "from@example.com", ["to@example.com"], attachments=[
+            "Subject",
+            "content",
+            "from@example.com",
+            ["to@example.com"],
+            attachments=[
                 ("file.txt", "file content", "text/plain"),
-            ]
+            ],
         )
         email.send()
         data = self.get_api_call_json()
-        self.assertEqual(data["attachments"], [{
-            "name": "file.txt",
-            "content": b64encode(b"file content").decode('ascii'),
-            "content_type": "text/plain",
-        }])
+        self.assertEqual(
+            data["attachments"],
+            [
+                {
+                    "name": "file.txt",
+                    "content": b64encode(b"file content").decode("ascii"),
+                    "content_type": "text/plain",
+                }
+            ],
+        )
 
     def test_embedded_images(self):
         image_filename = SAMPLE_IMAGE_FILENAME
@@ -182,7 +191,7 @@ class MailPaceBackendStandardEmailTests(MailPaceBackendMockAPITestCase):
         self.assertEqual(attachments[0]["content_type"], "image/png")
         self.assertEqual(decode_att(attachments[0]["content"]), image_data)
         self.assertEqual(attachments[0]["cid"], "cid:%s" % cid)
-    
+
     def test_tag(self):
         self.message.tags = ["receipt"]
         self.message.send()
@@ -194,7 +203,7 @@ class MailPaceBackendStandardEmailTests(MailPaceBackendMockAPITestCase):
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(data["tags"], ["receipt", "repeat-user"])
-    
+
     def test_invalid_response(self):
         """AnymailAPIError raised for non-json response"""
         self.set_mock_response(raw=b"not json")
@@ -206,7 +215,7 @@ class MailPaceBackendStandardEmailTests(MailPaceBackendMockAPITestCase):
         self.set_mock_response(raw=b"{}")  # valid json, but not a MailPace response
         with self.assertRaises(AnymailRequestsAPIError):
             self.message.send()
-    
+
     def test_response_blocked_error(self):
         """AnymailRecipientsRefused raised for error response with MailPace blocked address"""
         self.set_mock_response(
@@ -214,7 +223,8 @@ class MailPaceBackendStandardEmailTests(MailPaceBackendMockAPITestCase):
                 "errors": {
                     "to": ["contains a blocked address"]
                 }
-            }""", status_code=400
+            }""",
+            status_code=400,
         )
         with self.assertRaises(AnymailRecipientsRefused):
             self.message.send()
@@ -226,10 +236,12 @@ class MailPaceBackendStandardEmailTests(MailPaceBackendMockAPITestCase):
                 "errors": {
                     "to": ["number of email addresses exceeds maximum volume"]
                 }
-            }""", status_code=400
+            }""",
+            status_code=400,
         )
         with self.assertRaises(AnymailRecipientsRefused):
             self.message.send()
+
 
 @tag("mailpace")
 class MailPaceBackendRecipientsRefusedTests(MailPaceBackendMockAPITestCase):
@@ -260,6 +272,7 @@ class MailPaceBackendRecipientsRefusedTests(MailPaceBackendMockAPITestCase):
         )
         with self.assertRaises(AnymailAPIError):
             msg.send()
+
 
 @tag("mailpace")
 class MailPaceBackendSessionSharingTestCase(
