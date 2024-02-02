@@ -8,7 +8,7 @@ try:
     from nacl.signing import SigningKey
 except ImportError:
     # This will be raised if signing is attempted (and pynacl wasn't found)
-    VerifyKey = _LazyError(
+    SigningKey = _LazyError(
         AnymailImproperlyInstalled(missing_package="pynacl", install_extra="mailpace")
     )
 

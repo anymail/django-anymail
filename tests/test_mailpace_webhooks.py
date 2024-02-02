@@ -1,5 +1,4 @@
 import json
-import unittest
 from base64 import b64encode
 from unittest.mock import ANY
 
@@ -7,15 +6,22 @@ from django.test import tag
 
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.mailpace import MailPaceTrackingWebhookView
+from tests.utils import ClientWithCsrfChecks
 
 from .utils_mailpace import ClientWithMailPaceSignature, make_key
 from .webhook_cases import WebhookTestCase
 
+# These tests are triggered both with and without 'pynacl' installed,
+# if pynacl is unavailable, we use the ClientWithCsrfChecks class
+try:
+    from nacl.signing import SigningKey
+
+    PYNACL_INSTALLED = bool(SigningKey)
+except ImportError:
+    PYNACL_INSTALLED = False
+
 
 @tag("mailpace")
-@unittest.skipUnless(
-    ClientWithMailPaceSignature, "Install 'pynacl' to run mailpace webhook tests"
-)
 class MailPaceWebhookSecurityTestCase(WebhookTestCase):
     client_class = ClientWithMailPaceSignature
 
@@ -53,7 +59,10 @@ class MailPaceWebhookSecurityTestCase(WebhookTestCase):
 
 @tag("mailpace")
 class MailPaceDeliveryTestCase(WebhookTestCase):
-    client_class = ClientWithMailPaceSignature
+    if PYNACL_INSTALLED:
+        client_class = ClientWithMailPaceSignature
+    else:
+        client_class = ClientWithCsrfChecks
 
     def setUp(self):
         super().setUp()
