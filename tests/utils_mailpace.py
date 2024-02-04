@@ -49,7 +49,12 @@ class _ClientWithMailPaceSignature(ClientWithCsrfChecks):
             headers["X-MailPace-Signature"] = signature
 
         webhook_key = derive_public_webhook_key(self.private_key)
-        with override_settings(ANYMAIL={"MAILPACE_WEBHOOK_KEY": webhook_key}):
+        with override_settings(
+            ANYMAIL={
+                "MAILPACE_WEBHOOK_KEY": webhook_key,
+                "WEBHOOK_SECRET": "username:password",
+            }
+        ):
             # Django 4.2+ test Client allows headers=headers;
             # before that, must convert to HTTP_ args:
             return super().post(

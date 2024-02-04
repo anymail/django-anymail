@@ -23,13 +23,12 @@ except ImportError:
 
 
 @tag("mailpace")
-@unittest.skipUnless(PYNACL_INSTALLED, "pynacl is not installed")
+@unittest.skipUnless(PYNACL_INSTALLED, "Install Pynacl to run MailPace Webhook Tests")
 class MailPaceWebhookSecurityTestCase(WebhookTestCase):
     client_class = ClientWithMailPaceSignature
 
     def setUp(self):
         super().setUp()
-        self.clear_basic_auth()
         self.client.set_private_key(make_key())
 
     def test_failed_signature_check(self):
@@ -59,13 +58,12 @@ class MailPaceWebhookSecurityTestCase(WebhookTestCase):
 
 
 @tag("mailpace")
-@unittest.skipUnless(PYNACL_INSTALLED, "pynacl is not installed")
+@unittest.skipUnless(PYNACL_INSTALLED, "Install Pynacl to run MailPace Webhook Tests")
 class MailPaceDeliveryTestCase(WebhookTestCase):
     client_class = ClientWithMailPaceSignature
 
     def setUp(self):
         super().setUp()
-        self.clear_basic_auth()
         self.client.set_private_key(make_key())
 
     def test_queued_event(self):
