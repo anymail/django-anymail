@@ -75,29 +75,26 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
     # MailPace doesn't send a signature for inbound webhooks, yet
     # When/if MailPace does this, move this to the parent class
     def validate_request(self, request):
-        if self.webhook_key is None:
-            return True
-        else:
-            try:
-                signature_base64 = request.headers["X-MailPace-Signature"]
-                signature = base64.b64decode(signature_base64)
-            except (KeyError, binascii.Error):
-                raise AnymailWebhookValidationFailure(
-                    "MailPace webhook called with invalid or missing signature"
-                )
+        try:
+            signature_base64 = request.headers["X-MailPace-Signature"]
+            signature = base64.b64decode(signature_base64)
+        except (KeyError, binascii.Error):
+            raise AnymailWebhookValidationFailure(
+                "MailPace webhook called with invalid or missing signature"
+            )
 
-            verify_key_base64 = self.webhook_key
+        verify_key_base64 = self.webhook_key
 
-            verify_key = VerifyKey(base64.b64decode(verify_key_base64))
+        verify_key = VerifyKey(base64.b64decode(verify_key_base64))
 
-            message = request.body
+        message = request.body
 
-            try:
-                verify_key.verify(message, signature)
-            except (CryptoError, ValueError):
-                raise AnymailWebhookValidationFailure(
-                    "MailPace webhook called with incorrect signature"
-                )
+        try:
+            verify_key.verify(message, signature)
+        except (CryptoError, ValueError):
+            raise AnymailWebhookValidationFailure(
+                "MailPace webhook called with incorrect signature"
+            )
 
     def esp_to_anymail_event(self, esp_event):
         event_type = self.event_record_types.get(esp_event["event"], EventType.UNKNOWN)
