@@ -1,4 +1,5 @@
 import json
+import unittest
 from base64 import b64encode
 from unittest.mock import ANY
 
@@ -6,13 +7,13 @@ from django.test import tag
 
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.mailpace import MailPaceTrackingWebhookView
-from tests.utils import ClientWithCsrfChecks
 
 from .utils_mailpace import ClientWithMailPaceSignature, make_key
 from .webhook_cases import WebhookTestCase
 
 # These tests are triggered both with and without 'pynacl' installed,
-# if pynacl is unavailable, we use the ClientWithCsrfChecks class
+# without the ability to generate a signing key, there is no way to test
+# the webhook signature validation.
 try:
     from nacl.signing import SigningKey
 
@@ -22,13 +23,13 @@ except ImportError:
 
 
 @tag("mailpace")
+@unittest.skipUnless(PYNACL_INSTALLED, "pynacl is not installed")
 class MailPaceWebhookSecurityTestCase(WebhookTestCase):
     client_class = ClientWithMailPaceSignature
 
     def setUp(self):
         super().setUp()
         self.clear_basic_auth()
-
         self.client.set_private_key(make_key())
 
     def test_failed_signature_check(self):
@@ -58,16 +59,13 @@ class MailPaceWebhookSecurityTestCase(WebhookTestCase):
 
 
 @tag("mailpace")
+@unittest.skipUnless(PYNACL_INSTALLED, "pynacl is not installed")
 class MailPaceDeliveryTestCase(WebhookTestCase):
-    if PYNACL_INSTALLED:
-        client_class = ClientWithMailPaceSignature
-    else:
-        client_class = ClientWithCsrfChecks
+    client_class = ClientWithMailPaceSignature
 
     def setUp(self):
         super().setUp()
         self.clear_basic_auth()
-
         self.client.set_private_key(make_key())
 
     def test_queued_event(self):
