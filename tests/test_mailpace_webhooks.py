@@ -8,12 +8,14 @@ from django.test import tag
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.mailpace import MailPaceTrackingWebhookView
 
-from .utils_mailpace import ClientWithMailPaceSignature, make_key
+from .utils_mailpace import (
+    ClientWithMailPaceBasicAuth,
+    ClientWithMailPaceSignature,
+    make_key,
+)
 from .webhook_cases import WebhookTestCase
 
-# These tests are triggered both with and without 'pynacl' installed,
-# without the ability to generate a signing key, there is no way to test
-# the webhook signature validation.
+# These tests are triggered both with and without 'pynacl' installed
 try:
     from nacl.signing import SigningKey
 
@@ -23,7 +25,9 @@ except ImportError:
 
 
 @tag("mailpace")
-@unittest.skipUnless(PYNACL_INSTALLED, "Install Pynacl to run MailPace Webhook Tests")
+@unittest.skipUnless(
+    PYNACL_INSTALLED, "Install Pynacl to run MailPace Webhook Signature Tests"
+)
 class MailPaceWebhookSecurityTestCase(WebhookTestCase):
     client_class = ClientWithMailPaceSignature
 
@@ -55,6 +59,54 @@ class MailPaceWebhookSecurityTestCase(WebhookTestCase):
             headers={"X-MailPace-Signature": ""},
         )
         self.assertEqual(response.status_code, 400)
+
+
+@unittest.skipIf(PYNACL_INSTALLED, "Pynacl is not available, fallback to basic auth")
+class MailPaceWebhookBasicAuthTestCase(WebhookTestCase):
+    client_class = ClientWithMailPaceBasicAuth
+
+    def setUp(self):
+        super().setUp()
+
+    def test_queued_event(self):
+        raw_event = {
+            "event": "email.queued",
+            "payload": {
+                "status": "queued",
+                "id": 1,
+                "domain_id": 1,
+                "created_at": "2021-11-16T14:50:15.445Z",
+                "updated_at": "2021-11-16T14:50:15.445Z",
+                "from": "sender@example.com",
+                "to": "queued@example.com",
+                "htmlbody": "string",
+                "textbody": "string",
+                "cc": "string",
+                "bcc": "string",
+                "subject": "string",
+                "replyto": "string",
+                "message_id": "string",
+                "list_unsubscribe": "string",
+                "tags": ["string", "string"],
+            },
+        }
+        response = self.client.post(
+            "/anymail/mailpace/tracking/",
+            content_type="application/json",
+            data=json.dumps(raw_event),
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(
+            self.tracking_handler,
+            sender=MailPaceTrackingWebhookView,
+            event=ANY,
+            esp_name="MailPace",
+        )
+        event = kwargs["event"]
+        self.assertIsInstance(event, AnymailTrackingEvent)
+        self.assertEqual(event.event_type, "queued")
+        self.assertEqual(event.message_id, "string")
+        self.assertEqual(event.recipient, "queued@example.com")
 
 
 @tag("mailpace")

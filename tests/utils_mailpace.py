@@ -67,4 +67,11 @@ class _ClientWithMailPaceSignature(ClientWithCsrfChecks):
             )
 
 
+class _ClientWithMailPaceBasicAuth(ClientWithCsrfChecks):
+    def post(self, *args, **kwargs):
+        with override_settings(ANYMAIL={"WEBHOOK_SECRET": "username:password"}):
+            return super().post(*args, **kwargs)
+
+
 ClientWithMailPaceSignature = _ClientWithMailPaceSignature
+ClientWithMailPaceBasicAuth = _ClientWithMailPaceBasicAuth

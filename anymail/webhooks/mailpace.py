@@ -55,8 +55,10 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
             self.webhook_key = get_anymail_setting(
                 "webhook_key", esp_name=self.esp_name, kwargs=kwargs, allow_bare=True
             )
+            self.warn_if_no_basic_auth = False
         except AnymailConfigurationError:
             self.webhook_key = None
+            self.warn_if_no_basic_auth = True
 
         super().__init__(**kwargs)
 
