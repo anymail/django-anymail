@@ -2,11 +2,9 @@ import base64
 import binascii
 import json
 
-from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from anymail.exceptions import (
-    AnymailConfigurationError,
     AnymailImproperlyInstalled,
     AnymailWebhookValidationFailure,
     _LazyError,
