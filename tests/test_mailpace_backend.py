@@ -56,7 +56,7 @@ class MailPaceBackendStandardEmailTests(MailPaceBackendMockAPITestCase):
             ["to@example.com"],
             fail_silently=False,
         )
-        self.assert_esp_called("send/")
+        self.assert_esp_called("https://app.mailpace.com/api/v1/send")
         headers = self.get_api_call_headers()
         self.assertEqual(headers["MailPace-Server-Token"], "test_server_token")
         data = self.get_api_call_json()

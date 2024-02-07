@@ -51,14 +51,14 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
     webhook_key = None
 
     def __init__(self, **kwargs):
-        try:
-            self.webhook_key = get_anymail_setting(
-                "webhook_key", esp_name=self.esp_name, kwargs=kwargs, allow_bare=True
-            )
-            self.warn_if_no_basic_auth = False
-        except AnymailConfigurationError:
-            self.webhook_key = None
-            self.warn_if_no_basic_auth = True
+        self.webhook_key = get_anymail_setting(
+            "webhook_key",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            allow_bare=True,
+            default=None,
+        )
+        self.warn_if_no_basic_auth = self.webhook_key is None
 
         super().__init__(**kwargs)
 
@@ -81,10 +81,10 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
             try:
                 signature_base64 = request.headers["X-MailPace-Signature"]
                 signature = base64.b64decode(signature_base64)
-            except (KeyError, binascii.Error):
+            except (KeyError, binascii.Error) as error:
                 raise AnymailWebhookValidationFailure(
                     "MailPace webhook called with invalid or missing signature"
-                )
+                ) from error
 
             verify_key_base64 = self.webhook_key
 
@@ -98,9 +98,6 @@ class MailPaceTrackingWebhookView(MailPaceBaseWebhookView):
                 raise AnymailWebhookValidationFailure(
                     "MailPace webhook called with incorrect signature"
                 )
-        else:
-            return True
-            # No webhook key set
 
     def esp_to_anymail_event(self, esp_event):
         event_type = self.event_record_types.get(esp_event["event"], EventType.UNKNOWN)
@@ -138,7 +135,7 @@ class MailPaceInboundWebhookView(MailPaceBaseWebhookView):
 
         return AnymailInboundEvent(
             event_type=EventType.INBOUND,
-            timestamp=timezone.now(),
+            timestamp=None,
             event_id=esp_event.get("id", None),
             esp_event=esp_event,
             message=message,

@@ -21,7 +21,7 @@ class EmailBackend(AnymailRequestsBackend):
             "api_url",
             esp_name=esp_name,
             kwargs=kwargs,
-            default="https://app.mailpace.com/api/v1/send",
+            default="https://app.mailpace.com/api/v1/",
         )
         if not api_url.endswith("/"):
             api_url += "/"
@@ -37,7 +37,7 @@ class EmailBackend(AnymailRequestsBackend):
 
     def parse_recipient_status(self, response, payload, message):
         # Prepare the dict by setting everything to queued without a message id
-        unknown_status = AnymailRecipientStatus(message_id=None, status="queued")
+        unknown_status = AnymailRecipientStatus(message_id=None, status="unknown")
         recipient_status = CaseInsensitiveCasePreservingDict(
             {recip.addr_spec: unknown_status for recip in payload.to_cc_and_bcc_emails}
         )
@@ -122,9 +122,10 @@ class MailPacePayload(RequestsPayload):
         }
         self.server_token = backend.server_token  # esp_extra can override
         self.to_cc_and_bcc_emails = []
-        self.merge_data = None
-        self.merge_metadata = None
         super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)
+
+    def get_api_endpoint(self):
+        return "send"
 
     def get_request_params(self, api_url):
         params = super().get_request_params(api_url)
@@ -159,6 +160,12 @@ class MailPacePayload(RequestsPayload):
             reply_to = ", ".join([email.address for email in emails])
             self.data["replyto"] = reply_to
 
+    def set_extra_headers(self, headers):
+        if "list-unsubscribe" in headers:
+            self.data["list_unsubscribe"] = headers.pop("list-unsubscribe")
+        if headers:
+            self.unsupported_features("extra_headers (other than List-Unsubscribe)")
+
     def set_text_body(self, body):
         self.data["textbody"] = body
 
@@ -188,3 +195,8 @@ class MailPacePayload(RequestsPayload):
                 self.data["tags"] = tags[0]
             else:
                 self.data["tags"] = tags
+
+    def set_esp_extra(self, extra):
+        self.data.update(extra)
+        # Special handling for 'server_token':
+        self.server_token = self.data.pop("server_token", self.server_token)
