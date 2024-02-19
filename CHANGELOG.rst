@@ -25,6 +25,18 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*unreleased changes*
+
+Features
+~~~~~~~~
+
+* **Brevo:** Add support for batch sending
+  (`docs <https://anymail.dev/en/latest/esps/brevo/#batch-sending-merge-and-esp-templates>`__).
+
+
 v10.2
 -----
 

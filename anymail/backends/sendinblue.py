@@ -39,27 +39,41 @@ class EmailBackend(AnymailRequestsBackend):
         # SendinBlue doesn't give any detail on a success
         # https://developers.sendinblue.com/docs/responses
         message_id = None
+        message_ids = []
 
         if response.content != b"":
             parsed_response = self.deserialize_json_response(response, payload, message)
             try:
                 message_id = parsed_response["messageId"]
-            except (KeyError, TypeError) as err:
-                raise AnymailRequestsAPIError(
-                    "Invalid SendinBlue API response format",
-                    email_message=message,
-                    payload=payload,
-                    response=response,
-                    backend=self,
-                ) from err
+            except (KeyError, TypeError):
+                try:
+                    # batch send
+                    message_ids = parsed_response["messageIds"]
+                except (KeyError, TypeError) as err:
+                    raise AnymailRequestsAPIError(
+                        "Invalid SendinBlue API response format",
+                        email_message=message,
+                        payload=payload,
+                        response=response,
+                        backend=self,
+                    ) from err
 
         status = AnymailRecipientStatus(message_id=message_id, status="queued")
-        return {recipient.addr_spec: status for recipient in payload.all_recipients}
+        recipient_status = {
+            recipient.addr_spec: status for recipient in payload.all_recipients
+        }
+        if message_ids:
+            for to, message_id in zip(payload.to_recipients, message_ids):
+                recipient_status[to.addr_spec] = AnymailRecipientStatus(
+                    message_id=message_id, status="queued"
+                )
+        return recipient_status
 
 
 class SendinBluePayload(RequestsPayload):
     def __init__(self, message, defaults, backend, *args, **kwargs):
         self.all_recipients = []  # used for backend.parse_recipient_status
+        self.to_recipients = []  # used for backend.parse_recipient_status
 
         http_headers = kwargs.pop("headers", {})
         http_headers["api-key"] = backend.api_key
@@ -74,9 +88,32 @@ class SendinBluePayload(RequestsPayload):
 
     def init_payload(self):
         self.data = {"headers": CaseInsensitiveDict()}  # becomes json
+        self.merge_data = {}
+        self.metadata = {}
+        self.merge_metadata = {}
 
     def serialize_data(self):
         """Performs any necessary serialization on self.data, and returns the result."""
+        if self.is_batch():
+            # Burst data["to"] into data["messageVersions"]
+            to_list = self.data.pop("to", [])
+            self.data["messageVersions"] = [
+                {"to": [to], "params": self.merge_data.get(to["email"])}
+                for to in to_list
+            ]
+            if self.merge_metadata:
+                # Merge global metadata with any per-recipient metadata.
+                # (Top-level X-Mailin-custom header is already set to global metadata,
+                # and will apply for recipients without a "headers" override.)
+                for version in self.data["messageVersions"]:
+                    to_email = version["to"][0]["email"]
+                    if to_email in self.merge_metadata:
+                        recipient_metadata = self.metadata.copy()
+                        recipient_metadata.update(self.merge_metadata[to_email])
+                        version["headers"] = {
+                            "X-Mailin-custom": self.serialize_json(recipient_metadata)
+                        }
+
         if not self.data["headers"]:
             del self.data["headers"]  # don't send empty headers
         return self.serialize_json(self.data)
@@ -102,6 +139,8 @@ class SendinBluePayload(RequestsPayload):
         if emails:
             self.data[recipient_type] = [self.email_object(email) for email in emails]
             self.all_recipients += emails  # used for backend.parse_recipient_status
+            if recipient_type == "to":
+                self.to_recipients = emails  # used for backend.parse_recipient_status
 
     def set_subject(self, subject):
         if subject != "":  # see note in set_text_body about template rendering
@@ -158,8 +197,8 @@ class SendinBluePayload(RequestsPayload):
         self.data.update(extra)
 
     def set_merge_data(self, merge_data):
-        """SendinBlue doesn't support special attributes for each recipient"""
-        self.unsupported_feature("merge_data")
+        # Late bound in serialize_data:
+        self.merge_data = merge_data
 
     def set_merge_global_data(self, merge_global_data):
         self.data["params"] = merge_global_data
@@ -167,6 +206,11 @@ class SendinBluePayload(RequestsPayload):
     def set_metadata(self, metadata):
         # SendinBlue expects a single string payload
         self.data["headers"]["X-Mailin-custom"] = self.serialize_json(metadata)
+        self.metadata = metadata  # needed in serialize_data for batch send
+
+    def set_merge_metadata(self, merge_metadata):
+        # Late-bound in serialize_data:
+        self.merge_metadata = merge_metadata
 
     def set_send_at(self, send_at):
         try:
