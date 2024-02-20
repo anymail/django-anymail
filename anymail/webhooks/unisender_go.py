@@ -5,12 +5,12 @@ import typing
 from datetime import datetime, timezone
 from hashlib import md5
 
-from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.utils.crypto import constant_time_compare
 
 from anymail.exceptions import AnymailWebhookValidationFailure
 from anymail.signals import AnymailTrackingEvent, EventType, RejectReason, tracking
+from anymail.utils import get_anymail_setting
 from anymail.webhooks.base import AnymailCoreWebhookView
 
 """
@@ -121,14 +121,16 @@ class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
         """
         request_json = json.loads(request.body.decode("utf-8"))
         request_auth = request_json.get("auth", "")
-        request_json["auth"] = settings.ANYMAIL_UNISENDER_GO_API_KEY
+        request_json["auth"] = get_anymail_setting(
+            "api_key", esp_name=self.esp_name, allow_bare=True
+        )
         json_with_key = json.dumps(request_json, separators=(",", ":"))
 
         expected_auth = md5(json_with_key.encode("utf-8")).hexdigest()
 
         if not constant_time_compare(request_auth, expected_auth):
             raise AnymailWebhookValidationFailure(
-                f"Missing or invalid basic auth in Anymail {self.esp_name} webhook"
+                "Unisender Go webhook called with incorrect signature"
             )
 
     def parse_events(self, request: HttpRequest) -> list[AnymailTrackingEvent]:
