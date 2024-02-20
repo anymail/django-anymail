@@ -98,40 +98,42 @@ class SendinBlueBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             template_id=5,
             # Override template sender:
             from_email=formataddr(("Sender", self.from_email)),
-            # No batch send (so max one recipient suggested):
-            to=["Recipient <test+to1@anymail.dev>"],
+            to=["Recipient 1 <test+to1@anymail.dev>", "test+to2@anymail.dev"],
             reply_to=["Do not reply <reply@example.dev>"],
             tags=["using-template"],
-            headers={"X-Anymail-Test": "group: A, variation: C"},
-            merge_global_data={
-                # The Anymail test template includes `{{ params.SHIP_DATE }}`
-                # and `{{ params.ORDER_ID }}` substitutions
-                "SHIP_DATE": "yesterday",
-                "ORDER_ID": "12345",
+            # The Anymail test template includes `{{ params.SHIP_DATE }}`
+            # and `{{ params.ORDER_ID }}` substitutions
+            merge_data={
+                "test+to1@anymail.dev": {"ORDER_ID": "12345"},
+                "test+to2@anymail.dev": {"ORDER_ID": "23456"},
             },
-            metadata={"customer-id": "ZXK9123", "meta2": 2},
+            merge_global_data={"SHIP_DATE": "yesterday"},
+            metadata={"customer-id": "unknown", "meta2": 2},
+            merge_metadata={
+                "test+to1@anymail.dev": {"customer-id": "ZXK9123"},
+                "test+to2@anymail.dev": {"customer-id": "ZZT4192"},
+            },
         )
 
-        # Normal attachments don't work with Brevo templates:
-        #   message.attach("attachment1.txt", "Here is some\ntext", "text/plain")
-        # If you can host the attachment content on some publicly-accessible URL,
-        # this *non-portable* alternative allows sending attachments with templates:
-        message.esp_extra = {
-            "attachment": [
-                {
-                    "name": "attachment1.txt",
-                    # URL where Brevo can download the attachment content while
-                    # sending (must be content-type: text/plain):
-                    "url": "https://raw.githubusercontent.com/anymail/django-anymail/"
-                    "main/docs/_readme/template.txt",
-                }
-            ]
-        }
+        message.attach("attachment1.txt", "Here is some\ntext", "text/plain")
 
         message.send()
         # SendinBlue always queues:
         self.assertEqual(message.anymail_status.status, {"queued"})
-        self.assertRegex(message.anymail_status.message_id, r"\<.+@.+\>")
+        recipient_status = message.anymail_status.recipients
+        self.assertEqual(recipient_status["test+to1@anymail.dev"].status, "queued")
+        self.assertEqual(recipient_status["test+to2@anymail.dev"].status, "queued")
+        self.assertRegex(
+            recipient_status["test+to1@anymail.dev"].message_id, r"\<.+@.+\>"
+        )
+        self.assertRegex(
+            recipient_status["test+to2@anymail.dev"].message_id, r"\<.+@.+\>"
+        )
+        # Each recipient gets their own message_id:
+        self.assertNotEqual(
+            recipient_status["test+to1@anymail.dev"].message_id,
+            recipient_status["test+to2@anymail.dev"].message_id,
+        )
 
     @override_settings(ANYMAIL_SENDINBLUE_API_KEY="Hey, that's not an API key!")
     def test_invalid_api_key(self):

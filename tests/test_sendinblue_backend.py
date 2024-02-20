@@ -18,7 +18,7 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import attach_inline_image_file
+from anymail.message import AnymailMessage, attach_inline_image_file
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
@@ -478,19 +478,98 @@ class SendinBlueBackendAnymailFeatureTests(SendinBlueBackendMockAPITestCase):
         self.assertEqual(data["subject"], "My Subject")
         self.assertEqual(data["to"], [{"email": "to@example.com", "name": "Recipient"}])
 
+    _mock_batch_response = {
+        "messageIds": [
+            "<202403182259.64789700810.1@smtp-relay.mailin.fr>",
+            "<202403182259.64789700810.2@smtp-relay.mailin.fr>",
+        ]
+    }
+
     def test_merge_data(self):
-        self.message.merge_data = {
-            "alice@example.com": {":name": "Alice", ":group": "Developers"},
-            "bob@example.com": {":name": "Bob"},  # and leave :group undefined
-        }
-        with self.assertRaises(AnymailUnsupportedFeature):
-            self.message.send()
+        self.set_mock_response(json_data=self._mock_batch_response)
+        message = AnymailMessage(
+            from_email="from@example.com",
+            template_id=1234567,
+            to=["alice@example.com", "Bob <bob@example.com>"],
+            merge_data={
+                "alice@example.com": {"name": "Alice", "group": "Developers"},
+                "bob@example.com": {"name": "Bob"},  # and leave group undefined
+                "nobody@example.com": {"name": "Not a recipient for this message"},
+            },
+            merge_global_data={"group": "Users", "site": "ExampleCo"},
+        )
+        message.send()
+
+        # batch send uses same API endpoint as regular send:
+        self.assert_esp_called("/v3/smtp/email")
+        data = self.get_api_call_json()
+        versions = data["messageVersions"]
+        self.assertEqual(len(versions), 2)
+        self.assertEqual(
+            versions[0],
+            {
+                "to": [{"email": "alice@example.com"}],
+                "params": {"name": "Alice", "group": "Developers"},
+            },
+        )
+        self.assertEqual(
+            versions[1],
+            {
+                "to": [{"email": "bob@example.com", "name": "Bob"}],
+                "params": {"name": "Bob"},
+            },
+        )
+        self.assertEqual(data["params"], {"group": "Users", "site": "ExampleCo"})
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["alice@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["alice@example.com"].message_id,
+            "<202403182259.64789700810.1@smtp-relay.mailin.fr>",
+        )
+        self.assertEqual(recipients["bob@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["bob@example.com"].message_id,
+            "<202403182259.64789700810.2@smtp-relay.mailin.fr>",
+        )
 
     def test_merge_global_data(self):
         self.message.merge_global_data = {"a": "b"}
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(data["params"], {"a": "b"})
+
+    def test_merge_metadata(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.merge_metadata = {
+            "alice@example.com": {"order_id": 123, "tier": "premium"},
+            "bob@example.com": {"order_id": 678},
+        }
+        self.message.metadata = {"notification_batch": "zx912"}
+        self.message.send()
+
+        data = self.get_api_call_json()
+        versions = data["messageVersions"]
+        self.assertEqual(len(versions), 2)
+        self.assertEqual(versions[0]["to"], [{"email": "alice@example.com"}])
+        # metadata and merge_metadata[recipient] are combined:
+        self.assertEqual(
+            json.loads(versions[0]["headers"]["X-Mailin-custom"]),
+            {"order_id": 123, "tier": "premium", "notification_batch": "zx912"},
+        )
+        self.assertEqual(
+            versions[1]["to"], [{"name": "Bob", "email": "bob@example.com"}]
+        )
+        self.assertEqual(
+            json.loads(versions[1]["headers"]["X-Mailin-custom"]),
+            {"order_id": 678, "notification_batch": "zx912"},
+        )
+        # default metadata still sent in base headers:
+        self.assertEqual(
+            json.loads(data["headers"]["X-Mailin-custom"]),
+            {"notification_batch": "zx912"},
+        )
 
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
@@ -502,35 +581,24 @@ class SendinBlueBackendAnymailFeatureTests(SendinBlueBackendMockAPITestCase):
         self.message.send()
         data = self.get_api_call_json()
         self.assertNotIn("attachment", data)
-        self.assertNotIn("tag", data)
+        self.assertNotIn("bcc", data)
+        self.assertNotIn("cc", data)
         self.assertNotIn("headers", data)
+        self.assertNotIn("messageVersions", data)
+        self.assertNotIn("params", data)
         self.assertNotIn("replyTo", data)
-        self.assertNotIn("atributes", data)
+        self.assertNotIn("schedule", data)
+        self.assertNotIn("tags", data)
+        self.assertNotIn("templateId", data)
 
     def test_esp_extra(self):
-        # SendinBlue doesn't offer any esp-extra but we will test
-        # with some extra of SendGrid to see if it's work in the future
         self.message.esp_extra = {
-            "ip_pool_name": "transactional",
-            "asm": {  # subscription management
-                "group_id": 1,
-            },
-            "tracking_settings": {
-                "subscription_tracking": {
-                    "enable": True,
-                    "substitution_tag": "[unsubscribe_url]",
-                },
-            },
+            "batchId": "5c6cfa04-eed9-42c2-8b5c-6d470d978e9d",
         }
         self.message.send()
         data = self.get_api_call_json()
         # merged from esp_extra:
-        self.assertEqual(data["ip_pool_name"], "transactional")
-        self.assertEqual(data["asm"], {"group_id": 1})
-        self.assertEqual(
-            data["tracking_settings"]["subscription_tracking"],
-            {"enable": True, "substitution_tag": "[unsubscribe_url]"},
-        )
+        self.assertEqual(data["batchId"], "5c6cfa04-eed9-42c2-8b5c-6d470d978e9d")
 
     # noinspection PyUnresolvedReferences
     def test_send_attaches_anymail_status(self):

@@ -14,7 +14,7 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import attach_inline_image_file
+from anymail.message import AnymailMessage, attach_inline_image_file
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
@@ -443,6 +443,94 @@ class ResendBackendAnymailFeatureTests(ResendBackendMockAPITestCase):
                 "X-Tags": '["receipt", "reorder test 12"]',
                 "X-Metadata": '{"user_id": "12345"}',
             },
+        )
+
+    _mock_batch_response = {
+        "data": [
+            {"id": "ae2014de-c168-4c61-8267-70d2662a1ce1"},
+            {"id": "faccb7a5-8a28-4e9a-ac64-8da1cc3bc1cb"},
+        ]
+    }
+
+    def test_merge_data(self):
+        self.message.merge_data = {"to@example.com": {"customer_id": 3}}
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "merge_data"):
+            self.message.send()
+
+    def test_empty_merge_data(self):
+        # `merge_data = {}` triggers batch send
+        self.set_mock_response(json_data=self._mock_batch_response)
+        message = AnymailMessage(
+            from_email="from@example.com",
+            to=["alice@example.com", "Bob <bob@example.com>"],
+            cc=["cc@example.com"],
+            merge_data={
+                "alice@example.com": {},
+                "bob@example.com": {},
+            },
+        )
+        message.send()
+        self.assert_esp_called("/emails/batch")
+        data = self.get_api_call_json()
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["to"], ["alice@example.com"])
+        self.assertEqual(data[1]["to"], ["Bob <bob@example.com>"])
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["alice@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["alice@example.com"].message_id,
+            "ae2014de-c168-4c61-8267-70d2662a1ce1",
+        )
+        self.assertEqual(recipients["bob@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["bob@example.com"].message_id,
+            "faccb7a5-8a28-4e9a-ac64-8da1cc3bc1cb",
+        )
+        # No message_id for cc/bcc recipients in a batch send
+        self.assertEqual(recipients["cc@example.com"].status, "queued")
+        self.assertIsNone(recipients["cc@example.com"].message_id)
+
+    def test_merge_metadata(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        message = AnymailMessage(
+            from_email="from@example.com",
+            to=["alice@example.com", "Bob <bob@example.com>"],
+            merge_metadata={
+                "alice@example.com": {"order_id": 123, "tier": "premium"},
+                "bob@example.com": {"order_id": 678},
+            },
+            metadata={"notification_batch": "zx912"},
+        )
+        message.send()
+
+        # merge_metadata forces batch send API:
+        self.assert_esp_called("/emails/batch")
+
+        data = self.get_api_call_json()
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["to"], ["alice@example.com"])
+        # metadata and merge_metadata[recipient] are combined:
+        self.assertEqual(
+            json.loads(data[0]["headers"]["X-Metadata"]),
+            {"order_id": 123, "tier": "premium", "notification_batch": "zx912"},
+        )
+        self.assertEqual(data[1]["to"], ["Bob <bob@example.com>"])
+        self.assertEqual(
+            json.loads(data[1]["headers"]["X-Metadata"]),
+            {"order_id": 678, "notification_batch": "zx912"},
+        )
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["alice@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["alice@example.com"].message_id,
+            "ae2014de-c168-4c61-8267-70d2662a1ce1",
+        )
+        self.assertEqual(recipients["bob@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["bob@example.com"].message_id,
+            "faccb7a5-8a28-4e9a-ac64-8da1cc3bc1cb",
         )
 
     def test_track_opens(self):

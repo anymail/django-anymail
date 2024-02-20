@@ -149,10 +149,33 @@ Brevo can handle.
   If you are ignoring unsupported features and have multiple reply addresses,
   Anymail will use only the first one.
 
-**Metadata**
+**Metadata exposed in message headers**
   Anymail passes :attr:`~anymail.message.AnymailMessage.metadata` to Brevo
   as a JSON-encoded string using their :mailheader:`X-Mailin-custom` email header.
-  The metadata is available in tracking webhooks.
+  This header is included in the sent message, so **metadata will be visible to
+  message recipients** if they view the raw message source.
+
+**Special headers**
+  Brevo uses special email headers to control certain features.
+  You can set these using Django's
+  :class:`EmailMessage.headers <django.core.mail.EmailMessage>`:
+
+    .. code-block:: python
+
+        message = EmailMessage(
+            ...,
+            headers = {
+                "sender.ip": "10.10.1.150",  # use a dedicated IP
+                "idempotencyKey": "...uuid...",  # batch send deduplication
+            }
+        )
+
+        # Note the constructor param is called `headers`, but the
+        # corresponding attribute is named `extra_headers`:
+        message.extra_headers = {
+            "sender.ip": "10.10.1.222",
+            "idempotencyKey": "...uuid...",
+        }
 
 **Delayed sending**
   .. versionadded:: 9.0
@@ -174,30 +197,33 @@ Brevo can handle.
 Batch sending/merge and ESP templates
 -------------------------------------
 
-Brevo supports :ref:`ESP stored templates <esp-stored-templates>` populated with
-global merge data for all recipients, but does not offer :ref:`batch sending <batch-send>`
-with per-recipient merge data. Anymail's :attr:`~anymail.message.AnymailMessage.merge_data`
-and :attr:`~anymail.message.AnymailMessage.merge_metadata` message attributes are not
-supported with the Brevo backend, but you can use Anymail's
-:attr:`~anymail.message.AnymailMessage.merge_global_data` with Brevo templates.
+.. versionchanged:: 10.3
+
+    Added support for batch sending with :attr:`~anymail.message.AnymailMessage.merge_data`
+    and :attr:`~anymail.message.AnymailMessage.merge_metadata`.
+
+Brevo supports :ref:`ESP stored templates <esp-stored-templates>` and
+:ref:`batch sending <batch-send>` with per-recipient merge data.
 
 To use a Brevo template, set the message's
 :attr:`~anymail.message.AnymailMessage.template_id` to the numeric
-Brevo template ID, and supply substitution attributes using
-the message's :attr:`~anymail.message.AnymailMessage.merge_global_data`:
+Brevo template ID, and supply substitution params using Anymail's normalized
+:attr:`~anymail.message.AnymailMessage.merge_data` and
+:attr:`~anymail.message.AnymailMessage.merge_global_data` message attributes:
 
   .. code-block:: python
 
       message = EmailMessage(
-          to=["alice@example.com"]  # single recipient...
-          # ...multiple to emails would all get the same message
-          # (and would all see each other's emails in the "to" header)
+          # (subject and body come from the template, so don't include those)
+          to=["alice@example.com", "Bob <bob@example.com>"]
       )
       message.template_id = 3   # use this Brevo template
       message.from_email = None  # to use the template's default sender
+      message.merge_data = {
+          'alice@example.com': {'name': "Alice", 'order_no': "12345"},
+          'bob@example.com': {'name': "Bob", 'order_no': "54321"},
+      }
       message.merge_global_data = {
-          'name': "Alice",
-          'order_no': "12345",
           'ship_date': "May 15",
       }
 
@@ -213,6 +239,31 @@ If you want to use the template's sender, be sure to set ``from_email`` to ``Non
 
 You can also override the template's subject and reply-to address (but not body)
 using standard :class:`~django.core.mail.EmailMessage` attributes.
+
+Brevo also supports batch-sending without using an ESP-stored template. In this
+case, each recipient will receive the same content (Brevo doesn't support inline
+templates) but will see only their own *To* email address. Setting either of
+:attr:`~anymail.message.AnymailMessage.merge_data` or
+:attr:`~anymail.message.AnymailMessage.merge_metadata`---even to an empty
+dict---will cause Anymail to use Brevo's batch send option (``"messageVersions"``).
+
+You can use Anymail's
+:attr:`~anymail.message.AnymailMessage.merge_metadata` to supply custom tracking
+data for each recipient:
+
+  .. code-block:: python
+
+      message = EmailMessage(
+          to=["alice@example.com", "Bob <bob@example.com>"],
+          from_email="...", subject="...", body="..."
+      )
+      message.merge_metadata = {
+          'alice@example.com': {'user_id': "12345"},
+          'bob@example.com': {'user_id': "54321"},
+      }
+
+To use Brevo's "`idempotencyKey`_" with a batch send, set it in the
+message's headers: ``message.extra_headers = {"idempotencyKey": "...uuid..."}``.
 
 .. caution::
 
@@ -240,6 +291,9 @@ using standard :class:`~django.core.mail.EmailMessage` attributes.
 
 .. _Brevo Template Language:
     https://help.brevo.com/hc/en-us/articles/360000946299
+
+.. _idempotencyKey:
+    https://developers.brevo.com/docs/heterogenous-versions-batch-emails
 
 .. _convert each old template:
     https://help.brevo.com/hc/en-us/articles/360000991960
