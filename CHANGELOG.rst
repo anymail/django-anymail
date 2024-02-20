@@ -35,6 +35,8 @@ Features
 
 * **Brevo:** Add support for batch sending
   (`docs <https://anymail.dev/en/latest/esps/brevo/#batch-sending-merge-and-esp-templates>`__).
+* **Resend:** Add support for batch sending
+  (`docs <https://anymail.dev/en/latest/esps/resend/#batch-sending-merge-and-esp-templates>`__).
 
 
 v10.2

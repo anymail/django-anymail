@@ -3,6 +3,7 @@ from email.charset import QP, Charset
 from email.header import decode_header, make_header
 from email.headerregistry import Address
 
+from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
 from ..utils import (
     BASIC_NUMERIC_TYPES,
@@ -56,10 +57,24 @@ class EmailBackend(AnymailRequestsBackend):
         return ResendPayload(message, defaults, self)
 
     def parse_recipient_status(self, response, payload, message):
-        # Resend provides single message id, no other information.
-        # Assume "queued".
         parsed_response = self.deserialize_json_response(response, payload, message)
-        message_id = parsed_response["id"]
+        try:
+            message_id = parsed_response["id"]
+            message_ids = None
+        except (KeyError, TypeError):
+            # Batch send?
+            try:
+                message_id = None
+                message_ids = [item["id"] for item in parsed_response["data"]]
+            except (KeyError, TypeError) as err:
+                raise AnymailRequestsAPIError(
+                    "Invalid Resend API response format",
+                    email_message=message,
+                    payload=payload,
+                    response=response,
+                    backend=self,
+                ) from err
+
         recipient_status = CaseInsensitiveCasePreservingDict(
             {
                 recip.addr_spec: AnymailRecipientStatus(
@@ -68,12 +83,21 @@ class EmailBackend(AnymailRequestsBackend):
                 for recip in payload.recipients
             }
         )
+        if message_ids:
+            # batch send: ids are in same order as to_recipients
+            for recip, message_id in zip(payload.to_recipients, message_ids):
+                recipient_status[recip.addr_spec] = AnymailRecipientStatus(
+                    message_id=message_id, status="queued"
+                )
         return dict(recipient_status)
 
 
 class ResendPayload(RequestsPayload):
     def __init__(self, message, defaults, backend, *args, **kwargs):
         self.recipients = []  # for parse_recipient_status
+        self.to_recipients = []  # for parse_recipient_status
+        self.metadata = {}
+        self.merge_metadata = {}
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = "Bearer %s" % backend.api_key
         headers["Content-Type"] = "application/json"
@@ -81,10 +105,33 @@ class ResendPayload(RequestsPayload):
         super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)
 
     def get_api_endpoint(self):
+        if self.is_batch():
+            return "emails/batch"
         return "emails"
 
     def serialize_data(self):
-        return self.serialize_json(self.data)
+        payload = self.data
+        if self.is_batch():
+            # Burst payload across to addresses
+            to_emails = self.data.pop("to", [])
+            payload = []
+            for to_email, to in zip(to_emails, self.to_recipients):
+                data = self.data.copy()
+                data["to"] = [to_email]  # formatted for Resend (w/ workarounds)
+                if to.addr_spec in self.merge_metadata:
+                    # Merge global metadata with any per-recipient metadata.
+                    recipient_metadata = self.metadata.copy()
+                    recipient_metadata.update(self.merge_metadata[to.addr_spec])
+                    if "headers" in data:
+                        data["headers"] = data["headers"].copy()
+                    else:
+                        data["headers"] = {}
+                    data["headers"]["X-Metadata"] = self.serialize_json(
+                        recipient_metadata
+                    )
+                payload.append(data)
+
+        return self.serialize_json(payload)
 
     #
     # Payload construction
@@ -147,6 +194,8 @@ class ResendPayload(RequestsPayload):
             field = recipient_type
             self.data[field] = [self._resend_email_address(email) for email in emails]
             self.recipients += emails
+            if recipient_type == "to":
+                self.to_recipients = emails
 
     def set_subject(self, subject):
         self.data["subject"] = subject
@@ -206,6 +255,7 @@ class ResendPayload(RequestsPayload):
         self.data.setdefault("headers", {})["X-Metadata"] = self.serialize_json(
             metadata
         )
+        self.metadata = metadata  # may be needed for batch send in serialize_data
 
     # Resend doesn't support delayed sending
     # def set_send_at(self, send_at):
@@ -223,9 +273,16 @@ class ResendPayload(RequestsPayload):
     # (Their template feature is rendered client-side,
     # using React in node.js.)
     # def set_template_id(self, template_id):
-    # def set_merge_data(self, merge_data):
     # def set_merge_global_data(self, merge_global_data):
-    # def set_merge_metadata(self, merge_metadata):
+
+    def set_merge_data(self, merge_data):
+        # Empty merge_data is a request to use batch send;
+        # any other merge_data is unsupported.
+        if any(recipient_data for recipient_data in merge_data.values()):
+            self.unsupported_feature("merge_data")
+
+    def set_merge_metadata(self, merge_metadata):
+        self.merge_metadata = merge_metadata  # late bound in serialize_data
 
     def set_esp_extra(self, extra):
         self.data.update(extra)

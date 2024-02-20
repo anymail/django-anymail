@@ -86,6 +86,37 @@ class ResendBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             len(message.anymail_status.message_id), 0
         )  # non-empty string
 
+    def test_batch_send(self):
+        # merge_metadata or merge_data will use batch send API
+        message = AnymailMessage(
+            subject="Anymail Resend batch sendintegration test",
+            body="This is the text body",
+            from_email=self.from_email,
+            to=["test+to1@anymail.dev", '"Recipient 2" <test+to2@anymail.dev>'],
+            metadata={"meta1": "simple string", "meta2": 2},
+            merge_metadata={
+                "test+to1@anymail.dev": {"meta3": "recipient 1"},
+                "test+to2@anymail.dev": {"meta3": "recipient 2"},
+            },
+            tags=["tag 1", "tag 2"],
+        )
+        message.attach_alternative("<p>HTML content</p>", "text/html")
+        message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
+
+        message.send()
+        # Resend always queues:
+        self.assertEqual(message.anymail_status.status, {"queued"})
+        recipient_status = message.anymail_status.recipients
+        self.assertEqual(recipient_status["test+to1@anymail.dev"].status, "queued")
+        self.assertEqual(recipient_status["test+to2@anymail.dev"].status, "queued")
+        self.assertRegex(recipient_status["test+to1@anymail.dev"].message_id, r".+")
+        self.assertRegex(recipient_status["test+to2@anymail.dev"].message_id, r".+")
+        # Each recipient gets their own message_id:
+        self.assertNotEqual(
+            recipient_status["test+to1@anymail.dev"].message_id,
+            recipient_status["test+to2@anymail.dev"].message_id,
+        )
+
     @unittest.skip("Resend has stopped responding to bad/missing API keys (12/2023)")
     @override_settings(ANYMAIL_RESEND_API_KEY="Hey, that's not an API key!")
     def test_invalid_api_key(self):
