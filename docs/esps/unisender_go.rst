@@ -102,6 +102,10 @@ If 1: To ignore complainers on project. Works only with bypass_global=1 and requ
 Limitations and quirks
 ----------------------
 
+**cc and bcc are not supported**
+  Unisender Go's WEB API doesn't support cc and bcc.
+  It is possible via using SMTP API, which is not supported by anymail yet.
+
 **Anymail's `message_id` is set in metadata**
   Unisender sets message_id and returns it in the response on request.
   Anyway, for usability we set it in metadata and take from metadata in webhooks.

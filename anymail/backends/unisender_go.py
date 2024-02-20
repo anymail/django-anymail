@@ -15,7 +15,7 @@ from anymail.utils import Attachment, EmailAddress, get_anymail_setting, update_
 
 
 class EmailBackend(AnymailRequestsBackend):
-    """Unsidender GO v1 API Email Backend"""
+    """Unisdender GO v1 WEB API Email Backend"""
 
     esp_name = "Unisender Go"
 
@@ -47,12 +47,37 @@ class EmailBackend(AnymailRequestsBackend):
     def parse_recipient_status(
         self, response: Response, payload: UnisenderGoPayload, message: EmailMessage
     ) -> dict:
-        return {
-            recip.addr_spec: AnymailRecipientStatus(
-                message_id=payload.message_ids.get(recip.addr_spec), status="queued"
-            )
-            for recip in payload.all_recipients
+        """
+        Response example:
+        {
+          "status": "success",
+          "job_id": "1ZymBc-00041N-9X",
+          "emails": [
+            "user@example.com"
+          ],
+          "failed_emails": {
+            "email1@gmail.com": "temporary_unavailable",
+            "bad@address": "invalid",
+            "email@example.com": "duplicate",
+            "root@example.org": "permanent_unavailable",
+            "olduser@example.net": "unsubscribed"
+          }
         }
+        """
+        parsed_response = self.deserialize_json_response(response, payload, message)
+        succeed_emails = {
+            recipient: AnymailRecipientStatus(
+                message_id=payload.message_ids.get(recipient), status="queued"
+            )
+            for recipient in parsed_response["emails"]
+        }
+        failed_emails = {
+            recipient: AnymailRecipientStatus(
+                message_id=payload.message_ids.get(recipient), status="failed"
+            )
+            for recipient in parsed_response.get("failed_emails", {}).keys()
+        }
+        return {**succeed_emails, **failed_emails}
 
 
 class UnisenderGoPayload(RequestsPayload):
@@ -145,9 +170,6 @@ class UnisenderGoPayload(RequestsPayload):
         *args: typing.Any,
         **kwargs: typing.Any,
     ):
-        self.all_recipients: list[
-            EmailAddress
-        ] = []  # used for backend.parse_recipient_status
         self.generate_message_id = backend.generate_message_id
         self.message_ids: dict = {}  # recipient -> generated message_id mapping
         self.merge_data: dict = {}  # late-bound per-recipient data
@@ -194,11 +216,7 @@ class UnisenderGoPayload(RequestsPayload):
             }
 
     def set_merge_global_data(self, merge_global_data: dict[str, str]) -> None:
-        self.data.setdefault("global_substitutions", {})
-        self.data["global_substitutions"] = {
-            **self.data["global_substitutions"],
-            **merge_global_data,
-        }
+        self.data["global_substitutions"] = merge_global_data
 
     def set_anymail_id(self) -> None:
         """Ensure each personalization has a known anymail_id for event tracking"""
@@ -215,14 +233,21 @@ class UnisenderGoPayload(RequestsPayload):
         self.data["from_email"] = email.addr_spec
         self.data["from_name"] = email.display_name
 
-    def set_recipients(self, recipient_type: str, emails: list[EmailAddress]) -> None:
+    def set_to(self, emails: list[EmailAddress]) -> None:
         if not emails:
             return
         self.data["recipients"] = [
             {"email": email.addr_spec, "substitutions": {"to_name": email.display_name}}
             for email in emails
         ]
-        self.all_recipients += emails
+
+    def set_cc(self, emails: list[EmailAddress]):
+        if emails:
+            self.unsupported_feature("cc")
+
+    def set_bcc(self, emails: list[EmailAddress]):
+        if emails:
+            self.unsupported_feature("bcc")
 
     def set_subject(self, subject: str) -> None:
         if subject != "":  # see note in set_text_body about template rendering
@@ -244,6 +269,14 @@ class UnisenderGoPayload(RequestsPayload):
         Value in header has higher priority than in config.
         """
         self.data["headers"].update(headers)
+
+    def add_alternative(self, content: str, mimetype: str):
+        if mimetype.lower() == "text/x-amp-html":
+            if "amp-html" in self.data["body"]:
+                self.unsupported_feature("multiple html parts")
+            self.data["body"]["amp"] = content
+        else:
+            super().add_alternative(content, mimetype)
 
     def set_text_body(self, body: str) -> None:
         if body == "":
@@ -279,8 +312,20 @@ class UnisenderGoPayload(RequestsPayload):
     def set_send_at(self, send_at: datetime.datetime) -> None:
         self.data.setdefault("options", {})["send_at"] = send_at
 
-    def set_tags(self, tags: dict[str, str]) -> None:
+    def set_tags(self, tags: list[str]) -> None:
         self.data["tags"] = tags
 
     def set_template_id(self, template_id: str) -> None:
         self.data["template_id"] = template_id
+
+    def set_track_clicks(self, track_clicks: int):
+        """track_clicks expected to be 0 or 1"""
+        if track_clicks not in (0, 1):
+            raise AnymailConfigurationError("track_clicks expected to be 0 or 1")
+        self.data["track_links"] = track_clicks
+
+    def set_track_opens(self, track_opens: int):
+        """track_opens expected to be 0 or 1"""
+        if track_opens not in (0, 1):
+            raise AnymailConfigurationError("track_opens expected to be 0 or 1")
+        self.data["track_read"] = track_opens
