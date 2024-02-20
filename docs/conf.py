@@ -279,6 +279,7 @@ def setup(app):
     anymail_config_js = (DOCS_PATH / "_static/anymail-config.js").read_text()
     app.add_js_file(None, body=anymail_config_js)
     app.add_js_file("version-alert.js", **{"async": "async"})
+    app.add_js_file("table-formatting.js", **{"async": "async"})
     app.add_js_file("https://unpkg.com/rate-the-docs", **{"async": "async"})
 
     # Django-specific roles, from

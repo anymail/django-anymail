@@ -32,6 +32,11 @@ vNext
 
 Features
 ~~~~~~~~
+
+* **Brevo:** Add support for batch sending
+  (`docs <https://anymail.dev/en/latest/esps/brevo/#batch-sending-merge-and-esp-templates>`__).
+* **Resend:** Add support for batch sending
+  (`docs <https://anymail.dev/en/latest/esps/resend/#batch-sending-merge-and-esp-templates>`__).
 * **Unisender GO**: Add support for this ESP
   (`docs <https://anymail.dev/en/latest/esps/unisender_go/>`__).
 

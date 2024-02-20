@@ -110,8 +110,6 @@ max-line-length = 88
 target-version = ["py37"]
 
 [tool.doc8]
-# ignore very long lines in ESP support table:
-ignore-path-errors = ["docs/esps/index.rst;D001"]
 # for now, Anymail allows longer lines in docs source:
 max-line-length = 120
 

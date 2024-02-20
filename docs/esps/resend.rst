@@ -176,16 +176,6 @@ anyway---see :ref:`unsupported-features`.
   tracking webhook using :ref:`esp_event <resend-esp-event>`. (The linked
   sections below include examples.)
 
-**No stored templates or batch sending**
-  Resend does not currently offer ESP stored templates or merge capabilities,
-  including Anymail's
-  :attr:`~anymail.message.AnymailMessage.merge_data`,
-  :attr:`~anymail.message.AnymailMessage.merge_global_data`,
-  :attr:`~anymail.message.AnymailMessage.merge_metadata`, and
-  :attr:`~anymail.message.AnymailMessage.template_id` features.
-  (Resend's current template feature is only supported in node.js,
-  using templates that are rendered in their API client.)
-
 **No click/open tracking overrides**
   Resend does not support :attr:`~anymail.message.AnymailMessage.track_clicks`
   or :attr:`~anymail.message.AnymailMessage.track_opens`. Its
@@ -240,6 +230,47 @@ values directly to Resend's `send-email API`_. Example:
               {"name": "Feature_Flag_1", "value": "test_22_a"},
           ],
       }
+
+
+.. _resend-templates:
+
+Batch sending/merge and ESP templates
+-------------------------------------
+
+.. versionadded:: 10.3
+
+    Support for batch sending with
+    :attr:`~anymail.message.AnymailMessage.merge_metadata`.
+
+Resend supports :ref:`batch sending <batch-send>` (where each *To*
+recipient sees only their own email address). It also supports
+per-recipient metadata with batch sending.
+
+Set Anymail's normalized :attr:`~anymail.message.AnymailMessage.merge_metadata`
+attribute to use Resend's batch-send API:
+
+  .. code-block:: python
+
+      message = EmailMessage(
+          to=["alice@example.com", "Bob <bob@example.com>"],
+          from_email="...", subject="...", body="..."
+      )
+      message.merge_metadata = {
+          'alice@example.com': {'user_id': "12345"},
+          'bob@example.com': {'user_id': "54321"},
+      }
+
+Resend does not currently offer :ref:`ESP stored templates <esp-stored-templates>`
+or merge capabilities, so does not support Anymail's
+:attr:`~anymail.message.AnymailMessage.merge_data`,
+:attr:`~anymail.message.AnymailMessage.merge_global_data`, or
+:attr:`~anymail.message.AnymailMessage.template_id` message attributes.
+(Resend's current template feature is only supported in node.js,
+using templates that are rendered in their API client.)
+
+(Setting :attr:`~anymail.message.AnymailMessage.merge_data` to an empty
+dict will also invoke batch send, but trying to supply merge data for
+any recipient will raise an :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error.)
 
 
 .. _resend-webhooks:

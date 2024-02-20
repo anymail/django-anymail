@@ -1,4 +1,4 @@
-.. _unisender-backend:
+.. _unisender-go-backend:
 
 Unisender Go
 =============
