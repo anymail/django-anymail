@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from email.headerregistry import Address
+
 from django.test import SimpleTestCase, override_settings, tag
 
 from anymail.backends.unisender_go import EmailBackend, UnisenderGoPayload
@@ -27,8 +29,11 @@ class TestUnisenderGoPayload(SimpleTestCase):
             template_id=TEMPLATE_ID,
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
-            from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
-            to=[f"{TO_NAME} <{TO_EMAIL}>", f"{OTHER_TO_NAME} <{OTHER_TO_EMAIL}>"],
+            from_email=str(Address(display_name=FROM_NAME, addr_spec=FROM_EMAIL)),
+            to=[
+                str(Address(display_name=TO_NAME, addr_spec=TO_EMAIL)),
+                str(Address(display_name=OTHER_TO_NAME, addr_spec=OTHER_TO_EMAIL)),
+            ],
             merge_data=substitutions,
         )
         backend = EmailBackend()
@@ -61,7 +66,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         email = AnymailMessageMixin(
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
-            from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
+            from_email=str(Address(display_name=FROM_NAME, addr_spec=FROM_EMAIL)),
             to=[TO_EMAIL],
         )
         backend = EmailBackend()
@@ -74,7 +79,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
             "headers": {},
-            "recipients": [{"email": TO_EMAIL, "substitutions": {"to_name": ""}}],
+            "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
         }
 
@@ -94,10 +99,9 @@ class TestUnisenderGoPayload(SimpleTestCase):
         )
         expected_payload = {
             "from_email": FROM_EMAIL,
-            "from_name": "",
             "global_substitutions": GLOBAL_DATA,
             "headers": {},
-            "recipients": [{"email": TO_EMAIL, "substitutions": {"to_name": ""}}],
+            "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
         }
 
@@ -123,7 +127,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
             "headers": {},
-            "recipients": [{"email": TO_EMAIL, "substitutions": {"to_name": ""}}],
+            "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "skip_unsubscribe": 1,
         }
@@ -151,7 +155,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
             "headers": {},
-            "recipients": [{"email": TO_EMAIL, "substitutions": {"to_name": ""}}],
+            "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "skip_unsubscribe": 1,
         }
@@ -180,7 +184,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
             "headers": {},
-            "recipients": [{"email": TO_EMAIL, "substitutions": {"to_name": ""}}],
+            "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "global_language": "en",
         }
@@ -210,7 +214,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
             "headers": {},
-            "recipients": [{"email": TO_EMAIL, "substitutions": {"to_name": ""}}],
+            "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "global_language": "en",
         }
@@ -240,7 +244,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
             "headers": {},
-            "recipients": [{"email": TO_EMAIL, "substitutions": {"to_name": ""}}],
+            "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "bypass_global": 1,
             "bypass_unavailable": 1,

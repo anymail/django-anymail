@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-import datetime
 import typing
 import uuid
+from datetime import datetime, timezone
 
 from django.core.mail import EmailMessage
 from requests import Response
 from requests.structures import CaseInsensitiveDict
 
 from anymail.backends.base_requests import AnymailRequestsBackend, RequestsPayload
-from anymail.exceptions import AnymailConfigurationError
 from anymail.message import AnymailRecipientStatus
 from anymail.utils import Attachment, EmailAddress, get_anymail_setting, update_deep
 
 
 class EmailBackend(AnymailRequestsBackend):
-    """Unisdender GO v1 WEB API Email Backend"""
+    """Unisender Go v1 Web API Email Backend"""
 
     esp_name = "Unisender Go"
 
@@ -30,12 +29,13 @@ class EmailBackend(AnymailRequestsBackend):
         self.generate_message_id = get_anymail_setting(
             "generate_message_id", esp_name=esp_name, kwargs=kwargs, default=True
         )
-        self.merge_field_format = get_anymail_setting(
-            "merge_field_format", esp_name=esp_name, kwargs=kwargs, default=None
-        )
 
+        # No default for api_url setting -- it depends on account's data center. E.g.:
+        # - https://go1.unisender.ru/ru/transactional/api/v1
+        # - https://go2.unisender.ru/ru/transactional/api/v1
         api_url = get_anymail_setting("api_url", esp_name=esp_name, kwargs=kwargs)
-        # Don't set default, because url depends on location
+        if not api_url.endswith("/"):
+            api_url += "/"
 
         super().__init__(api_url, **kwargs)
 
@@ -43,6 +43,15 @@ class EmailBackend(AnymailRequestsBackend):
         self, message: EmailMessage, defaults: dict
     ) -> UnisenderGoPayload:
         return UnisenderGoPayload(message=message, defaults=defaults, backend=self)
+
+    # Map Unisender Go "failed_email" code -> AnymailRecipientStatus.status
+    _unisender_failure_status = {
+        # "duplicate": ignored (see parse_recipient_status)
+        "invalid": "invalid",
+        "permanent_unavailable": "rejected",
+        "temporary_unavailable": "failed",
+        "unsubscribed": "rejected",
+    }
 
     def parse_recipient_status(
         self, response: Response, payload: UnisenderGoPayload, message: EmailMessage
@@ -53,7 +62,8 @@ class EmailBackend(AnymailRequestsBackend):
           "status": "success",
           "job_id": "1ZymBc-00041N-9X",
           "emails": [
-            "user@example.com"
+            "user@example.com",
+            "email@example.com",
           ],
           "failed_emails": {
             "email1@gmail.com": "temporary_unavailable",
@@ -73,92 +83,19 @@ class EmailBackend(AnymailRequestsBackend):
         }
         failed_emails = {
             recipient: AnymailRecipientStatus(
-                message_id=payload.message_ids.get(recipient), status="failed"
+                # Message wasn't sent to this recipient, so Unisender Go hasn't stored
+                # any metadata (including message_id)
+                message_id=None,
+                status=self._unisender_failure_status.get(status, "failed"),
             )
-            for recipient in parsed_response.get("failed_emails", {}).keys()
+            for recipient, status in parsed_response.get("failed_emails", {}).items()
+            if status != "duplicate"  # duplicates are in both succeed and failed lists
         }
         return {**succeed_emails, **failed_emails}
 
 
 class UnisenderGoPayload(RequestsPayload):
-    """
-    API EXAMPLE:
-
-    request_body = {
-      "message": {
-        "recipients": [
-          {
-            "email": "user@example.com",
-            "substitutions": {
-              "CustomerId": 12452,
-              "to_name": "John Smith"
-            },
-            "metadata": {
-              "campaign_id": "c77f4f4e-3561-49f7-9f07-c35be01b4f43",
-              "customer_hash": "b253ac7"
-            }
-          }
-        ],
-        "template_id": "string",
-        "tags": [
-          "string1"
-        ],
-        "skip_unsubscribe": 0,
-        "global_language": "string",
-        "template_engine": "simple",
-        "global_substitutions": {
-          "property1": "string",
-          "property2": "string"
-        },
-        "global_metadata": {
-          "property1": "string",
-          "property2": "string"
-        },
-        "body": {
-          "html": "<b>Hello, {{to_name}}</b>",
-          "plaintext": "Hello, {{to_name}}",
-          "amp": "<!doctype html>Some HTML staff</html>"
-        },
-        "subject": "string",
-        "from_email": "user@example.com",
-        "from_name": "John Smith",
-        "reply_to": "user@example.com",
-        "track_links": 0,
-        "track_read": 0,
-        "bypass_global": 0,
-        "bypass_unavailable": 0,
-        "bypass_unsubscribed": 0,
-        "bypass_complained": 0,
-        "headers": {
-          "X-MyHeader": "some data",
-          "List-Unsubscribe": (
-            "<mailto: unsubscribe@example.com?subject=unsubscribe>, "
-            "<http://www.example.com/unsubscribe/{{CustomerId}}>"
-          )
-        },
-        "attachments": [
-          {
-            "type": "text/plain",
-            "name": "readme.txt",
-            "content": "SGVsbG8sIHdvcmxkIQ=="
-          }
-        ],
-        "inline_attachments": [
-          {
-            "type": "image/gif",
-            "name": "IMAGECID1",
-            "content": "R0lGODdhAwADAIABAP+rAP///ywAAAAAAwADAAACBIQRBwUAOw=="
-          }
-        ],
-        "options": {
-          "send_at": "2021-11-19 10:00:00",
-          "unsubscribe_url": "https://example.org/unsubscribe/{{CustomerId}}",
-          "custom_backend_id": 0,
-          "smtp_pool_id": "string"
-        }
-      }
-    }
-    """
+    # Payload: see https://godocs.unisender.ru/web-api-ref#email-send
 
     data: dict
 
@@ -171,15 +108,12 @@ class UnisenderGoPayload(RequestsPayload):
         **kwargs: typing.Any,
     ):
         self.generate_message_id = backend.generate_message_id
-        self.message_ids: dict = {}  # recipient -> generated message_id mapping
-        self.merge_data: dict = {}  # late-bound per-recipient data
-        self.merge_global_data: dict = {}
-        self.merge_metadata: dict = {}
+        self.message_ids = CaseInsensitiveDict()  # recipient -> generated message_id
 
         http_headers = kwargs.pop("headers", {})
         http_headers["Content-Type"] = "application/json"
         http_headers["Accept"] = "application/json"
-        http_headers["X-API-key"] = backend.api_key
+        http_headers["X-API-KEY"] = backend.api_key
         super().__init__(
             message, defaults, backend, headers=http_headers, *args, **kwargs
         )
@@ -195,7 +129,6 @@ class UnisenderGoPayload(RequestsPayload):
         self.data = {"headers": CaseInsensitiveDict()}  # becomes json
 
     def serialize_data(self) -> str:
-        """Performs any necessary serialization on self.data, and returns the result."""
         if self.generate_message_id:
             self.set_anymail_id()
 
@@ -207,13 +140,14 @@ class UnisenderGoPayload(RequestsPayload):
     def set_merge_data(self, merge_data: dict[str, dict[str, str]]) -> None:
         if not merge_data:
             return
+        assert "recipients" in self.data  # must be called after set_to
         for recipient in self.data["recipients"]:
             recipient_email = recipient["email"]
-            recipient.setdefault("substitutions", {})
-            recipient["substitutions"] = {
-                **merge_data[recipient_email],
-                **recipient["substitutions"],
-            }
+            if recipient_email in merge_data:
+                # (substitutions may already be present with "to_email")
+                recipient.setdefault("substitutions", {}).update(
+                    merge_data[recipient_email]
+                )
 
     def set_merge_global_data(self, merge_global_data: dict[str, str]) -> None:
         self.data["global_substitutions"] = merge_global_data
@@ -221,25 +155,25 @@ class UnisenderGoPayload(RequestsPayload):
     def set_anymail_id(self) -> None:
         """Ensure each personalization has a known anymail_id for event tracking"""
         for recipient in self.data["recipients"]:
-            anymail_id = str(uuid.uuid4())
-
-            recipient.setdefault("metadata", {})
-            recipient["metadata"]["message_id"] = anymail_id
-
+            # This ensures duplicate recipients get same message_id
+            # (because Unisender Go only sends to first instance of duplicate)
             email_address = recipient["email"]
+            anymail_id = self.message_ids.get(email_address) or str(uuid.uuid4())
+            recipient.setdefault("metadata", {})["message_id"] = anymail_id
             self.message_ids[email_address] = anymail_id
 
     def set_from_email(self, email: EmailAddress) -> None:
         self.data["from_email"] = email.addr_spec
-        self.data["from_name"] = email.display_name
+        if email.display_name:
+            self.data["from_name"] = email.display_name
 
     def set_to(self, emails: list[EmailAddress]) -> None:
-        if not emails:
-            return
-        self.data["recipients"] = [
-            {"email": email.addr_spec, "substitutions": {"to_name": email.display_name}}
-            for email in emails
-        ]
+        self.data["recipients"] = []
+        for email in emails:
+            recipient_data = {"email": email.addr_spec}
+            if email.display_name:
+                recipient_data["substitutions"] = {"to_name": email.display_name}
+            self.data["recipients"].append(recipient_data)
 
     def set_cc(self, emails: list[EmailAddress]):
         if emails:
@@ -250,56 +184,43 @@ class UnisenderGoPayload(RequestsPayload):
             self.unsupported_feature("bcc")
 
     def set_subject(self, subject: str) -> None:
-        if subject != "":  # see note in set_text_body about template rendering
+        if subject:
             self.data["subject"] = subject
 
     def set_reply_to(self, emails: list[EmailAddress]) -> None:
-        # Unisender GO only supports a single address in the reply_to API param.
+        # Unisender Go only supports a single address in the reply_to API param.
         if len(emails) > 1:
             self.unsupported_feature("multiple reply_to addresses")
         if len(emails) > 0:
             self.data["reply_to"] = emails[0].addr_spec
+            if emails[0].display_name:
+                self.data["reply_to_name"] = emails[0].display_name
 
     def set_extra_headers(self, headers: dict[str, str]) -> None:
-        """
-        Available service extra headers are:
-        - X-UNISENDER-GO-Global-Language
-        - X-UNISENDER-GO-Template-Engine
-
-        Value in header has higher priority than in config.
-        """
         self.data["headers"].update(headers)
 
     def add_alternative(self, content: str, mimetype: str):
         if mimetype.lower() == "text/x-amp-html":
-            if "amp-html" in self.data["body"]:
-                self.unsupported_feature("multiple html parts")
-            self.data["body"]["amp"] = content
+            if "amp" in self.data.get("body", {}):
+                self.unsupported_feature("multiple amp-html parts")
+            self.data.setdefault("body", {})["amp"] = content
         else:
             super().add_alternative(content, mimetype)
 
     def set_text_body(self, body: str) -> None:
-        if body == "":
-            return
-        if "body" not in self.data:
-            self.data["body"] = {}
-        self.data["body"]["plaintext"] = body
+        if body:
+            self.data.setdefault("body", {})["plaintext"] = body
 
     def set_html_body(self, body: str) -> None:
-        if body == "":
-            return
-        if "body" not in self.data:
-            self.data["body"] = {}
-        self.data["body"]["html"] = body
+        if body:
+            self.data.setdefault("body", {})["html"] = body
 
     def add_attachment(self, attachment: Attachment) -> None:
-        """Seek! Name must not have / in it, esp fails in this case."""
-        if "/" in attachment.name:
-            raise AnymailConfigurationError("found '/' in attachment name")
+        name = attachment.cid if attachment.inline else attachment.name
         att = {
             "content": attachment.b64content,
             "type": attachment.mimetype,
-            "name": attachment.name or "",  # required - submit empty string if unknown
+            "name": name or "",  # required - submit empty string if unknown
         }
         if attachment.inline:
             self.data.setdefault("inline_attachments", []).append(att)
@@ -309,8 +230,25 @@ class UnisenderGoPayload(RequestsPayload):
     def set_metadata(self, metadata: dict[str, str]) -> None:
         self.data["global_metadata"] = metadata
 
-    def set_send_at(self, send_at: datetime.datetime) -> None:
-        self.data.setdefault("options", {})["send_at"] = send_at
+    def set_merge_metadata(self, merge_metadata: dict[str, str]) -> None:
+        assert "recipients" in self.data  # must be called after set_to
+        for recipient in self.data["recipients"]:
+            recipient_email = recipient["email"]
+            if recipient_email in merge_metadata:
+                recipient["metadata"] = merge_metadata[recipient_email]
+
+    def set_send_at(self, send_at: datetime | str) -> None:
+        try:
+            # "Date and time in the format “YYYY-MM-DD hh:mm:ss” in the UTC time zone."
+            # If send_at is a datetime, it's guaranteed to be aware, but maybe not UTC.
+            # Convert to UTC, then strip tzinfo to avoid isoformat "+00:00" at end.
+            send_at_utc = send_at.astimezone(timezone.utc).replace(tzinfo=None)
+            send_at_formatted = send_at_utc.isoformat(sep=" ", timespec="seconds")
+            assert len(send_at_formatted) == 19
+        except (AttributeError, TypeError):
+            # Not a datetime - caller is responsible for formatting
+            send_at_formatted = send_at
+        self.data.setdefault("options", {})["send_at"] = send_at_formatted
 
     def set_tags(self, tags: list[str]) -> None:
         self.data["tags"] = tags
@@ -318,14 +256,8 @@ class UnisenderGoPayload(RequestsPayload):
     def set_template_id(self, template_id: str) -> None:
         self.data["template_id"] = template_id
 
-    def set_track_clicks(self, track_clicks: int):
-        """track_clicks expected to be 0 or 1"""
-        if track_clicks not in (0, 1):
-            raise AnymailConfigurationError("track_clicks expected to be 0 or 1")
-        self.data["track_links"] = track_clicks
+    def set_track_clicks(self, track_clicks: typing.Any):
+        self.data["track_links"] = 1 if track_clicks else 0
 
-    def set_track_opens(self, track_opens: int):
-        """track_opens expected to be 0 or 1"""
-        if track_opens not in (0, 1):
-            raise AnymailConfigurationError("track_opens expected to be 0 or 1")
-        self.data["track_read"] = track_opens
+    def set_track_opens(self, track_opens: typing.Any):
+        self.data["track_read"] = 1 if track_opens else 0
