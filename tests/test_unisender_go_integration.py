@@ -75,8 +75,7 @@ class UnisenderGoBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(anymail_status.message_id, message_id)
 
     def test_all_options(self):
-        send_at_datetime = datetime.now() + timedelta(minutes=2)
-        send_at = send_at_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        send_at = datetime.now() + timedelta(minutes=2)
         message = AnymailMessage(
             subject="Anymail Unisender Go all-options integration test",
             body="This is the text body",
@@ -142,6 +141,10 @@ class UnisenderGoBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             },
             merge_global_data={"ship_date": "yesterday"},
             metadata={"customer-id": "unknown", "meta2": 2},
+            merge_metadata={
+                "test+to1@anymail.dev": {"customer-id": "ZXK9123"},
+                "test+to2@anymail.dev": {"customer-id": "ZZT4192"},
+            },
         )
         message.from_email = None  # use template sender
         message.attach("attachment1.txt", "Here is some\ntext", "text/plain")
