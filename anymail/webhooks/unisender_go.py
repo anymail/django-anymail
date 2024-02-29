@@ -13,61 +13,11 @@ from anymail.signals import AnymailTrackingEvent, EventType, RejectReason, track
 from anymail.utils import get_anymail_setting
 from anymail.webhooks.base import AnymailCoreWebhookView
 
-"""
-Callback API example:
-{
-   "auth":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-   "events_by_user":
-   [
-      {
-        "user_id":456,
-        "project_id":"6432890213745872",
-        "project_name":"MyProject",
-        "events":
-        [
-          {
-            "event_name":"transactional_email_status",
-            "event_data":
-            {
-              "job_id":"1a3Q2V-0000OZ-S0",
-              "metadata":
-              {
-                "key1":"val1",
-                "key2":"val2"
-              },
-              "email":"recipient.email@example.com",
-              "status":"sent",
-              "event_time":"2015-11-30 15:09:42",
-              "url":"http://some.url.com",
-              "delivery_info":
-              {
-                "delivery_status": "err_delivery_failed",
-                "destination_response": "550 Spam rejected",
-                "user_agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36...",
-                "ip":"111.111.111.111"
-              }
-            }
-          },
-          {
-            "event_name":"transactional_spam_block",
-            "event_data":
-            {
-              "block_time":"YYYY-MM-DD HH:MM:SS",
-              "block_type":"one_smtp",
-              "domain":"domain_name",
-              "SMTP_blocks_count":8,
-              "domain_status":"blocked"
-            }
-          }
-        ]
-      }
-   ]
-}
-"""
-
 
 class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
     """Handler for UniSender delivery and engagement tracking webhooks"""
+
+    # See https://godocs.unisender.ru/web-api-ref#callback-format for webhook payload
 
     esp_name = "Unisender Go"
     signal = tracking
@@ -86,18 +36,18 @@ class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
     }
 
     reject_reasons = {
-        "err_user_unknown": RejectReason.INVALID,
-        "err_user_inactive": RejectReason.INVALID,
-        "err_will_retry": RejectReason.INVALID,
-        "err_mailbox_discarded": RejectReason.INVALID,
+        "err_user_unknown": RejectReason.BOUNCED,
+        "err_user_inactive": RejectReason.BOUNCED,
+        "err_will_retry": RejectReason.BOUNCED,
+        "err_mailbox_discarded": RejectReason.BOUNCED,
         "err_mailbox_full": RejectReason.BOUNCED,
         "err_spam_rejected": RejectReason.SPAM,
         "err_blacklisted": RejectReason.BLOCKED,
-        "err_too_large": RejectReason.BLOCKED,
+        "err_too_large": RejectReason.BOUNCED,
         "err_unsubscribed": RejectReason.UNSUBSCRIBED,
-        "err_unreachable": RejectReason.INVALID,
-        "err_skip_letter": RejectReason.INVALID,
-        "err_domain_inactive": RejectReason.INVALID,
+        "err_unreachable": RejectReason.BOUNCED,
+        "err_skip_letter": RejectReason.BOUNCED,
+        "err_domain_inactive": RejectReason.BOUNCED,
         "err_destination_misconfigured": RejectReason.BOUNCED,
         "err_delivery_failed": RejectReason.OTHER,
         "err_spam_skipped": RejectReason.SPAM,
@@ -109,7 +59,7 @@ class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
     def get(
         self, request: HttpRequest, *args: typing.Any, **kwargs: typing.Any
     ) -> HttpResponse:
-        # Some ESPs verify the webhook with a GET request at configuration time
+        # Unisender Go verifies the webhook with a GET request at configuration time
         return HttpResponse()
 
     def validate_request(self, request: HttpRequest) -> None:
@@ -135,41 +85,38 @@ class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
 
     def parse_events(self, request: HttpRequest) -> list[AnymailTrackingEvent]:
         request_json = json.loads(request.body.decode("utf-8"))
+        assert len(request_json["events_by_user"]) == 1  # per API docs
         esp_events = request_json["events_by_user"][0]["events"]
-        parsed_events = [
-            self.esp_to_anymail_event(esp_event) for esp_event in esp_events
+        return [
+            self.esp_to_anymail_event(esp_event)
+            for esp_event in esp_events
+            if esp_event["event_name"] == "transactional_email_status"
         ]
-        return [event for event in parsed_events if event]
 
-    def esp_to_anymail_event(self, esp_event: dict) -> AnymailTrackingEvent | None:
-        if esp_event["event_name"] == "transactional_spam_block":
-            return None
+    def esp_to_anymail_event(self, esp_event: dict) -> AnymailTrackingEvent:
         event_data = esp_event["event_data"]
         event_type = self.event_types.get(event_data["status"], EventType.UNKNOWN)
         timestamp = datetime.fromisoformat(event_data["event_time"])
         timestamp_utc = timestamp.replace(tzinfo=timezone.utc)
-        metadata = event_data["metadata"]
-        event_data["esp_name"] = self.esp_name
+        metadata = event_data.get("metadata", {})
+
         delivery_info = event_data.get("delivery_info", {})
-        unisender_delivery_status = delivery_info.get("delivery_status", "")
-        if unisender_delivery_status.startswith("err"):
-            anymail_reject_reason = self.reject_reasons.get(
-                unisender_delivery_status, RejectReason.OTHER
-            )
+        delivery_status = delivery_info.get("delivery_status", "")
+        if delivery_status.startswith("err"):
+            reject_reason = self.reject_reasons.get(delivery_status, RejectReason.OTHER)
         else:
-            anymail_reject_reason = ""
+            reject_reason = None
 
         return AnymailTrackingEvent(
             event_type=event_type,
             timestamp=timestamp_utc,
-            message_id=metadata.get("message_id", None),
+            message_id=metadata.get("message_id"),
             event_id=None,
             recipient=event_data["email"],
-            reject_reason=anymail_reject_reason,
-            mta_response=delivery_info.get("destination_response", ""),
-            tags=None,
+            reject_reason=reject_reason,
+            mta_response=delivery_info.get("destination_response"),
             metadata=metadata,
             click_url=event_data.get("url"),
-            user_agent=delivery_info.get("user_agent", ""),
+            user_agent=delivery_info.get("user_agent"),
             esp_event=event_data,
         )
