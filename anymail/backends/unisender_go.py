@@ -155,11 +155,11 @@ class UnisenderGoPayload(RequestsPayload):
     def set_anymail_id(self) -> None:
         """Ensure each personalization has a known anymail_id for event tracking"""
         for recipient in self.data["recipients"]:
-            # This ensures duplicate recipients get same message_id
+            # This ensures duplicate recipients get same anymail_id
             # (because Unisender Go only sends to first instance of duplicate)
             email_address = recipient["email"]
             anymail_id = self.message_ids.get(email_address) or str(uuid.uuid4())
-            recipient.setdefault("metadata", {})["message_id"] = anymail_id
+            recipient.setdefault("metadata", {})["anymail_id"] = anymail_id
             self.message_ids[email_address] = anymail_id
 
     def set_from_email(self, email: EmailAddress) -> None:

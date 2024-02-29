@@ -31,7 +31,7 @@ UNISENDER_TEST_DEFAULT_EXAMPLE = {
                     "event_name": "transactional_email_status",
                     "event_data": {
                         "job_id": MESSAGE_ID,
-                        "metadata": {"key1": "val1", "message_id": TEST_EMAIL_ID},
+                        "metadata": {"key1": "val1", "anymail_id": TEST_EMAIL_ID},
                         "email": UNISENDER_TEST_EMAIL,
                         "status": EVENT_TYPE,
                         "event_time": EVENT_TIME,
@@ -110,9 +110,7 @@ class TestUnisenderGoWebhooks(SimpleTestCase):
         self.assertEqual(event.recipient, UNISENDER_TEST_EMAIL)
         self.assertEqual(event.reject_reason, RejectReason.OTHER)
         self.assertEqual(event.mta_response, DELIVERY_RESPONSE)
-        self.assertDictEqual(
-            event.metadata, {"key1": "val1", "message_id": TEST_EMAIL_ID}
-        )
+        self.assertDictEqual(event.metadata, {"key1": "val1"})
 
     def test_without_delivery_info(self):
         request = RequestFactory().post(

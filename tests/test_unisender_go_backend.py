@@ -128,7 +128,7 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
                     "email": "to@example.com",
                     # make sure the backend assigned the message_id
                     # for event tracking and notification
-                    "metadata": {"message_id": "mocked-uuid-1"},
+                    "metadata": {"anymail_id": "mocked-uuid-1"},
                 }
             ],
         )
@@ -540,18 +540,18 @@ class UnisenderGoBackendAnymailFeatureTests(UnisenderGoBackendMockAPITestCase):
         self.message.send()
         data = self.get_api_call_json()
         recipients = data["message"]["recipients"]
-        # message_id added to other recipient metadata
+        # anymail_id added to other recipient metadata
         self.assertEqual(
             recipients[0]["metadata"],
             {
-                "message_id": "mocked-uuid-1",
+                "anymail_id": "mocked-uuid-1",
                 "order_id": 123,
             },
         )
         self.assertEqual(
             recipients[1]["metadata"],
             {
-                "message_id": "mocked-uuid-2",
+                "anymail_id": "mocked-uuid-2",
                 "order_id": 678,
                 "tier": "premium",
             },
@@ -635,7 +635,7 @@ class UnisenderGoBackendAnymailFeatureTests(UnisenderGoBackendMockAPITestCase):
         )
 
     def test_batch_recipients_get_unique_message_ids(self):
-        """In a batch send, each recipient should get a distinct own message_id"""
+        """In a batch send, each recipient should get a distinct message_id"""
         # Unisender Go *always* uses batch send; no need to force by setting merge_data.
         self.set_mock_response(success_emails=["to1@example.com", "to2@example.com"])
         msg = mail.EmailMessage(
