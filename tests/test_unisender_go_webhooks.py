@@ -14,7 +14,7 @@ from anymail.webhooks.unisender_go import UnisenderGoTrackingWebhookView
 EVENT_TYPE = EventType.SENT
 EVENT_TIME = "2015-11-30 15:09:42"
 EVENT_DATETIME = datetime.datetime(2015, 11, 30, 15, 9, 42, tzinfo=timezone.utc)
-MESSAGE_ID = "1a3Q2V-0000OZ-S0"
+JOB_ID = "1a3Q2V-0000OZ-S0"
 DELIVERY_RESPONSE = "550 Spam rejected"
 UNISENDER_TEST_EMAIL = "recipient.email@example.com"
 TEST_API_KEY = "api_key"
@@ -30,7 +30,7 @@ UNISENDER_TEST_DEFAULT_EXAMPLE = {
                 {
                     "event_name": "transactional_email_status",
                     "event_data": {
-                        "job_id": MESSAGE_ID,
+                        "job_id": JOB_ID,
                         "metadata": {"key1": "val1", "anymail_id": TEST_EMAIL_ID},
                         "email": UNISENDER_TEST_EMAIL,
                         "status": EVENT_TYPE,
@@ -69,7 +69,7 @@ EXAMPLE_WITHOUT_DELIVERY_INFO = {
                 {
                     "event_name": "transactional_email_status",
                     "event_data": {
-                        "job_id": MESSAGE_ID,
+                        "job_id": JOB_ID,
                         "metadata": {},
                         "email": UNISENDER_TEST_EMAIL,
                         "status": EVENT_TYPE,
@@ -123,6 +123,9 @@ class TestUnisenderGoWebhooks(SimpleTestCase):
         events = view.parse_events(request)
 
         self.assertEqual(len(events), 1)
+        # Without metadata["anymail_id"], message_id uses the job_id.
+        # (This covers messages sent with "UNISENDER_GO_GENERATE_MESSAGE_ID": False.)
+        self.assertEqual(events[0].message_id, JOB_ID)
 
     @override_settings(ANYMAIL_UNISENDER_GO_API_KEY=TEST_API_KEY)
     def test_check_authorization(self):

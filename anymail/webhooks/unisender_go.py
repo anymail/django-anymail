@@ -99,7 +99,7 @@ class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
         timestamp = datetime.fromisoformat(event_data["event_time"])
         timestamp_utc = timestamp.replace(tzinfo=timezone.utc)
         metadata = event_data.get("metadata", {})
-        message_id = metadata.pop("anymail_id", None)
+        message_id = metadata.pop("anymail_id", event_data.get("job_id"))
 
         delivery_info = event_data.get("delivery_info", {})
         delivery_status = delivery_info.get("delivery_status", "")

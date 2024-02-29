@@ -75,9 +75,11 @@ class EmailBackend(AnymailRequestsBackend):
         }
         """
         parsed_response = self.deserialize_json_response(response, payload, message)
+        # job_id serves as message_id when not self.generate_message_id
+        job_id = parsed_response.get("job_id")
         succeed_emails = {
             recipient: AnymailRecipientStatus(
-                message_id=payload.message_ids.get(recipient), status="queued"
+                message_id=payload.message_ids.get(recipient, job_id), status="queued"
             )
             for recipient in parsed_response["emails"]
         }

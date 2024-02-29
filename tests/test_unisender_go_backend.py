@@ -697,10 +697,23 @@ class UnisenderGoBackendAnymailFeatureTests(UnisenderGoBackendMockAPITestCase):
 
     @override_settings(ANYMAIL_UNISENDER_GO_GENERATE_MESSAGE_ID=False)
     def test_disable_generate_message_id(self):
+        """
+        When not generating per-recipient message_id,
+        use Unisender Go's job_id for all recipients.
+        """
+        self.set_mock_response(
+            success_emails=["to1@example.com", "to2@example.com"],
+            job_id="123456-000HHH-CcCc",
+        )
+        self.message.to = ["to1@example.com", "to2@example.com"]
         self.message.send()
-        self.assertIsNone(self.message.anymail_status.message_id)
-        self.assertIsNone(
-            self.message.anymail_status.recipients["to@example.com"].message_id
+        self.assertEqual(self.message.anymail_status.message_id, "123456-000HHH-CcCc")
+        recipient_status = self.message.anymail_status.recipients
+        self.assertEqual(
+            recipient_status["to1@example.com"].message_id, "123456-000HHH-CcCc"
+        )
+        self.assertEqual(
+            recipient_status["to2@example.com"].message_id, "123456-000HHH-CcCc"
         )
 
     # noinspection PyUnresolvedReferences
