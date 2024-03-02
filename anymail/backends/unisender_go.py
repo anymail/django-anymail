@@ -123,12 +123,10 @@ class UnisenderGoPayload(RequestsPayload):
     def get_api_endpoint(self) -> str:
         return "email/send.json"
 
-    def set_esp_extra(self, extra: dict) -> None:
-        """Set every esp extra parameter with its docstring"""
-        update_deep(self.data, extra)
-
     def init_payload(self) -> None:
-        self.data = {"headers": CaseInsensitiveDict()}  # becomes json
+        self.data = {
+            "headers": CaseInsensitiveDict(),  # becomes json
+        }
 
     def serialize_data(self) -> str:
         if self.generate_message_id:
@@ -139,21 +137,6 @@ class UnisenderGoPayload(RequestsPayload):
 
         return self.serialize_json({"message": self.data})
 
-    def set_merge_data(self, merge_data: dict[str, dict[str, str]]) -> None:
-        if not merge_data:
-            return
-        assert "recipients" in self.data  # must be called after set_to
-        for recipient in self.data["recipients"]:
-            recipient_email = recipient["email"]
-            if recipient_email in merge_data:
-                # (substitutions may already be present with "to_email")
-                recipient.setdefault("substitutions", {}).update(
-                    merge_data[recipient_email]
-                )
-
-    def set_merge_global_data(self, merge_global_data: dict[str, str]) -> None:
-        self.data["global_substitutions"] = merge_global_data
-
     def set_anymail_id(self) -> None:
         """Ensure each personalization has a known anymail_id for event tracking"""
         for recipient in self.data["recipients"]:
@@ -163,6 +146,10 @@ class UnisenderGoPayload(RequestsPayload):
             anymail_id = self.message_ids.get(email_address) or str(uuid.uuid4())
             recipient.setdefault("metadata", {})["anymail_id"] = anymail_id
             self.message_ids[email_address] = anymail_id
+
+    #
+    # Payload construction
+    #
 
     def set_from_email(self, email: EmailAddress) -> None:
         self.data["from_email"] = email.addr_spec
@@ -201,14 +188,6 @@ class UnisenderGoPayload(RequestsPayload):
     def set_extra_headers(self, headers: dict[str, str]) -> None:
         self.data["headers"].update(headers)
 
-    def add_alternative(self, content: str, mimetype: str):
-        if mimetype.lower() == "text/x-amp-html":
-            if "amp" in self.data.get("body", {}):
-                self.unsupported_feature("multiple amp-html parts")
-            self.data.setdefault("body", {})["amp"] = content
-        else:
-            super().add_alternative(content, mimetype)
-
     def set_text_body(self, body: str) -> None:
         if body:
             self.data.setdefault("body", {})["plaintext"] = body
@@ -216,6 +195,14 @@ class UnisenderGoPayload(RequestsPayload):
     def set_html_body(self, body: str) -> None:
         if body:
             self.data.setdefault("body", {})["html"] = body
+
+    def add_alternative(self, content: str, mimetype: str):
+        if mimetype.lower() == "text/x-amp-html":
+            if "amp" in self.data.get("body", {}):
+                self.unsupported_feature("multiple amp-html parts")
+            self.data.setdefault("body", {})["amp"] = content
+        else:
+            super().add_alternative(content, mimetype)
 
     def add_attachment(self, attachment: Attachment) -> None:
         name = attachment.cid if attachment.inline else attachment.name
@@ -231,13 +218,6 @@ class UnisenderGoPayload(RequestsPayload):
 
     def set_metadata(self, metadata: dict[str, str]) -> None:
         self.data["global_metadata"] = metadata
-
-    def set_merge_metadata(self, merge_metadata: dict[str, str]) -> None:
-        assert "recipients" in self.data  # must be called after set_to
-        for recipient in self.data["recipients"]:
-            recipient_email = recipient["email"]
-            if recipient_email in merge_metadata:
-                recipient["metadata"] = merge_metadata[recipient_email]
 
     def set_send_at(self, send_at: datetime | str) -> None:
         try:
@@ -255,11 +235,36 @@ class UnisenderGoPayload(RequestsPayload):
     def set_tags(self, tags: list[str]) -> None:
         self.data["tags"] = tags
 
-    def set_template_id(self, template_id: str) -> None:
-        self.data["template_id"] = template_id
-
     def set_track_clicks(self, track_clicks: typing.Any):
         self.data["track_links"] = 1 if track_clicks else 0
 
     def set_track_opens(self, track_opens: typing.Any):
         self.data["track_read"] = 1 if track_opens else 0
+
+    def set_template_id(self, template_id: str) -> None:
+        self.data["template_id"] = template_id
+
+    def set_merge_data(self, merge_data: dict[str, dict[str, str]]) -> None:
+        if not merge_data:
+            return
+        assert "recipients" in self.data  # must be called after set_to
+        for recipient in self.data["recipients"]:
+            recipient_email = recipient["email"]
+            if recipient_email in merge_data:
+                # (substitutions may already be present with "to_email")
+                recipient.setdefault("substitutions", {}).update(
+                    merge_data[recipient_email]
+                )
+
+    def set_merge_global_data(self, merge_global_data: dict[str, str]) -> None:
+        self.data["global_substitutions"] = merge_global_data
+
+    def set_merge_metadata(self, merge_metadata: dict[str, str]) -> None:
+        assert "recipients" in self.data  # must be called after set_to
+        for recipient in self.data["recipients"]:
+            recipient_email = recipient["email"]
+            if recipient_email in merge_metadata:
+                recipient["metadata"] = merge_metadata[recipient_email]
+
+    def set_esp_extra(self, extra: dict) -> None:
+        update_deep(self.data, extra)
