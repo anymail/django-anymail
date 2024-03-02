@@ -25,11 +25,11 @@ table.sticky-left th:first-of-type[colspan] > p {
 
    This makes code.xref's inside an <a> use standard link coloring instead.
 
-   [1]: https://github.com/rtfd/sphinx_rtd_theme/blob/0.4.2/sass/_theme_rst.sass#L293-L294
-   [2]: https://github.com/rtfd/sphinx_rtd_theme/blob/0.4.2/sass/_theme_rst.sass#L287-L289
+   [1]: https://github.com/readthedocs/sphinx_rtd_theme/blob/2.0.0/src/sass/_theme_rst.sass#L484
+   [2]: https://github.com/readthedocs/sphinx_rtd_theme/blob/2.0.0/src/sass/_theme_rst.sass#L477
 
-   Related: https://github.com/rtfd/sphinx_rtd_theme/issues/153
-            https://github.com/rtfd/sphinx_rtd_theme/issues/92
+   Related: https://github.com/readthedocs/sphinx_rtd_theme/issues/153
+            https://github.com/readthedocs/sphinx_rtd_theme/issues/92
 */
 .rst-content a code.xref {
   color: inherit;
