@@ -124,15 +124,28 @@ class UnisenderGoPayload(RequestsPayload):
         return "email/send.json"
 
     def init_payload(self) -> None:
-        self.data = {
-            "headers": CaseInsensitiveDict(),  # becomes json
+        self.data = {  # becomes json
+            "headers": CaseInsensitiveDict(),
+            "recipients": [],
         }
 
     def serialize_data(self) -> str:
         if self.generate_message_id:
             self.set_anymail_id()
 
-        if not self.data["headers"]:
+        headers = self.data["headers"]
+        if self.is_batch():
+            # Remove the all-recipient "to" header for batch sends.
+            # Unisender Go will construct a single-recipient "to" for each recipient.
+            # Unisender Go doesn't allow a "cc" header without an explicit "to"
+            # header, so we cannot support "cc" for batch sends.
+            headers.pop("to", None)
+            if headers.pop("cc", None):
+                self.unsupported_feature(
+                    "cc with batch send (merge_data or merge_metadata)"
+                )
+
+        if not headers:
             del self.data["headers"]  # don't send empty headers
 
         return self.serialize_json({"message": self.data})
@@ -156,21 +169,20 @@ class UnisenderGoPayload(RequestsPayload):
         if email.display_name:
             self.data["from_name"] = email.display_name
 
-    def set_to(self, emails: list[EmailAddress]) -> None:
-        self.data["recipients"] = []
+    def set_recipients(self, recipient_type: str, emails: list[EmailAddress]):
         for email in emails:
-            recipient_data = {"email": email.addr_spec}
+            recipient = {"email": email.addr_spec}
             if email.display_name:
-                recipient_data["substitutions"] = {"to_name": email.display_name}
-            self.data["recipients"].append(recipient_data)
+                recipient["substitutions"] = {"to_name": email.display_name}
+            self.data["recipients"].append(recipient)
 
-    def set_cc(self, emails: list[EmailAddress]):
-        if emails:
-            self.unsupported_feature("cc")
-
-    def set_bcc(self, emails: list[EmailAddress]):
-        if emails:
-            self.unsupported_feature("bcc")
+        if emails and recipient_type in {"to", "cc"}:
+            # Add "to" or "cc" header listing all recipients of type.
+            # See https://godocs.unisender.ru/cc-and-bcc.
+            # (For batch sends, these will be adjusted later in self.serialize_data.)
+            self.data["headers"][recipient_type] = ", ".join(
+                email.address for email in emails
+            )
 
     def set_subject(self, subject: str) -> None:
         if subject:
@@ -247,7 +259,7 @@ class UnisenderGoPayload(RequestsPayload):
     def set_merge_data(self, merge_data: dict[str, dict[str, str]]) -> None:
         if not merge_data:
             return
-        assert "recipients" in self.data  # must be called after set_to
+        assert self.data["recipients"]  # must be called after set_to
         for recipient in self.data["recipients"]:
             recipient_email = recipient["email"]
             if recipient_email in merge_data:
@@ -260,7 +272,7 @@ class UnisenderGoPayload(RequestsPayload):
         self.data["global_substitutions"] = merge_global_data
 
     def set_merge_metadata(self, merge_metadata: dict[str, str]) -> None:
-        assert "recipients" in self.data  # must be called after set_to
+        assert self.data["recipients"]  # must be called after set_to
         for recipient in self.data["recipients"]:
             recipient_email = recipient["email"]
             if recipient_email in merge_metadata:

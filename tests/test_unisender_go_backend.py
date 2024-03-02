@@ -143,39 +143,38 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
             "Message",
             "From Name <from@example.com>",
             ["Recipient #1 <to1@example.com>", "to2@example.com"],
+            cc=["Carbon Copy <cc1@example.com>", "cc2@example.com"],
+            bcc=["Blind Copy <bcc1@example.com>", "bcc2@example.com"],
         )
         msg.send()
         data = self.get_api_call_json()
         self.assertEqual(data["message"]["from_email"], "from@example.com")
         self.assertEqual(data["message"]["from_name"], "From Name")
 
-        self.assertEqual(len(data["message"]["recipients"]), 2)
-        recipient_1 = data["message"]["recipients"][0]
-        self.assertEqual(recipient_1["email"], "to1@example.com")
-        self.assertEqual(recipient_1["substitutions"]["to_name"], "Recipient #1")
+        recipients = data["message"]["recipients"]
+        self.assertEqual(len(recipients), 6)
+        self.assertEqual(recipients[0]["email"], "to1@example.com")
+        self.assertEqual(recipients[0]["substitutions"]["to_name"], "Recipient #1")
+        self.assertEqual(recipients[1]["email"], "to2@example.com")
+        self.assertNotIn("substitutions", recipients[1])  # to_name not needed
+        self.assertEqual(recipients[2]["email"], "cc1@example.com")
+        self.assertEqual(recipients[2]["substitutions"]["to_name"], "Carbon Copy")
+        self.assertEqual(recipients[3]["email"], "cc2@example.com")
+        self.assertNotIn("substitutions", recipients[3])  # to_name not needed
+        self.assertEqual(recipients[4]["email"], "bcc1@example.com")
+        self.assertEqual(recipients[4]["substitutions"]["to_name"], "Blind Copy")
+        self.assertEqual(recipients[5]["email"], "bcc2@example.com")
+        self.assertNotIn("substitutions", recipients[5])  # to_name not needed
 
-        recipient_2 = data["message"]["recipients"][1]
-        self.assertEqual(recipient_2["email"], "to2@example.com")
-        self.assertNotIn("substitutions", recipient_2)  # to_name not needed
-
-    def test_cc(self):
-        # Unisender Go does not support cc through their web API
-        self.message.cc = ["cc@example.com"]
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "cc"):
-            self.message.send()
-
-    def test_bcc(self):
-        # Unisender Go does not support bcc through their web API
-        self.message.bcc = ["bcc@example.com"]
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "bcc"):
-            self.message.send()
-
-    @override_settings(ANYMAIL_IGNORE_UNSUPPORTED_FEATURES=True)
-    def test_ignore_unsupported_cc_bcc(self):
-        self.message.cc = ["cc@example.com"]
-        self.message.bcc = ["bcc@example.com"]
-        self.message.send()
-        self.assertEqual(self.message.anymail_status.status, {"queued"})
+        # This also covers Unisender Go's special handling for cc/bcc
+        headers = data["message"]["headers"]
+        self.assertEqual(
+            headers["to"], "Recipient #1 <to1@example.com>, to2@example.com"
+        )
+        self.assertEqual(
+            headers["cc"], "Carbon Copy <cc1@example.com>, cc2@example.com"
+        )
+        self.assertNotIn("bcc", headers)
 
     def test_html_message(self):
         text_content = "This is an important message."
@@ -219,15 +218,12 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
         }
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(
-            data["message"]["headers"],
-            {
-                "X-Custom": "string",
-                "X-Num": 123,
-            },
-        )
+        headers = data["message"]["headers"]
+        self.assertEqual(headers["X-Custom"], "string")
+        self.assertEqual(headers["X-Num"], 123)
+
         # Reply-To must be moved to separate param
-        self.assertNotIn("Reply-To", data["message"]["headers"])
+        self.assertNotIn("Reply-To", headers)
         self.assertEqual(data["message"]["reply_to"], "noreply@example.com")
         self.assertNotIn("reply_to_name", data["message"])
 
@@ -531,6 +527,11 @@ class UnisenderGoBackendAnymailFeatureTests(UnisenderGoBackendMockAPITestCase):
             {"group": "Users", "site": "ExampleCo"},
         )
 
+        # For batch send, must not include common "to" header
+        headers = data["message"].get("headers", {})
+        self.assertNotIn("to", headers)
+        self.assertNotIn("cc", headers)
+
     def test_merge_metadata(self):
         self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
         self.message.merge_metadata = {
@@ -557,6 +558,35 @@ class UnisenderGoBackendAnymailFeatureTests(UnisenderGoBackendMockAPITestCase):
             },
         )
 
+        # For batch send, must not include common "to" header
+        headers = data["message"].get("headers", {})
+        self.assertNotIn("to", headers)
+        self.assertNotIn("cc", headers)
+
+    def test_cc_unsupported_with_batch_send(self):
+        self.message.merge_data = {}
+        self.message.cc = ["cc@example.com"]
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature,
+            "cc with batch send (merge_data or merge_metadata)",
+        ):
+            self.message.send()
+
+    @override_settings(ANYMAIL_IGNORE_UNSUPPORTED_FEATURES=True)
+    def test_ignore_unsupported_cc_with_batch_send(self):
+        self.message.merge_data = {}
+        self.message.cc = ["cc@example.com"]
+        self.message.bcc = ["bcc@example.com"]
+        self.message.send()
+        self.assertEqual(self.message.anymail_status.status, {"queued"})
+        data = self.get_api_call_json()
+        # Unisender Go prohibits "cc" header without "to" header,
+        # and we can't include a "to" header for batch send,
+        # so make sure we've removed the "cc" header when ignoring unsupported cc
+        headers = data["message"].get("headers", {})
+        self.assertNotIn("cc", headers)
+        self.assertNotIn("to", headers)
+
     @override_settings(ANYMAIL_UNISENDER_GO_GENERATE_MESSAGE_ID=False)
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
@@ -571,7 +601,6 @@ class UnisenderGoBackendAnymailFeatureTests(UnisenderGoBackendMockAPITestCase):
         self.assertNotIn("from_name", message_data)
         self.assertNotIn("global_substitutions", message_data)
         self.assertNotIn("global_metadata", message_data)
-        self.assertNotIn("headers", message_data)
         self.assertNotIn("inline_attachments", message_data)
         self.assertNotIn("options", message_data)
         self.assertNotIn("reply_to", message_data)

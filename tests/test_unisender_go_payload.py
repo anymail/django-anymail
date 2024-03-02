@@ -5,7 +5,7 @@ from email.headerregistry import Address
 from django.test import SimpleTestCase, override_settings, tag
 
 from anymail.backends.unisender_go import EmailBackend, UnisenderGoPayload
-from anymail.message import AnymailMessageMixin
+from anymail.message import AnymailMessage
 
 TEMPLATE_ID = "template_id"
 FROM_EMAIL = "sender@test.test"
@@ -25,7 +25,7 @@ SUBSTITUTION_TWO = {"arg2": "arg2"}
 class TestUnisenderGoPayload(SimpleTestCase):
     def test_unisender_go_payload__full(self):
         substitutions = {TO_EMAIL: SUBSTITUTION_ONE, OTHER_TO_EMAIL: SUBSTITUTION_TWO}
-        email = AnymailMessageMixin(
+        email = AnymailMessage(
             template_id=TEMPLATE_ID,
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
@@ -45,7 +45,9 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
-            "headers": {},
+            "headers": {
+                "to": ", ".join(email.to),
+            },
             "recipients": [
                 {
                     "email": TO_EMAIL,
@@ -63,7 +65,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         self.assertEqual(payload.data, expected_payload)
 
     def test_unisender_go_payload__parse_from__with_name(self):
-        email = AnymailMessageMixin(
+        email = AnymailMessage(
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
             from_email=str(Address(display_name=FROM_NAME, addr_spec=FROM_EMAIL)),
@@ -78,7 +80,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
-            "headers": {},
+            "headers": {"to": TO_EMAIL},
             "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
         }
@@ -86,7 +88,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         self.assertEqual(payload.data, expected_payload)
 
     def test_unisender_go_payload__parse_from__without_name(self):
-        email = AnymailMessageMixin(
+        email = AnymailMessage(
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
             from_email=FROM_EMAIL,
@@ -100,7 +102,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         expected_payload = {
             "from_email": FROM_EMAIL,
             "global_substitutions": GLOBAL_DATA,
-            "headers": {},
+            "headers": {"to": TO_EMAIL},
             "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
         }
@@ -111,7 +113,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         ANYMAIL={"UNISENDER_GO_SEND_DEFAULTS": {"esp_extra": {"skip_unsubscribe": 1}}},
     )
     def test_unisender_go_payload__parse_from__with_unsub__in_settings(self):
-        email = AnymailMessageMixin(
+        email = AnymailMessage(
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
             from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
@@ -126,7 +128,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
-            "headers": {},
+            "headers": {"to": TO_EMAIL},
             "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "skip_unsubscribe": 1,
@@ -138,7 +140,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         ANYMAIL={"UNISENDER_GO_SEND_DEFAULTS": {"esp_extra": {"skip_unsubscribe": 0}}},
     )
     def test_unisender_go_payload__parse_from__with_unsub__in_args(self):
-        email = AnymailMessageMixin(
+        email = AnymailMessage(
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
             from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
@@ -154,7 +156,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
-            "headers": {},
+            "headers": {"to": TO_EMAIL},
             "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "skip_unsubscribe": 1,
@@ -168,7 +170,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         },
     )
     def test_unisender_go_payload__parse_from__global_language__in_settings(self):
-        email = AnymailMessageMixin(
+        email = AnymailMessage(
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
             from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
@@ -183,7 +185,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
-            "headers": {},
+            "headers": {"to": TO_EMAIL},
             "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "global_language": "en",
@@ -197,7 +199,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         },
     )
     def test_unisender_go_payload__parse_from__global_language__in_args(self):
-        email = AnymailMessageMixin(
+        email = AnymailMessage(
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
             from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
@@ -213,7 +215,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
-            "headers": {},
+            "headers": {"to": TO_EMAIL},
             "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "global_language": "en",
@@ -222,7 +224,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
         self.assertEqual(payload.data, expected_payload)
 
     def test_unisender_go_payload__parse_from__bypass_esp_extra(self):
-        email = AnymailMessageMixin(
+        email = AnymailMessage(
             subject=SUBJECT,
             merge_global_data=GLOBAL_DATA,
             from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
@@ -243,7 +245,7 @@ class TestUnisenderGoPayload(SimpleTestCase):
             "from_email": FROM_EMAIL,
             "from_name": FROM_NAME,
             "global_substitutions": GLOBAL_DATA,
-            "headers": {},
+            "headers": {"to": TO_EMAIL},
             "recipients": [{"email": TO_EMAIL}],
             "subject": SUBJECT,
             "bypass_global": 1,
