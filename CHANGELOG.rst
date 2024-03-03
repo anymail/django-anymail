@@ -35,10 +35,14 @@ Features
 
 * **Brevo:** Add support for batch sending
   (`docs <https://anymail.dev/en/latest/esps/brevo/#batch-sending-merge-and-esp-templates>`__).
+
 * **Resend:** Add support for batch sending
   (`docs <https://anymail.dev/en/latest/esps/resend/#batch-sending-merge-and-esp-templates>`__).
-* **Unisender GO**: Add support for this ESP
+
+* **Unisender Go**: Add support for this ESP
   (`docs <https://anymail.dev/en/latest/esps/unisender_go/>`__).
+  (Thanks to `@Arondit`_ for the implementation.)
+
 
 v10.2
 -----
@@ -1573,6 +1577,7 @@ Features
 .. _@ailionx: https://github.com/ailionx
 .. _@alee: https://github.com/alee
 .. _@anstosa: https://github.com/anstosa
+.. _@Arondit: https://github.com/Arondit
 .. _@b0d0nne11: https://github.com/b0d0nne11
 .. _@calvin: https://github.com/calvin
 .. _@chrisgrande: https://github.com/chrisgrande
