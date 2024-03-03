@@ -3,6 +3,8 @@ from __future__ import annotations
 import typing
 import uuid
 from datetime import datetime, timezone
+from email.charset import QP, Charset
+from email.headerregistry import Address
 
 from django.core.mail import EmailMessage
 from requests import Response
@@ -11,6 +13,11 @@ from requests.structures import CaseInsensitiveDict
 from anymail.backends.base_requests import AnymailRequestsBackend, RequestsPayload
 from anymail.message import AnymailRecipientStatus
 from anymail.utils import Attachment, EmailAddress, get_anymail_setting, update_deep
+
+# Used to force RFC-2047 encoded word
+# in address formatting workaround
+QP_CHARSET = Charset("utf-8")
+QP_CHARSET.header_encoding = QP
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -36,6 +43,17 @@ class EmailBackend(AnymailRequestsBackend):
         api_url = get_anymail_setting("api_url", esp_name=esp_name, kwargs=kwargs)
         if not api_url.endswith("/"):
             api_url += "/"
+
+        # Undocumented setting to control workarounds for Unisender Go display-name issues
+        # (see below). If/when Unisender Go fixes the problems, you can disable Anymail's
+        # workarounds by adding `"UNISENDER_GO_WORKAROUND_DISPLAY_NAME_BUGS": False`
+        # to your `ANYMAIL` settings.
+        self.workaround_display_name_bugs = get_anymail_setting(
+            "workaround_display_name_bugs",
+            esp_name=esp_name,
+            kwargs=kwargs,
+            default=True,
+        )
 
         super().__init__(api_url, **kwargs)
 
@@ -169,6 +187,36 @@ class UnisenderGoPayload(RequestsPayload):
         if email.display_name:
             self.data["from_name"] = email.display_name
 
+    def _format_email_address(self, address):
+        """
+        Return EmailAddress address formatted for use with Unisender Go to/cc headers.
+
+        Works around a bug in Unisender Go's API that rejects To or Cc headers
+        containing commas in any display-name, despite those names being properly
+        enclosed in "quotes" per RFC 5322. Workaround substitutes an RFC 2047
+        encoded word, which avoids the comma that confuses Unisender Go's parser.
+
+        Note that parens, quote chars, and other special characters appearing
+        in "quoted strings" don't cause problems. (Unisender Go is likely splitting
+        the to/cc headers on "," and then trying to parse each segment as an email
+        address, rather than using a parser designed for complete address headers.)
+
+        This workaround is only necessary in the To and Cc headers. Unisender Go
+        properly formats commas and other characters in `to_name` and `from_name`.
+        (But see set_reply_to for a related issue.)
+        """
+        formatted = address.address
+        if self.backend.workaround_display_name_bugs:
+            if "," in formatted:
+                # Workaround: force RFC-2047 encoded word
+                formatted = str(
+                    Address(
+                        display_name=QP_CHARSET.header_encode(address.display_name),
+                        addr_spec=address.addr_spec,
+                    )
+                )
+        return formatted
+
     def set_recipients(self, recipient_type: str, emails: list[EmailAddress]):
         for email in emails:
             recipient = {"email": email.addr_spec}
@@ -181,7 +229,7 @@ class UnisenderGoPayload(RequestsPayload):
             # See https://godocs.unisender.ru/cc-and-bcc.
             # (For batch sends, these will be adjusted later in self.serialize_data.)
             self.data["headers"][recipient_type] = ", ".join(
-                email.address for email in emails
+                self._format_email_address(email) for email in emails
             )
 
     def set_subject(self, subject: str) -> None:
@@ -193,9 +241,20 @@ class UnisenderGoPayload(RequestsPayload):
         if len(emails) > 1:
             self.unsupported_feature("multiple reply_to addresses")
         if len(emails) > 0:
-            self.data["reply_to"] = emails[0].addr_spec
-            if emails[0].display_name:
-                self.data["reply_to_name"] = emails[0].display_name
+            reply_to = emails[0]
+            self.data["reply_to"] = reply_to.addr_spec
+            display_name = reply_to.display_name
+            if display_name:
+                if self.backend.workaround_display_name_bugs:
+                    # Unisender Go doesn't properly "quote" (RFC 5322) a `reply_to_name`
+                    # containing special characters (comma, parens, etc.), resulting
+                    # in an invalid Reply-To header that can cause problems when the
+                    # recipient tries to reply. (They *do* properly handle special chars
+                    # in `to_name` and `from_name`; this only affects `reply_to_name`.)
+                    if reply_to.address.startswith('"'):  # requires quoted syntax
+                        # Workaround: force RFC-2047 encoded word
+                        display_name = QP_CHARSET.header_encode(display_name)
+                self.data["reply_to_name"] = display_name
 
     def set_extra_headers(self, headers: dict[str, str]) -> None:
         self.data["headers"].update(headers)

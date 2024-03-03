@@ -83,10 +83,10 @@ class UnisenderGoBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
                 Address(display_name="Test From, with comma", addr_spec=self.from_email)
             ),
             to=["test+to1@anymail.dev", '"Recipient 2, OK?" <test+to2@anymail.dev>'],
-            cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
-            bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
+            cc=["test+cc1@anymail.dev", '"Copy 2, OK?" <test+cc2@anymail.dev>'],
+            bcc=["test+bcc1@anymail.dev", '"BCC 2, OK?" <bcc2@anymail.dev>'],
             # Unisender Go only supports a single reply-to:
-            reply_to=['"Reply, with comma" <reply@example.com>'],
+            reply_to=['"Reply, with comma (and parens)" <reply@example.com>'],
             headers={"X-Anymail-Test": "value", "X-Anymail-Count": 3},
             metadata={"meta1": "simple string", "meta2": 2},
             send_at=send_at,

@@ -176,6 +176,33 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
         )
         self.assertNotIn("bcc", headers)
 
+    def test_display_names_with_commas(self):
+        # Verify workaround for Unisender Go bug parsing to/cc headers
+        # with display names containing commas
+        self.message.to = [
+            '"With, Comma" <to1@example.com>',
+            '"(without) comma" <to2@example.com>',
+        ]
+        self.message.cc = [
+            '"With, Comma" <cc1@example.com>',
+            '"(without) comma" <cc2@example.com>',
+        ]
+        self.message.send()
+        data = self.get_api_call_json()
+        headers = data["message"]["headers"]
+        # display-name with comma converted to RFC 2047 encoded word;
+        # not necessary for display names with other special characters
+        self.assertEqual(
+            headers["to"],
+            "=?utf-8?q?With=2C_Comma?= <to1@example.com>, "
+            '"(without) comma" <to2@example.com>',
+        )
+        self.assertEqual(
+            headers["cc"],
+            "=?utf-8?q?With=2C_Comma?= <cc1@example.com>, "
+            '"(without) comma" <cc2@example.com>',
+        )
+
     def test_html_message(self):
         text_content = "This is an important message."
         html_content = "<p>This is an <strong>important</strong> message.</p>"
@@ -239,6 +266,16 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
         data = self.get_api_call_json()
         self.assertEqual(data["message"]["reply_to"], "reply@example.com")
         self.assertEqual(data["message"]["reply_to_name"], "Reply recipient")
+
+    def test_reply_to_name_workaround(self):
+        # Check workaround for reply-to display-name containing special chars
+        self.message.reply_to = ['"Reply (parens)" <reply@example.com']
+        self.message.send()
+        data = self.get_api_call_json()
+        # Special chars force RFC 2047 encoded word
+        self.assertEqual(
+            data["message"]["reply_to_name"], "=?utf-8?q?Reply_=28parens=29?="
+        )
 
     def test_attachments(self):
         text_content = "* Item one\n* Item two\n* Item three"
