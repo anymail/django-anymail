@@ -3,6 +3,7 @@ from __future__ import annotations
 from email.headerregistry import Address
 
 from django.test import SimpleTestCase, override_settings, tag
+from requests.structures import CaseInsensitiveDict
 
 from anymail.backends.unisender_go import EmailBackend, UnisenderGoPayload
 from anymail.message import AnymailMessage
@@ -63,6 +64,47 @@ class TestUnisenderGoPayload(SimpleTestCase):
         }
 
         self.assertEqual(payload.data, expected_payload)
+
+    def test_unisender_go_payload__cc_bcc(self):
+        cc_to_email = "receiver_cc@test.test"
+        bcc_to_email = "receiver_bcc@test.test"
+        email = AnymailMessage(
+            template_id=TEMPLATE_ID,
+            subject=SUBJECT,
+            merge_global_data=GLOBAL_DATA,
+            from_email=f"{FROM_NAME} <{FROM_EMAIL}>",
+            to=[
+                str(Address(display_name=TO_NAME, addr_spec=TO_EMAIL)),
+                str(Address(display_name=OTHER_TO_NAME, addr_spec=OTHER_TO_EMAIL)),
+            ],
+            cc=[cc_to_email],
+            bcc=[bcc_to_email],
+        )
+        backend = EmailBackend()
+
+        payload = UnisenderGoPayload(
+            message=email, backend=backend, defaults=backend.send_defaults
+        )
+        expected_headers = {
+            "To": f"{TO_NAME} <{TO_EMAIL}>, {OTHER_TO_NAME} <{OTHER_TO_EMAIL}>",
+            "CC": cc_to_email,
+        }
+        expected_headers = CaseInsensitiveDict(expected_headers)
+        expected_recipients = [
+            {
+                "email": TO_EMAIL,
+                "substitutions": {"to_name": TO_NAME},
+            },
+            {
+                "email": OTHER_TO_EMAIL,
+                "substitutions": {"to_name": OTHER_TO_NAME},
+            },
+            {"email": cc_to_email},
+            {"email": bcc_to_email},
+        ]
+
+        self.assertEqual(payload.data["headers"], expected_headers)
+        self.assertCountEqual(payload.data["recipients"], expected_recipients)
 
     def test_unisender_go_payload__parse_from__with_name(self):
         email = AnymailMessage(
