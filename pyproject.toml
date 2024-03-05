@@ -14,7 +14,7 @@ authors = [
 description = """\
     Django email backends and webhooks for Amazon SES, Brevo (Sendinblue),
     MailerSend, Mailgun, Mailjet, Mandrill, Postal, Postmark, Resend,
-    SendGrid, Unisender GO and SparkPost\
+    SendGrid, SparkPost and Unisender Go\
     """
 # readme: see tool.hatch.metadata.hooks.custom below
 keywords = [
@@ -24,7 +24,8 @@ keywords = [
     "MailerSend", "Mailgun", "Mailjet", "Mandrill",
     "Postal", "Postmark",
     "Resend",
-    "SendGrid", "SendinBlue", "SparkPost", "Unisender GO"
+    "SendGrid", "SendinBlue", "SparkPost",
+    "Unisender Go",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
