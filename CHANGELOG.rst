@@ -44,6 +44,13 @@ Features
   (Thanks to `@Arondit`_ for the implementation.)
 
 
+Fixes
+~~~~~
+
+* **Mailgun:** Avoid an error when Mailgun posts null delivery-status
+  to the event tracking webhook. (Thanks to `@izimobil`_ for the fix.)
+
+
 v10.2
 -----
 
@@ -1595,6 +1602,7 @@ Features
 .. _@Flexonze: https://github.com/Flexonze
 .. _@gdvalderrama: https://github.com/gdvalderrama
 .. _@Honza-m: https://github.com/Honza-m
+.. _@izimobil: https://github.com/izimobil
 .. _@janneThoft: https://github.com/janneThoft
 .. _@jc-ee: https://github.com/jc-ee
 .. _@joshkersey: https://github.com/joshkersey
