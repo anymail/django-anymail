@@ -176,31 +176,33 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
         )
         self.assertNotIn("bcc", headers)
 
-    def test_display_names_with_commas(self):
+    def test_display_names_with_special_chars(self):
         # Verify workaround for Unisender Go bug parsing to/cc headers
-        # with display names containing commas
+        # with display names containing commas, angle brackets, or at sign
         self.message.to = [
             '"With, Comma" <to1@example.com>',
-            '"(without) comma" <to2@example.com>',
+            '"angle <brackets>" <to2@example.com>',
+            '"(without) special / chars" <to3@example.com>',
         ]
         self.message.cc = [
-            '"With, Comma" <cc1@example.com>',
-            '"(without) comma" <cc2@example.com>',
+            '"Someone @example.com" <cc1@example.com>',
+            '"[without] special & chars" <cc2@example.com>',
         ]
         self.message.send()
         data = self.get_api_call_json()
         headers = data["message"]["headers"]
-        # display-name with comma converted to RFC 2047 encoded word;
+        # display-name with , < > @ converted to RFC 2047 encoded word;
         # not necessary for display names with other special characters
         self.assertEqual(
             headers["to"],
             "=?utf-8?q?With=2C_Comma?= <to1@example.com>, "
-            '"(without) comma" <to2@example.com>',
+            "=?utf-8?q?angle_=3Cbrackets=3E?= <to2@example.com>, "
+            '"(without) special / chars" <to3@example.com>',
         )
         self.assertEqual(
             headers["cc"],
-            "=?utf-8?q?With=2C_Comma?= <cc1@example.com>, "
-            '"(without) comma" <cc2@example.com>',
+            "=?utf-8?q?Someone_=40example=2Ecom?= <cc1@example.com>, "
+            '"[without] special & chars" <cc2@example.com>',
         )
 
     def test_html_message(self):

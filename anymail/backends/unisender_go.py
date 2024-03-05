@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import typing
 import uuid
 from datetime import datetime, timezone
@@ -192,14 +193,13 @@ class UnisenderGoPayload(RequestsPayload):
         Return EmailAddress address formatted for use with Unisender Go to/cc headers.
 
         Works around a bug in Unisender Go's API that rejects To or Cc headers
-        containing commas in any display-name, despite those names being properly
-        enclosed in "quotes" per RFC 5322. Workaround substitutes an RFC 2047
-        encoded word, which avoids the comma that confuses Unisender Go's parser.
+        containing commas, angle brackets, or @ in any display-name, despite those
+        names being properly enclosed in "quotes" per RFC 5322. Workaround substitutes
+        an RFC 2047 encoded word, which avoids the problem characters.
 
         Note that parens, quote chars, and other special characters appearing
-        in "quoted strings" don't cause problems. (Unisender Go is likely splitting
-        the to/cc headers on "," and then trying to parse each segment as an email
-        address, rather than using a parser designed for complete address headers.)
+        in "quoted strings" don't cause problems. (Unisender Go tech support
+        has confirmed the problem is limited to , < > @.)
 
         This workaround is only necessary in the To and Cc headers. Unisender Go
         properly formats commas and other characters in `to_name` and `from_name`.
@@ -207,8 +207,10 @@ class UnisenderGoPayload(RequestsPayload):
         """
         formatted = address.address
         if self.backend.workaround_display_name_bugs:
-            if "," in formatted:
-                # Workaround: force RFC-2047 encoded word
+            # Workaround: force RFC-2047 QP encoded word for display_name if it has
+            # prohibited chars (and isn't already encoded in the formatted address)
+            display_name = address.display_name
+            if re.search(r"[,<>@]", display_name) and display_name in formatted:
                 formatted = str(
                     Address(
                         display_name=QP_CHARSET.header_encode(address.display_name),
