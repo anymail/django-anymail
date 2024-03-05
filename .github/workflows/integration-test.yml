@@ -50,6 +50,7 @@ jobs:
           - { tox: django41-py310-sendgrid, python: "3.10" }
           - { tox: django41-py310-sendinblue, python: "3.10" }
           - { tox: django41-py310-sparkpost, python: "3.10" }
+          - { tox: django41-py310-unisender_go, python: "3.10" }
 
     steps:
       - name: Get code
