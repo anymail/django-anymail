@@ -630,6 +630,63 @@ class MailgunTestCase(WebhookTestCase):
         self.assertEqual(event.event_type, "clicked")
         self.assertEqual(event.click_url, "https://example.com/test")
 
+    def test_no_delivery_status(self):
+        raw_event = mailgun_sign_payload(
+            {
+                "signature": {
+                    "timestamp": "1534108637",
+                    "token": "651869375b9df3c98fc15c4889b102119add1235c38fc92824",
+                    "signature": "...",
+                },
+                "event-data": {
+                    "tags": [],
+                    "timestamp": 1534108637.153125,
+                    "storage": {
+                        "url": "https://sw.api.mailgun.net/v3/domains/"
+                        "example.org/messages/eyJwI...",
+                        "key": "eyJwI...",
+                    },
+                    "recipient-domain": "example.com",
+                    "id": "hTWCTD81RtiDN-...",
+                    "campaigns": [],
+                    "user-variables": {},
+                    "flags": {
+                        "is-routed": False,
+                        "is-authenticated": True,
+                        "is-system-test": False,
+                        "is-test-mode": False,
+                    },
+                    "log-level": "info",
+                    "envelope": {
+                        "sending-ip": "333.123.123.200",
+                        "sender": "test@example.org",
+                        "transport": "smtp",
+                        "targets": "recipient@example.com",
+                    },
+                    "message": {
+                        "headers": {
+                            "to": "recipient@example.com",
+                            "message-id": "20180812211713.1.DF5966851B4BAA99"
+                            "@example.org",
+                            "from": "test@example.org",
+                            "subject": "Testing",
+                        },
+                        "attachments": [],
+                        "size": 809,
+                    },
+                    "recipient": "recipient@example.com",
+                    "event": "accepted",
+                    "delivery-status": None,
+                },
+            }
+        )
+        response = self.client.post(
+            "/anymail/mailgun/tracking/",
+            data=json.dumps(raw_event),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
 
 @tag("mailgun")
 @override_settings(ANYMAIL_MAILGUN_WEBHOOK_SIGNING_KEY=TEST_WEBHOOK_SIGNING_KEY)
