@@ -172,12 +172,12 @@ class MailgunTrackingWebhookView(MailgunBaseWebhookView):
 
         try:
             delivery_status = event_data["delivery-status"]
-        except KeyError:
-            description = None
-            mta_response = None
-        else:
+            # if delivery_status is None, an AttributeError will be raised
             description = delivery_status.get("description")
             mta_response = delivery_status.get("message")
+        except (KeyError, AttributeError):
+            description = None
+            mta_response = None
 
         if "reason" in event_data:
             reject_reason = self.reject_reasons.get(
