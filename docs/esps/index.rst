@@ -23,6 +23,7 @@ and notes about any quirks or limitations:
    resend
    sendgrid
    sparkpost
+   unisender_go
 
 
 Anymail feature support

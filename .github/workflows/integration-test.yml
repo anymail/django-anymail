@@ -50,6 +50,7 @@ jobs:
           - { tox: django41-py310-sendgrid, python: "3.10" }
           - { tox: django41-py310-sendinblue, python: "3.10" }
           - { tox: django41-py310-sparkpost, python: "3.10" }
+          - { tox: django41-py310-unisender_go, python: "3.10" }
 
     steps:
       - name: Get code
@@ -97,3 +98,7 @@ jobs:
           ANYMAIL_TEST_SENDINBLUE_DOMAIN: ${{ secrets.ANYMAIL_TEST_SENDINBLUE_DOMAIN }}
           ANYMAIL_TEST_SPARKPOST_API_KEY: ${{ secrets.ANYMAIL_TEST_SPARKPOST_API_KEY }}
           ANYMAIL_TEST_SPARKPOST_DOMAIN: ${{ secrets.ANYMAIL_TEST_SPARKPOST_DOMAIN }}
+          ANYMAIL_TEST_UNISENDER_GO_API_KEY: ${{ secrets.ANYMAIL_TEST_UNISENDER_GO_API_KEY }}
+          ANYMAIL_TEST_UNISENDER_GO_API_URL: ${{ vars.ANYMAIL_TEST_UNISENDER_GO_API_URL }}
+          ANYMAIL_TEST_UNISENDER_GO_DOMAIN: ${{ vars.ANYMAIL_TEST_UNISENDER_GO_DOMAIN }}
+          ANYMAIL_TEST_UNISENDER_GO_TEMPLATE_ID: ${{ vars.ANYMAIL_TEST_UNISENDER_GO_TEMPLATE_ID }}

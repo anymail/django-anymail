@@ -23,6 +23,7 @@ from .webhooks.sparkpost import (
     SparkPostInboundWebhookView,
     SparkPostTrackingWebhookView,
 )
+from .webhooks.unisender_go import UnisenderGoTrackingWebhookView
 
 app_name = "anymail"
 urlpatterns = [
@@ -124,6 +125,11 @@ urlpatterns = [
         "sparkpost/tracking/",
         SparkPostTrackingWebhookView.as_view(),
         name="sparkpost_tracking_webhook",
+    ),
+    path(
+        "unisender_go/tracking/",
+        UnisenderGoTrackingWebhookView.as_view(),
+        name="unisender_go_tracking_webhook",
     ),
     # Anymail uses a combined Mandrill webhook endpoint,
     # to simplify Mandrill's key-validation scheme:

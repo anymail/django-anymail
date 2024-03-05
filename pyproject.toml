@@ -14,7 +14,7 @@ authors = [
 description = """\
     Django email backends and webhooks for Amazon SES, Brevo (Sendinblue),
     MailerSend, Mailgun, Mailjet, Mandrill, Postal, Postmark, Resend,
-    SendGrid, and SparkPost\
+    SendGrid, SparkPost and Unisender Go\
     """
 # readme: see tool.hatch.metadata.hooks.custom below
 keywords = [
@@ -25,6 +25,7 @@ keywords = [
     "Postal", "Postmark",
     "Resend",
     "SendGrid", "SendinBlue", "SparkPost",
+    "Unisender Go",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -74,6 +75,7 @@ resend = ["svix"]
 sendgrid = []
 sendinblue = []
 sparkpost = []
+unisender-go = []
 postal = [
     # Postal requires cryptography for verifying webhooks.
     # Cryptography's wheels are broken on darwin-arm64 before Python 3.9.
