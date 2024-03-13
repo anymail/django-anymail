@@ -443,7 +443,7 @@ To update your code:
 
 2.  If you are using Anymail's status tracking webhook,
     go to Brevo's dashboard (under `Transactional > Email > Settings > Webhook`_),
-    and change the end or the URL from ``.../anymail/sendinblue/tracking/``
+    and change the end of the URL from ``.../anymail/sendinblue/tracking/``
     to ``.../anymail/brevo/tracking/``. (Or use the code below to automate this.)
 
     In your :ref:`tracking signal receiver function <signal-receivers>`,
