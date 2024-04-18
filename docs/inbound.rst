@@ -304,7 +304,7 @@ Normalized inbound message
     .. code-block:: python
 
         message['reply-to']  # the Reply-To header (header keys are case-insensitive)
-        message.getall('DKIM-Signature')  # list of all DKIM-Signature headers
+        message.get_all('DKIM-Signature')  # list of all DKIM-Signature headers
 
     And you can use Message methods like :meth:`~email.message.EmailMessage.walk` and
     :meth:`~email.message.EmailMessage.get_content_type` to examine more-complex
