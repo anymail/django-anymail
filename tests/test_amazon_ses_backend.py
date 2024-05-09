@@ -560,6 +560,14 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
         ):
             self.message.send()
 
+    def test_merge_header_data(self):
+        # Amazon SES only supports merging when using templates (see below)
+        self.message.merge_header_data = {}
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "merge_header_data without template_id"
+        ):
+            self.message.send()
+
     @override_settings(
         # only way to use tags with template_id:
         ANYMAIL_AMAZON_SES_MESSAGE_TAG_NAME="Campaign"
@@ -594,6 +602,12 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
                 "alice@example.com": {"name": "Alice", "group": "Developers"},
                 "bob@example.com": {"name": "Bob"},  # and leave group undefined
                 "nobody@example.com": {"name": "Not a recipient for this message"},
+            },
+            merge_header_data={
+                "alice@example.com": [
+                    {"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/a/"}],
+                "nobody@example.com": [
+                    {"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/b/"}]
             },
             merge_global_data={"group": "Users", "site": "ExampleCo"},
             # (only works with AMAZON_SES_MESSAGE_TAG_NAME when using template):
@@ -645,6 +659,14 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
                 ]
             ),
             {"name": "Bob"},
+        )
+        self.assertEqual(
+            bulk_entries[0]["ReplacementHeaders"],
+            [{"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/a/"}],
+        )
+        self.assertEqual(
+            bulk_entries[1]["ReplacementHeaders"],
+            [],
         )
         self.assertEqual(
             json.loads(params["DefaultContent"]["Template"]["TemplateData"]),

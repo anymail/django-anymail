@@ -28,6 +28,7 @@ class AnymailMessageMixin(EmailMessage):
         self.track_opens = kwargs.pop("track_opens", UNSET)
         self.template_id = kwargs.pop("template_id", UNSET)
         self.merge_data = kwargs.pop("merge_data", UNSET)
+        self.merge_header_data = kwargs.pop("merge_header_data", UNSET)
         self.merge_global_data = kwargs.pop("merge_global_data", UNSET)
         self.merge_metadata = kwargs.pop("merge_metadata", UNSET)
         self.anymail_status = AnymailStatus()
