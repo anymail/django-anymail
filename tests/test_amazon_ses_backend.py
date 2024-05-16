@@ -605,9 +605,11 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
             },
             merge_header_data={
                 "alice@example.com": [
-                    {"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/a/"}],
+                    {"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/a/"}
+                ],
                 "nobody@example.com": [
-                    {"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/b/"}]
+                    {"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/b/"}
+                ],
             },
             merge_global_data={"group": "Users", "site": "ExampleCo"},
             # (only works with AMAZON_SES_MESSAGE_TAG_NAME when using template):

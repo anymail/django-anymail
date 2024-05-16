@@ -369,7 +369,7 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
                         ),
                     }
                 },
-                "ReplacementHeaders": self.merge_header_data.get(to.addr_spec, [])
+                "ReplacementHeaders": self.merge_header_data.get(to.addr_spec, []),
             }
             for to in self.recipients["to"]
         ]
