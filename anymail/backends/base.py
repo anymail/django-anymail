@@ -285,8 +285,8 @@ class BasePayload:
         ("track_opens", last, None),
         ("template_id", last, force_non_lazy),
         ("merge_data", merge_dicts_one_level, force_non_lazy_dict),
-        ("merge_header_data", None, None),
         ("merge_global_data", merge_dicts_shallow, force_non_lazy_dict),
+        ("merge_headers", None, None),
         ("merge_metadata", merge_dicts_one_level, force_non_lazy_dict),
         ("esp_extra", merge_dicts_deep, force_non_lazy_dict),
     )
@@ -294,7 +294,7 @@ class BasePayload:
 
     # If any of these attrs are set on a message, treat the message
     # as a batch send (separate message for each `to` recipient):
-    batch_attrs = ("merge_data", "merge_header_data", "merge_metadata")
+    batch_attrs = ("merge_data", "merge_headers", "merge_metadata")
 
     def __init__(self, message, defaults, backend):
         self.message = message
@@ -618,8 +618,8 @@ class BasePayload:
     def set_merge_data(self, merge_data):
         self.unsupported_feature("merge_data")
 
-    def set_merge_header_data(self, merge_data):
-        self.unsupported_feature("set_merge_header_data")
+    def set_merge_headers(self, merge_headers):
+        self.unsupported_feature("merge_headers")
 
     def set_merge_global_data(self, merge_global_data):
         self.unsupported_feature("merge_global_data")

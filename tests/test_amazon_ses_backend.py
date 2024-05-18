@@ -560,13 +560,63 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
         ):
             self.message.send()
 
-    def test_merge_header_data(self):
+    def test_merge_headers(self):
         # Amazon SES only supports merging when using templates (see below)
-        self.message.merge_header_data = {}
+        self.message.merge_headers = {}
         with self.assertRaisesMessage(
-            AnymailUnsupportedFeature, "merge_header_data without template_id"
+            AnymailUnsupportedFeature, "merge_headers without template_id"
         ):
             self.message.send()
+
+    @override_settings(
+        # only way to use tags with template_id:
+        ANYMAIL_AMAZON_SES_MESSAGE_TAG_NAME="Campaign"
+    )
+    def test_template_dont_add_merge_headers(self):
+        """With template_id, Anymail switches to SESv2 SendBulkEmail"""
+        # SendBulkEmail uses a completely different API call and payload
+        # structure, so this re-tests a bunch of Anymail features that were handled
+        # differently above. (See test_amazon_ses_integration for a more realistic
+        # template example.)
+        raw_response = {
+            "BulkEmailEntryResults": [
+                {
+                    "Status": "SUCCESS",
+                    "MessageId": "1111111111111111-bbbbbbbb-3333-7777",
+                },
+                {
+                    "Status": "ACCOUNT_DAILY_QUOTA_EXCEEDED",
+                    "Error": "Daily message quota exceeded",
+                },
+            ],
+            "ResponseMetadata": self.DEFAULT_SEND_RESPONSE["ResponseMetadata"],
+        }
+        self.set_mock_response(raw_response, operation_name="send_bulk_email")
+        message = AnymailMessage(
+            template_id="welcome_template",
+            from_email='"Example, Inc." <from@example.com>',
+            to=["alice@example.com", "罗伯特 <bob@example.com>"],
+            cc=["cc@example.com"],
+            reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
+            merge_data={
+                "alice@example.com": {"name": "Alice", "group": "Developers"},
+                "bob@example.com": {"name": "Bob"},  # and leave group undefined
+                "nobody@example.com": {"name": "Not a recipient for this message"},
+            },
+            merge_global_data={"group": "Users", "site": "ExampleCo"},
+            # (only works with AMAZON_SES_MESSAGE_TAG_NAME when using template):
+            tags=["WelcomeVariantA"],
+            envelope_sender="bounce@example.com",
+            esp_extra={
+                "FromEmailAddressIdentityArn": (
+                    "arn:aws:ses:us-east-1:123456789012:identity/example.com"
+                )
+            },
+        )
+        message.send()
+
+        params = self.get_send_params(operation_name="send_bulk_email")
+        self.assertNotIn("ReplacementHeaders", params["BulkEmailEntries"][0])
 
     @override_settings(
         # only way to use tags with template_id:
@@ -603,7 +653,7 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
                 "bob@example.com": {"name": "Bob"},  # and leave group undefined
                 "nobody@example.com": {"name": "Not a recipient for this message"},
             },
-            merge_header_data={
+            merge_headers={
                 "alice@example.com": [
                     {"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/a/"}
                 ],

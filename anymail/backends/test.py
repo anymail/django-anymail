@@ -147,8 +147,8 @@ class TestPayload(BasePayload):
     def set_merge_data(self, merge_data):
         self.params["merge_data"] = merge_data
 
-    def set_merge_header_data(self, merge_data):
-        self.params["merge_header_data"] = merge_data
+    def set_merge_headers(self, merge_headers):
+        self.params["merge_headers"] = merge_headers
 
     def set_merge_metadata(self, merge_metadata):
         self.params["merge_metadata"] = merge_metadata

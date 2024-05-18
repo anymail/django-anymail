@@ -298,6 +298,9 @@ class AmazonSESV2SendEmailPayload(AmazonSESBasePayload):
         # metadata.
         self.mime_message["X-Metadata"] = self.serialize_json(metadata)
 
+    def set_merge_headers(self, merge_headers):
+        self.unsupported_feature("merge_headers without template_id")
+
     def set_tags(self, tags):
         # See note about Amazon SES Message Tags and custom headers in set_metadata
         # above. To support reliable retrieval in webhooks, use custom headers for tags.
@@ -327,9 +330,6 @@ class AmazonSESV2SendEmailPayload(AmazonSESBasePayload):
     def set_merge_data(self, merge_data):
         self.unsupported_feature("merge_data without template_id")
 
-    def set_merge_header_data(self, merge_data):
-        self.unsupported_feature("merge_header_data without template_id")
-
     def set_merge_global_data(self, merge_global_data):
         self.unsupported_feature("global_merge_data without template_id")
 
@@ -342,7 +342,7 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
         # late-bind recipients and merge_data in finalize_payload
         self.recipients = {"to": [], "cc": [], "bcc": []}
         self.merge_data = {}
-        self.merge_header_data = {}
+        self.merge_headers = {}
 
     def finalize_payload(self):
         # Build BulkEmailEntries from recipients and merge_data.
@@ -359,8 +359,9 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
             ]
 
         # Construct an entry with merge data for each "to" recipient:
-        self.params["BulkEmailEntries"] = [
-            {
+        self.params["BulkEmailEntries"] = []
+        for to in self.recipients["to"]:
+            entry = {
                 "Destination": dict(ToAddresses=[to.address], **cc_and_bcc_addresses),
                 "ReplacementEmailContent": {
                     "ReplacementTemplate": {
@@ -369,10 +370,11 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
                         ),
                     }
                 },
-                "ReplacementHeaders": self.merge_header_data.get(to.addr_spec, []),
             }
-            for to in self.recipients["to"]
-        ]
+
+            if len(self.merge_headers) > 0:
+                entry["ReplacementHeaders"] = self.merge_headers.get(to.addr_spec, [])
+            self.params["BulkEmailEntries"].append(entry)
 
     def parse_recipient_status(self, response):
         try:
@@ -495,9 +497,9 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
         # late-bound in finalize_payload
         self.merge_data = merge_data
 
-    def set_merge_header_data(self, merge_data):
+    def set_merge_headers(self, merge_headers):
         # late-bound in finalize_payload
-        self.merge_header_data = merge_data
+        self.merge_headers = merge_headers
 
     def set_merge_global_data(self, merge_global_data):
         # DefaultContent.Template.TemplateData
