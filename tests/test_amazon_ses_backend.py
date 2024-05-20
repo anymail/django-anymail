@@ -655,10 +655,15 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
             },
             merge_headers={
                 "alice@example.com": [
-                    {"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/a/"}
+                    {"Name": "List-Unsubscribe", "Value": "<https://example.com/a/>"},
+                    {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
                 ],
                 "nobody@example.com": [
-                    {"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/b/"}
+                    {
+                        "Name": "List-Unsubscribe",
+                        "Value": "<mailto:unsubscribe@example.com>",
+                    },
+                    {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
                 ],
             },
             merge_global_data={"group": "Users", "site": "ExampleCo"},
@@ -712,9 +717,13 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
             ),
             {"name": "Bob"},
         )
+
         self.assertEqual(
             bulk_entries[0]["ReplacementHeaders"],
-            [{"Name": "List-Unsubscribe-Post", "Value": "https://xyz.com/a/"}],
+            [
+                {"Name": "List-Unsubscribe", "Value": "<https://example.com/a/>"},
+                {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
+            ],
         )
         self.assertEqual(
             bulk_entries[1]["ReplacementHeaders"],
