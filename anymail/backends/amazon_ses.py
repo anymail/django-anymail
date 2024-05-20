@@ -373,7 +373,10 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
             }
 
             if len(self.merge_headers) > 0:
-                entry["ReplacementHeaders"] = self.merge_headers.get(to.addr_spec, [])
+                entry["ReplacementHeaders"] = [
+                    {"Name": key, "Value": value}
+                    for key, value in self.merge_headers.get(to.addr_spec, {}).items()
+                ]
             self.params["BulkEmailEntries"].append(entry)
 
     def parse_recipient_status(self, response):

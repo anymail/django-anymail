@@ -654,17 +654,14 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
                 "nobody@example.com": {"name": "Not a recipient for this message"},
             },
             merge_headers={
-                "alice@example.com": [
-                    {"Name": "List-Unsubscribe", "Value": "<https://example.com/a/>"},
-                    {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
-                ],
-                "nobody@example.com": [
-                    {
-                        "Name": "List-Unsubscribe",
-                        "Value": "<mailto:unsubscribe@example.com>",
-                    },
-                    {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
-                ],
+                "alice@example.com": {
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                },
+                "nobody@example.com": {
+                    "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                },
             },
             merge_global_data={"group": "Users", "site": "ExampleCo"},
             # (only works with AMAZON_SES_MESSAGE_TAG_NAME when using template):
@@ -722,7 +719,10 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
             bulk_entries[0]["ReplacementHeaders"],
             [
                 {"Name": "List-Unsubscribe", "Value": "<https://example.com/a/>"},
-                {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
+                {
+                    "Name": "List-Unsubscribe-Post",
+                    "Value": "List-Unsubscribe=One-Click",
+                },
             ],
         )
         self.assertEqual(
