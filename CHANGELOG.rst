@@ -41,6 +41,13 @@ Breaking changes
   (Anymail 10.0 switched to the SES v2 API by default. If your ``EMAIL_BACKEND``
   setting has ``amazon_sesv2``, change that to just ``amazon_ses``.)
 
+Features
+~~~~~~~~
+
+* **Amazon SES:** Add new ``merge_headers`` option for per-recipient
+  headers with template sends. (Requires boto3 >= 1.34.98.)
+  (Thanks to `@carrerasrodrigo`_ the implementation.)
+
 
 v10.3
 -----
@@ -1615,6 +1622,7 @@ Features
 .. _@Arondit: https://github.com/Arondit
 .. _@b0d0nne11: https://github.com/b0d0nne11
 .. _@calvin: https://github.com/calvin
+.. _@carrerasrodrigo: https://github.com/carrerasrodrigo
 .. _@chrisgrande: https://github.com/chrisgrande
 .. _@cjsoftuk: https://github.com/cjsoftuk
 .. _@costela: https://github.com/costela
