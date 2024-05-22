@@ -160,7 +160,7 @@ messages.)
 
 
 .. _v3 Mail Send API:
-    https://sendgrid.com/docs/API_Reference/Web_API_v3/Mail/index.html#-Request-Body-Parameters
+    https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send#request-body
 
 
 
@@ -300,7 +300,7 @@ duplicated for *every* to-recipient.)
 See the `SendGrid's transactional template overview`_ for more information.
 
 .. _SendGrid's transactional template overview:
-    https://sendgrid.com/docs/ui/sending-email/create-and-edit-transactional-templates/
+    https://www.twilio.com/docs/sendgrid/ui/sending-email/how-to-send-an-email-with-dynamic-templates
 
 
 .. _sendgrid-legacy-templates:
@@ -440,4 +440,4 @@ incoming emails for spam" checkbox.
 
 
 .. _Inbound Parse Webhook:
-   https://sendgrid.com/docs/Classroom/Basics/Inbound_Parse_Webhook/setting_up_the_inbound_parse_webhook.html
+   https://www.twilio.com/docs/sendgrid/for-developers/parsing-email/setting-up-the-inbound-parse-webhook
