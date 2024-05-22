@@ -396,12 +396,12 @@ queued, rejected, bounced, deferred, delivered, opened, clicked, complained, uns
 subscribed.
 
 The event's :attr:`~anymail.signals.AnymailTrackingEvent.esp_event` field will be
-a `dict` of `Sendgrid event`_ fields, for a single event. (Although SendGrid calls
+a `dict` of `SendGrid event`_ fields, for a single event. (Although SendGrid calls
 webhooks with batches of events, Anymail will invoke your signal receiver separately
 for each event in the batch.)
 
 .. _SendGrid mail settings: https://app.sendgrid.com/settings/mail_settings
-.. _Sendgrid event: https://www.twilio.com/docs/sendgrid/api-reference/webhooks
+.. _SendGrid event: https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/event#delivery-events
 
 
 .. _sendgrid-inbound:
