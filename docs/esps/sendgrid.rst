@@ -15,7 +15,7 @@ Anymail integrates with the `SendGrid`_ email service, using their `Web API v3`_
     to succeed, and reports these errors as drop events.
 
 .. _SendGrid: https://sendgrid.com/
-.. _Web API v3: https://sendgrid.com/docs/API_Reference/Web_API_v3/Mail/index.html
+.. _Web API v3: https://www.twilio.com/docs/sendgrid/api-reference
 .. _activity feed: https://app.sendgrid.com/email_activity?events=drops
 
 
@@ -401,7 +401,7 @@ webhooks with batches of events, Anymail will invoke your signal receiver separa
 for each event in the batch.)
 
 .. _SendGrid mail settings: https://app.sendgrid.com/settings/mail_settings
-.. _Sendgrid event: https://sendgrid.com/docs/API_Reference/Webhooks/event.html
+.. _Sendgrid event: https://www.twilio.com/docs/sendgrid/api-reference/settings-tracking
 
 
 .. _sendgrid-inbound:
