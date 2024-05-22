@@ -401,7 +401,7 @@ webhooks with batches of events, Anymail will invoke your signal receiver separa
 for each event in the batch.)
 
 .. _SendGrid mail settings: https://app.sendgrid.com/settings/mail_settings
-.. _Sendgrid event: https://www.twilio.com/docs/sendgrid/api-reference/settings-tracking
+.. _Sendgrid event: https://www.twilio.com/docs/sendgrid/api-reference/webhooks
 
 
 .. _sendgrid-inbound:
