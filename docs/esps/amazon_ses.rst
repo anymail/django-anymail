@@ -68,6 +68,11 @@ setting to customize the Boto session.
 Limitations and quirks
 ----------------------
 
+.. versionchanged:: 11.0
+
+    Anymail's :attr:`~anymail.message.AnymailMessage.merge_metadata`
+    is now supported.
+
 **Hard throttling**
   Like most ESPs, Amazon SES `throttles sending`_ for new customers. But unlike
   most ESPs, SES does not queue and slowly release throttled messages. Instead, it
@@ -79,11 +84,6 @@ Limitations and quirks
   Anymail tries to provide a useful, portable default behavior for its
   :attr:`~anymail.message.AnymailMessage.tags` feature. See :ref:`amazon-ses-tags`
   below for more information and additional options.
-
-**No merge_metadata**
-  Amazon SES's batch sending API does not support the custom headers Anymail uses
-  for metadata, so Anymail's :attr:`~anymail.message.AnymailMessage.merge_metadata`
-  feature is not available. (See :ref:`amazon-ses-tags` below for more information.)
 
 **Open and click tracking overrides**
   Anymail's :attr:`~anymail.message.AnymailMessage.track_opens` and
@@ -126,7 +126,7 @@ Limitations and quirks
   signal, and using it will likely prevent delivery of your email.)
 
 **Template limitations**
-  Messages sent with templates have a number of additional limitations, such as not
+  Messages sent with templates have some additional limitations, such as not
   supporting attachments. See :ref:`amazon-ses-templates` below.
 
 
@@ -195,12 +195,7 @@ characters.
 
 For more complex use cases, set the SES ``EmailTags`` parameter (or ``DefaultEmailTags``
 for template sends) directly in Anymail's :ref:`esp_extra <amazon-ses-esp-extra>`. See
-the example below. (Because custom headers do not work with SES's SendBulkEmail call,
-esp_extra ``DefaultEmailTags`` is the only way to attach data to SES messages also using
-Anymail's :attr:`~anymail.message.AnymailMessage.template_id` and
-:attr:`~anymail.message.AnymailMessage.merge_data` features, and
-:attr:`~anymail.message.AnymailMessage.merge_metadata` cannot be supported.)
-
+the example below.
 
 .. _Introducing Sending Metrics:
     https://aws.amazon.com/blogs/ses/introducing-sending-metrics/
@@ -264,9 +259,10 @@ See Amazon's `Sending personalized email`_ guide for more information.
 When you set a message's :attr:`~anymail.message.AnymailMessage.template_id`
 to the name of one of your SES templates, Anymail will use the SES v2 `SendBulkEmail`_
 call to send template messages personalized with data
-from Anymail's normalized :attr:`~anymail.message.AnymailMessage.merge_data`
-and :attr:`~anymail.message.AnymailMessage.merge_global_data`
-message attributes.
+from Anymail's normalized :attr:`~anymail.message.AnymailMessage.merge_data`,
+:attr:`~anymail.message.AnymailMessage.merge_global_data`,
+:attr:`~anymail.message.AnymailMessage.merge_metadata`, and
+:attr:`~anymail.message.AnymailMessage.merge_headers` message attributes.
 
   .. code-block:: python
 
@@ -284,17 +280,21 @@ message attributes.
           'ship_date': "May 15",
       }
 
-Amazon's templated email APIs don't support several features available for regular email.
+Amazon's templated email APIs don't support a few features available for regular email.
 When :attr:`~anymail.message.AnymailMessage.template_id` is used:
 
-* Attachments and alternative parts (including AMPHTML) are not supported
-* Extra headers are not supported
+* Attachments and inline images are not supported
+* Alternative parts (including AMPHTML) are not supported
 * Overriding the template's subject or body is not supported
-* Anymail's :attr:`~anymail.message.AnymailMessage.metadata` is not supported
-* Anymail's :attr:`~anymail.message.AnymailMessage.tags` are only supported
-  with the :setting:`AMAZON_SES_MESSAGE_TAG_NAME <ANYMAIL_AMAZON_SES_MESSAGE_TAG_NAME>`
-  setting; only a single tag is allowed, and the tag is not directly available
-  to webhooks. (See :ref:`amazon-ses-tags` above.)
+
+.. versionchanged:: 11.0
+
+    Extra headers, :attr:`~anymail.message.AnymailMessage.metadata`,
+    :attr:`~anymail.message.AnymailMessage.merge_metadata`, and
+    :attr:`~anymail.message.AnymailMessage.tags` are now fully supported
+    when using :attr:`~anymail.message.AnymailMessage.template_id`.
+    (This requires :pypi:`boto3` v1.34.98 or later, which enables the
+    ReplacementHeaders parameter for SendBulkEmail.)
 
 .. _Sending personalized email:
    https://docs.aws.amazon.com/ses/latest/DeveloperGuide/send-personalized-email-api.html

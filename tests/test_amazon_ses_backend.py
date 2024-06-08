@@ -568,60 +568,6 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
         ):
             self.message.send()
 
-    @override_settings(
-        # only way to use tags with template_id:
-        ANYMAIL_AMAZON_SES_MESSAGE_TAG_NAME="Campaign"
-    )
-    def test_template_dont_add_merge_headers(self):
-        """With template_id, Anymail switches to SESv2 SendBulkEmail"""
-        # SendBulkEmail uses a completely different API call and payload
-        # structure, so this re-tests a bunch of Anymail features that were handled
-        # differently above. (See test_amazon_ses_integration for a more realistic
-        # template example.)
-        raw_response = {
-            "BulkEmailEntryResults": [
-                {
-                    "Status": "SUCCESS",
-                    "MessageId": "1111111111111111-bbbbbbbb-3333-7777",
-                },
-                {
-                    "Status": "ACCOUNT_DAILY_QUOTA_EXCEEDED",
-                    "Error": "Daily message quota exceeded",
-                },
-            ],
-            "ResponseMetadata": self.DEFAULT_SEND_RESPONSE["ResponseMetadata"],
-        }
-        self.set_mock_response(raw_response, operation_name="send_bulk_email")
-        message = AnymailMessage(
-            template_id="welcome_template",
-            from_email='"Example, Inc." <from@example.com>',
-            to=["alice@example.com", "罗伯特 <bob@example.com>"],
-            cc=["cc@example.com"],
-            reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
-            merge_data={
-                "alice@example.com": {"name": "Alice", "group": "Developers"},
-                "bob@example.com": {"name": "Bob"},  # and leave group undefined
-                "nobody@example.com": {"name": "Not a recipient for this message"},
-            },
-            merge_global_data={"group": "Users", "site": "ExampleCo"},
-            # (only works with AMAZON_SES_MESSAGE_TAG_NAME when using template):
-            tags=["WelcomeVariantA"],
-            envelope_sender="bounce@example.com",
-            esp_extra={
-                "FromEmailAddressIdentityArn": (
-                    "arn:aws:ses:us-east-1:123456789012:identity/example.com"
-                )
-            },
-        )
-        message.send()
-
-        params = self.get_send_params(operation_name="send_bulk_email")
-        self.assertNotIn("ReplacementHeaders", params["BulkEmailEntries"][0])
-
-    @override_settings(
-        # only way to use tags with template_id:
-        ANYMAIL_AMAZON_SES_MESSAGE_TAG_NAME="Campaign"
-    )
     def test_template(self):
         """With template_id, Anymail switches to SESv2 SendBulkEmail"""
         # SendBulkEmail uses a completely different API call and payload
@@ -648,24 +594,29 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
             to=["alice@example.com", "罗伯特 <bob@example.com>"],
             cc=["cc@example.com"],
             reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
+            headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+            merge_headers={
+                "alice@example.com": {
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                },
+                "bob@example.com": {
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
             merge_data={
                 "alice@example.com": {"name": "Alice", "group": "Developers"},
                 "bob@example.com": {"name": "Bob"},  # and leave group undefined
                 "nobody@example.com": {"name": "Not a recipient for this message"},
             },
-            merge_headers={
-                "alice@example.com": {
-                    "List-Unsubscribe": "<https://example.com/a/>",
-                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                },
-                "nobody@example.com": {
-                    "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
-                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                },
-            },
             merge_global_data={"group": "Users", "site": "ExampleCo"},
-            # (only works with AMAZON_SES_MESSAGE_TAG_NAME when using template):
-            tags=["WelcomeVariantA"],
+            tags=["Welcome Variant A", "Cohort 12/2017"],
+            metadata={"meta1": "test"},
+            merge_metadata={
+                "alice@example.com": {"meta2": "meta-alice"},
+            },
             envelope_sender="bounce@example.com",
             esp_extra={
                 "FromEmailAddressIdentityArn": (
@@ -715,19 +666,40 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
             {"name": "Bob"},
         )
 
-        self.assertEqual(
+        self.assertCountEqual(
             bulk_entries[0]["ReplacementHeaders"],
             [
-                {"Name": "List-Unsubscribe", "Value": "<https://example.com/a/>"},
+                # From extra_headers and merge_headers:
                 {
                     "Name": "List-Unsubscribe-Post",
                     "Value": "List-Unsubscribe=One-Click",
                 },
+                {"Name": "List-Unsubscribe", "Value": "<https://example.com/a/>"},
+                # From metadata and merge_metadata:
+                {
+                    "Name": "X-Metadata",
+                    "Value": '{"meta1": "test", "meta2": "meta-alice"}',
+                },
+                # From tags:
+                {"Name": "X-Tag", "Value": "Welcome Variant A"},
+                {"Name": "X-Tag", "Value": "Cohort 12/2017"},
             ],
         )
-        self.assertEqual(
+        self.assertCountEqual(
             bulk_entries[1]["ReplacementHeaders"],
-            [],
+            [
+                # From extra_headers and merge_headers:
+                {
+                    "Name": "List-Unsubscribe-Post",
+                    "Value": "List-Unsubscribe=One-Click",
+                },
+                {"Name": "List-Unsubscribe", "Value": "<https://example.com/b/>"},
+                # From metadata (no merge_metadata for bob@):
+                {"Name": "X-Metadata", "Value": '{"meta1": "test"}'},
+                # From tags:
+                {"Name": "X-Tag", "Value": "Welcome Variant A"},
+                {"Name": "X-Tag", "Value": "Cohort 12/2017"},
+            ],
         )
         self.assertEqual(
             json.loads(params["DefaultContent"]["Template"]["TemplateData"]),
@@ -736,10 +708,6 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
         self.assertEqual(
             params["ReplyToAddresses"],
             ["reply1@example.com", "Reply 2 <reply2@example.com>"],
-        )
-        self.assertEqual(
-            params["DefaultEmailTags"],
-            [{"Name": "Campaign", "Value": "WelcomeVariantA"}],
         )
         self.assertEqual(params["FeedbackForwardingEmailAddress"], "bounce@example.com")
         # esp_extra:
@@ -769,6 +737,69 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
         )
         self.assertEqual(message.anymail_status.esp_response, raw_response)
 
+    def test_template_omits_unused_replacement_headers(self):
+        """If headers are not needed, the ReplacementHeaders param should be omitted"""
+        # bob@example.com requires ReplacementHeaders; alice@example.com doesn't
+        raw_response = {
+            "BulkEmailEntryResults": [
+                {
+                    "Status": "SUCCESS",
+                    "MessageId": "1111111111111111-bbbbbbbb-3333-7777",
+                },
+                {
+                    "Status": "SUCCESS",
+                    "MessageId": "1111111111111111-bbbbbbbb-4444-8888",
+                },
+            ],
+            "ResponseMetadata": self.DEFAULT_SEND_RESPONSE["ResponseMetadata"],
+        }
+        self.set_mock_response(raw_response, operation_name="send_bulk_email")
+        message = AnymailMessage(
+            template_id="welcome_template",
+            from_email='"Example, Inc." <from@example.com>',
+            to=["alice@example.com", "罗伯特 <bob@example.com>"],
+            reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
+            merge_headers={
+                "alice@example.com": {},
+                "bob@example.com": {"X-Test": "test"},
+            },
+            merge_global_data={"group": "Users", "site": "ExampleCo"},
+        )
+        message.send()
+
+        params = self.get_send_params(operation_name="send_bulk_email")
+        self.assertNotIn("ReplacementHeaders", params["BulkEmailEntries"][0])
+        self.assertIn("ReplacementHeaders", params["BulkEmailEntries"][1])
+
+    @override_settings(
+        # This will pass DefaultEmailTags: Name "Campaign"
+        ANYMAIL_AMAZON_SES_MESSAGE_TAG_NAME="Campaign"
+    )
+    def test_template_default_email_tag(self):
+        raw_response = {
+            "BulkEmailEntryResults": [
+                {
+                    "Status": "SUCCESS",
+                    "MessageId": "1111111111111111-bbbbbbbb-3333-7777",
+                },
+            ],
+            "ResponseMetadata": self.DEFAULT_SEND_RESPONSE["ResponseMetadata"],
+        }
+        self.set_mock_response(raw_response, operation_name="send_bulk_email")
+        message = AnymailMessage(
+            template_id="welcome_template",
+            from_email='"Example, Inc." <from@example.com>',
+            to=["alice@example.com"],
+            tags=["WelcomeVariantA"],
+        )
+        message.send()
+
+        params = self.get_send_params(operation_name="send_bulk_email")
+        self.assertEqual(
+            params["DefaultEmailTags"],
+            [{"Name": "Campaign", "Value": "WelcomeVariantA"}],
+        )
+
     def test_template_failure(self):
         """Failures to all recipients raise a similar error to non-template sends"""
         raw_response = {
@@ -794,7 +825,7 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
             message.send()
 
     def test_template_unsupported(self):
-        """A lot of options are not compatible with SendBulkTemplatedEmail"""
+        """Some options are not compatible with SendBulkTemplatedEmail"""
         message = AnymailMessage(template_id="welcome_template", to=["to@example.com"])
 
         message.subject = "nope, can't change template subject"
@@ -822,25 +853,6 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
         ):
             message.send()
         message.attachments = []
-
-        message.extra_headers = {"X-Custom": "header"}
-        with self.assertRaisesMessage(
-            AnymailUnsupportedFeature, "extra_headers with template"
-        ):
-            message.send()
-        message.extra_headers = {}
-
-        message.metadata = {"meta": "data"}
-        with self.assertRaisesMessage(
-            AnymailUnsupportedFeature, "metadata with template"
-        ):
-            message.send()
-        message.metadata = None
-
-        message.tags = ["tag 1", "tag 2"]
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "tags with template"):
-            message.send()
-        message.tags = None
 
     def test_send_anymail_message_without_template(self):
         # Make sure SendEmail is used for non-template_id messages

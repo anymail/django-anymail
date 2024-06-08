@@ -2,6 +2,8 @@ import email.charset
 import email.encoders
 import email.policy
 
+from requests.structures import CaseInsensitiveDict
+
 from .. import __version__ as ANYMAIL_VERSION
 from ..exceptions import AnymailAPIError, AnymailImproperlyInstalled
 from ..message import AnymailRecipientStatus
@@ -339,10 +341,14 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
 
     def init_payload(self):
         super().init_payload()
-        # late-bind recipients and merge_data in finalize_payload
+        # late-bind in finalize_payload:
         self.recipients = {"to": [], "cc": [], "bcc": []}
         self.merge_data = {}
+        self.headers = {}
         self.merge_headers = {}
+        self.metadata = {}
+        self.merge_metadata = {}
+        self.tags = []
 
     def finalize_payload(self):
         # Build BulkEmailEntries from recipients and merge_data.
@@ -372,11 +378,26 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
                 },
             }
 
-            if len(self.merge_headers) > 0:
-                entry["ReplacementHeaders"] = [
-                    {"Name": key, "Value": value}
-                    for key, value in self.merge_headers.get(to.addr_spec, {}).items()
+            replacement_headers = []
+            if self.headers or to.addr_spec in self.merge_headers:
+                headers = CaseInsensitiveDict(self.headers)
+                headers.update(self.merge_headers.get(to.addr_spec, {}))
+                replacement_headers += [
+                    {"Name": key, "Value": value} for key, value in headers.items()
                 ]
+            if self.metadata or to.addr_spec in self.merge_metadata:
+                metadata = self.metadata.copy()
+                metadata.update(self.merge_metadata.get(to.addr_spec, {}))
+                if metadata:
+                    replacement_headers.append(
+                        {"Name": "X-Metadata", "Value": self.serialize_json(metadata)}
+                    )
+            if self.tags:
+                replacement_headers += [
+                    {"Name": "X-Tag", "Value": tag} for tag in self.tags
+                ]
+            if replacement_headers:
+                entry["ReplacementHeaders"] = replacement_headers
             self.params["BulkEmailEntries"].append(entry)
 
     def parse_recipient_status(self, response):
@@ -446,7 +467,7 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
             self.params["ReplyToAddresses"] = [email.address for email in emails]
 
     def set_extra_headers(self, headers):
-        self.unsupported_feature("extra_headers with template")
+        self.headers = headers
 
     def set_text_body(self, body):
         if body:
@@ -468,27 +489,26 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
         self.params["FeedbackForwardingEmailAddress"] = email.addr_spec
 
     def set_metadata(self, metadata):
-        # no custom headers with SendBulkEmail
-        self.unsupported_feature("metadata with template")
+        self.metadata = metadata
+
+    def set_merge_metadata(self, merge_metadata):
+        self.merge_metadata = merge_metadata
 
     def set_tags(self, tags):
-        # no custom headers with SendBulkEmail, but support
-        # AMAZON_SES_MESSAGE_TAG_NAME if used (see tags/metadata in
-        # AmazonSESV2SendEmailPayload for more info)
-        if tags:
-            if self.backend.message_tag_name is not None:
-                if len(tags) > 1:
-                    self.unsupported_feature(
-                        "multiple tags with the AMAZON_SES_MESSAGE_TAG_NAME setting"
-                    )
-                self.params["DefaultEmailTags"] = [
-                    {"Name": self.backend.message_tag_name, "Value": tags[0]}
-                ]
-            else:
+        self.tags = tags
+
+        # Also *optionally* pass a single Message Tag if the AMAZON_SES_MESSAGE_TAG_NAME
+        # Anymail setting is set (default no). The AWS API restricts tag content in this
+        # case. (This is useful for dashboard segmentation; use esp_extra["Tags"] for
+        # anything more complex.)
+        if tags and self.backend.message_tag_name is not None:
+            if len(tags) > 1:
                 self.unsupported_feature(
-                    "tags with template (unless using the"
-                    " AMAZON_SES_MESSAGE_TAG_NAME setting)"
+                    "multiple tags with the AMAZON_SES_MESSAGE_TAG_NAME setting"
                 )
+            self.params["DefaultEmailTags"] = [
+                {"Name": self.backend.message_tag_name, "Value": tags[0]}
+            ]
 
     def set_template_id(self, template_id):
         # DefaultContent.Template.TemplateName

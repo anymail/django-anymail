@@ -164,6 +164,20 @@ class AmazonSESBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
                 "success+to2@simulator.amazonses.com": {"order": 6789},
             },
             merge_global_data={"name": "Customer", "ship_date": "today"},  # default
+            headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+            merge_headers={
+                "success+to1@simulator.amazonses.com": {
+                    "List-Unsubscribe": "<https://example.com/unsubscribe/to1>"
+                },
+                "success+to2@simulator.amazonses.com": {
+                    "List-Unsubscribe": "<https://example.com/unsubscribe/to2>"
+                },
+            },
+            tags=["Live integration test", "Template send"],
+            metadata={"test": "data"},
+            merge_metadata={"success+to2@simulator.amazonses.com": {"user-id": "2"}},
         )
         message.send()
         recipient_status = message.anymail_status.recipients

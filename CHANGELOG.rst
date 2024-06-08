@@ -48,6 +48,10 @@ Features
   headers with template sends. (Requires boto3 >= 1.34.98.)
   (Thanks to `@carrerasrodrigo`_ the implementation.)
 
+* **Amazon SES:** Allow extra headers, ``metadata``, ``merge_metadata``,
+  and ``tags`` when sending with a ``template_id``.
+  (Requires boto3 v1.34.98 or later.)
+
 
 v10.3
 -----
