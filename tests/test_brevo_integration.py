@@ -113,6 +113,18 @@ class BrevoBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
                 "test+to1@anymail.dev": {"customer-id": "ZXK9123"},
                 "test+to2@anymail.dev": {"customer-id": "ZZT4192"},
             },
+            headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+            merge_headers={
+                "test+to1@anymail.dev": {
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                },
+                "test+to2@anymail.dev": {
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
         )
 
         message.attach("attachment1.txt", "Here is some\ntext", "text/plain")

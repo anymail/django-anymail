@@ -568,6 +568,43 @@ class BrevoBackendAnymailFeatureTests(BrevoBackendMockAPITestCase):
             {"notification_batch": "zx912"},
         )
 
+    def test_merge_headers(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.extra_headers = {
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+        }
+        self.message.merge_headers = {
+            "alice@example.com": {
+                "List-Unsubscribe": "<https://example.com/a/>",
+            },
+            "bob@example.com": {
+                "List-Unsubscribe": "<https://example.com/b/>",
+            },
+        }
+
+        self.message.send()
+
+        data = self.get_api_call_json()
+        versions = data["messageVersions"]
+        self.assertEqual(len(versions), 2)
+        self.assertEqual(
+            versions[0]["headers"], {"List-Unsubscribe": "<https://example.com/a/>"}
+        )
+        self.assertEqual(
+            versions[1]["headers"], {"List-Unsubscribe": "<https://example.com/b/>"}
+        )
+        self.assertNotIn("params", versions[0])  # because no merge_data
+        # non-merge headers still in base data
+        self.assertEqual(
+            data["headers"],
+            {
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+        )
+
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
 

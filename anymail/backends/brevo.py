@@ -91,28 +91,32 @@ class BrevoPayload(RequestsPayload):
         self.merge_data = {}
         self.metadata = {}
         self.merge_metadata = {}
+        self.merge_headers = {}
 
     def serialize_data(self):
         """Performs any necessary serialization on self.data, and returns the result."""
         if self.is_batch():
             # Burst data["to"] into data["messageVersions"]
             to_list = self.data.pop("to", [])
-            self.data["messageVersions"] = [
-                {"to": [to], "params": self.merge_data.get(to["email"])}
-                for to in to_list
-            ]
-            if self.merge_metadata:
-                # Merge global metadata with any per-recipient metadata.
-                # (Top-level X-Mailin-custom header is already set to global metadata,
-                # and will apply for recipients without a "headers" override.)
-                for version in self.data["messageVersions"]:
-                    to_email = version["to"][0]["email"]
-                    if to_email in self.merge_metadata:
-                        recipient_metadata = self.metadata.copy()
-                        recipient_metadata.update(self.merge_metadata[to_email])
-                        version["headers"] = {
-                            "X-Mailin-custom": self.serialize_json(recipient_metadata)
-                        }
+            self.data["messageVersions"] = []
+            for to in to_list:
+                to_email = to["email"]
+                version = {"to": [to]}
+                headers = CaseInsensitiveDict()
+                if to_email in self.merge_data:
+                    version["params"] = self.merge_data[to_email]
+                if to_email in self.merge_metadata:
+                    # Merge global metadata with any per-recipient metadata.
+                    # (Top-level X-Mailin-custom header already has global metadata,
+                    # and will apply for recipients without version headers.)
+                    recipient_metadata = self.metadata.copy()
+                    recipient_metadata.update(self.merge_metadata[to_email])
+                    headers["X-Mailin-custom"] = self.serialize_json(recipient_metadata)
+                if to_email in self.merge_headers:
+                    headers.update(self.merge_headers[to_email])
+                if headers:
+                    version["headers"] = headers
+                self.data["messageVersions"].append(version)
 
         if not self.data["headers"]:
             del self.data["headers"]  # don't send empty headers
@@ -211,6 +215,10 @@ class BrevoPayload(RequestsPayload):
     def set_merge_metadata(self, merge_metadata):
         # Late-bound in serialize_data:
         self.merge_metadata = merge_metadata
+
+    def set_merge_headers(self, merge_headers):
+        # Late-bound in serialize_data:
+        self.merge_headers = merge_headers
 
     def set_send_at(self, send_at):
         try:
