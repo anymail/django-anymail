@@ -144,6 +144,40 @@ class SendGridDeliveryTestCase(WebhookTestCase):
         self.assertEqual(event.reject_reason, "invalid")
         self.assertEqual(event.mta_response, None)
 
+    def test_dropped_bounced(self):
+        # https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/event#dropped
+        raw_events = [
+            {
+                "email": "example@example.com",
+                "timestamp": 1513299569,
+                "smtp-id": "<14c5d75ce93.dfd.64b469@ismtpd-555>",
+                "event": "dropped",
+                "category": "cat facts",
+                "sg_event_id": "zmzJhfJgAfUSOW80yEbPyw==",
+                "sg_message_id": "14c5d75ce93.dfd.64b469.filter0001.16648.5515E0B88.0",
+                "reason": "Bounced Address",
+                "status": "5.0.0",
+            }
+        ]
+        response = self.client.post(
+            "/anymail/sendgrid/tracking/",
+            content_type="application/json",
+            data=json.dumps(raw_events),
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(
+            self.tracking_handler,
+            sender=SendGridTrackingWebhookView,
+            event=ANY,
+            esp_name="SendGrid",
+        )
+        event = kwargs["event"]
+        self.assertIsInstance(event, AnymailTrackingEvent)
+        self.assertEqual(event.event_type, "rejected")
+        self.assertEqual(event.esp_event, raw_events[0])
+        self.assertEqual(event.recipient, "example@example.com")
+        self.assertEqual(event.reject_reason, "bounced")
+
     def test_dropped_unsubscribed_event(self):
         raw_events = [
             {

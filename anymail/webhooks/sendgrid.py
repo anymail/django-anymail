@@ -46,6 +46,7 @@ class SendGridTrackingWebhookView(AnymailBaseWebhookView):
         "invalid": RejectReason.INVALID,
         "unsubscribed address": RejectReason.UNSUBSCRIBED,
         "bounce": RejectReason.BOUNCED,
+        "bounced address": RejectReason.BOUNCED,
         "blocked": RejectReason.BLOCKED,
         "expired": RejectReason.TIMED_OUT,
     }
