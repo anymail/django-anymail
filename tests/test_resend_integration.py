@@ -87,7 +87,7 @@ class ResendBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         )  # non-empty string
 
     def test_batch_send(self):
-        # merge_metadata or merge_data will use batch send API
+        # merge_metadata, merge_headers, or merge_data will use batch send API
         message = AnymailMessage(
             subject="Anymail Resend batch sendintegration test",
             body="This is the text body",
@@ -99,6 +99,18 @@ class ResendBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
                 "test+to2@anymail.dev": {"meta3": "recipient 2"},
             },
             tags=["tag 1", "tag 2"],
+            headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+            merge_headers={
+                "test+to1@anymail.dev": {
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                },
+                "test+to2@anymail.dev": {
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
         )
         message.attach_alternative("<p>HTML content</p>", "text/html")
         message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")

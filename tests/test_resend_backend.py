@@ -533,6 +533,49 @@ class ResendBackendAnymailFeatureTests(ResendBackendMockAPITestCase):
             "faccb7a5-8a28-4e9a-ac64-8da1cc3bc1cb",
         )
 
+    def test_merge_headers(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        message = AnymailMessage(
+            from_email="from@example.com",
+            to=["alice@example.com", "Bob <bob@example.com>"],
+            headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+            merge_headers={
+                "alice@example.com": {
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                },
+                "bob@example.com": {
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
+        )
+        message.send()
+
+        # merge_headers forces batch send API:
+        self.assert_esp_called("/emails/batch")
+
+        data = self.get_api_call_json()
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["to"], ["alice@example.com"])
+        # global and recipient headers are combined:
+        self.assertEqual(
+            data[0]["headers"],
+            {
+                "List-Unsubscribe": "<https://example.com/a/>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+        )
+        self.assertEqual(data[1]["to"], ["Bob <bob@example.com>"])
+        self.assertEqual(
+            data[1]["headers"],
+            {
+                "List-Unsubscribe": "<https://example.com/b/>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+        )
+
     def test_track_opens(self):
         self.message.track_opens = True
         with self.assertRaisesMessage(AnymailUnsupportedFeature, "track_opens"):

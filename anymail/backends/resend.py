@@ -98,6 +98,7 @@ class ResendPayload(RequestsPayload):
         self.to_recipients = []  # for parse_recipient_status
         self.metadata = {}
         self.merge_metadata = {}
+        self.merge_headers = {}
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = "Bearer %s" % backend.api_key
         headers["Content-Type"] = "application/json"
@@ -129,6 +130,14 @@ class ResendPayload(RequestsPayload):
                     data["headers"]["X-Metadata"] = self.serialize_json(
                         recipient_metadata
                     )
+                if to.addr_spec in self.merge_headers:
+                    if "headers" in data:
+                        # Merge global headers (or X-Metadata from above)
+                        headers = CaseInsensitiveCasePreservingDict(data["headers"])
+                        headers.update(self.merge_headers[to.addr_spec])
+                    else:
+                        headers = self.merge_headers[to.addr_spec]
+                    data["headers"] = headers
                 payload.append(data)
 
         return self.serialize_json(payload)
@@ -283,6 +292,9 @@ class ResendPayload(RequestsPayload):
 
     def set_merge_metadata(self, merge_metadata):
         self.merge_metadata = merge_metadata  # late bound in serialize_data
+
+    def set_merge_headers(self, merge_headers):
+        self.merge_headers = merge_headers  # late bound in serialize_data
 
     def set_esp_extra(self, extra):
         self.data.update(extra)
