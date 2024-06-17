@@ -68,13 +68,29 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
             bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
             reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
-            headers={"X-Anymail-Test": "value"},
+            headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
             # no send_at support
             metadata={"meta1": "simple string", "meta2": 2},
             tags=["tag 1"],  # max one tag
             track_opens=True,
             track_clicks=True,
-            merge_data={},  # force batch send (distinct message for each `to`)
+            # either of these merge_ options will force batch send
+            # (unique message for each "to" recipient)
+            merge_metadata={
+                "test+to1@anymail.dev": {"customer-id": "ZXK9123"},
+                "test+to2@anymail.dev": {"customer-id": "ZZT4192"},
+            },
+            merge_headers={
+                "test+to1@anymail.dev": {
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                },
+                "test+to2@anymail.dev": {
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
         )
         message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
         message.attach("attachment2.csv", "ID,Name\n1,Amy Lina", "text/csv")

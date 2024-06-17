@@ -712,6 +712,49 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
         self.assertEqual(messages[1]["To"], "Bob <bob@example.com>")
         self.assertEqual(messages[1]["Metadata"], {"order_id": 678, "tier": "premium"})
 
+    def test_merge_headers(self):
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.extra_headers = {
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+        }
+        self.message.merge_headers = {
+            "alice@example.com": {
+                "List-Unsubscribe": "<https://example.com/a/>",
+            },
+            "bob@example.com": {
+                "List-Unsubscribe": "<https://example.com/b/>",
+            },
+        }
+        self.message.send()
+
+        self.assert_esp_called("/email/batch")
+        data = self.get_api_call_json()
+        self.assertEqual(len(data), 2)
+        # Global and merge headers are combined:
+        self.assertEqual(data[0]["To"], "alice@example.com")
+        self.assertCountEqual(
+            data[0]["Headers"],
+            [
+                {"Name": "List-Unsubscribe", "Value": "<https://example.com/a/>"},
+                {
+                    "Name": "List-Unsubscribe-Post",
+                    "Value": "List-Unsubscribe=One-Click",
+                },
+            ],
+        )
+        self.assertEqual(data[1]["To"], "Bob <bob@example.com>")
+        self.assertCountEqual(
+            data[1]["Headers"],
+            [
+                {"Name": "List-Unsubscribe", "Value": "<https://example.com/b/>"},
+                {
+                    "Name": "List-Unsubscribe-Post",
+                    "Value": "List-Unsubscribe=One-Click",
+                },
+            ],
+        )
+
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
 

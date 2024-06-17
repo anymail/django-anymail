@@ -1,5 +1,7 @@
 import re
 
+from requests.structures import CaseInsensitiveDict
+
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
 from ..utils import (
@@ -209,6 +211,7 @@ class PostmarkPayload(RequestsPayload):
         self.cc_and_bcc_emails = []  # needed for parse_recipient_status
         self.merge_data = None
         self.merge_metadata = None
+        self.merge_headers = {}
         super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)
 
     def get_api_endpoint(self):
@@ -274,6 +277,18 @@ class PostmarkPayload(RequestsPayload):
                 data["Metadata"].update(recipient_metadata)
             else:
                 data["Metadata"] = recipient_metadata
+        if to.addr_spec in self.merge_headers:
+            if "Headers" in data:
+                # merge global and recipient headers
+                headers = CaseInsensitiveDict(
+                    (item["Name"], item["Value"]) for item in data["Headers"]
+                )
+                headers.update(self.merge_headers[to.addr_spec])
+            else:
+                headers = self.merge_headers[to.addr_spec]
+            data["Headers"] = [
+                {"Name": name, "Value": value} for name, value in headers.items()
+            ]
         return data
 
     #
@@ -382,6 +397,10 @@ class PostmarkPayload(RequestsPayload):
     def set_merge_metadata(self, merge_metadata):
         # late-bind
         self.merge_metadata = merge_metadata
+
+    def set_merge_headers(self, merge_headers):
+        # late-bind
+        self.merge_headers = merge_headers
 
     def set_esp_extra(self, extra):
         self.data.update(extra)
