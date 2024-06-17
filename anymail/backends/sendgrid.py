@@ -92,6 +92,7 @@ class SendGridPayload(RequestsPayload):
         self.merge_data = {}  # late-bound per-recipient data
         self.merge_global_data = {}
         self.merge_metadata = {}
+        self.merge_headers = {}
 
         http_headers = kwargs.pop("headers", {})
         http_headers["Authorization"] = "Bearer %s" % backend.api_key
@@ -116,6 +117,7 @@ class SendGridPayload(RequestsPayload):
             self.expand_personalizations_for_batch()
         self.build_merge_data()
         self.build_merge_metadata()
+        self.build_merge_headers()
         if self.generate_message_id:
             self.set_anymail_id()
 
@@ -215,6 +217,15 @@ class SendGridPayload(RequestsPayload):
                 if recipient_metadata:
                     recipient_custom_args = self.transform_metadata(recipient_metadata)
                     personalization["custom_args"] = recipient_custom_args
+
+    def build_merge_headers(self):
+        if self.merge_headers:
+            for personalization in self.data["personalizations"]:
+                assert len(personalization["to"]) == 1
+                recipient_email = personalization["to"][0]["email"]
+                recipient_headers = self.merge_headers.get(recipient_email)
+                if recipient_headers:
+                    personalization["headers"] = recipient_headers
 
     #
     # Payload construction
@@ -373,6 +384,11 @@ class SendGridPayload(RequestsPayload):
         # build_merge_data, after we know recipients, template type,
         # and merge_field_format.
         self.merge_metadata = merge_metadata
+
+    def set_merge_headers(self, merge_headers):
+        # Becomes personalizations[...]['headers'] in
+        # build_merge_data
+        self.merge_headers = merge_headers
 
     def set_esp_extra(self, extra):
         self.merge_field_format = extra.pop(

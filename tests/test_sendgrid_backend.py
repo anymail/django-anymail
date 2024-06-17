@@ -1016,6 +1016,45 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
             ],
         )
 
+    def test_merge_headers(self):
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.extra_headers = {
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+        }
+        self.message.merge_headers = {
+            "alice@example.com": {
+                "List-Unsubscribe": "<https://example.com/a/>",
+            },
+            "bob@example.com": {
+                "List-Unsubscribe": "<https://example.com/b/>",
+            },
+        }
+        self.message.send()
+        data = self.get_api_call_json()
+        personalizations = data["personalizations"]
+        self.assertEqual(len(personalizations), 2)
+
+        self.assertEqual(personalizations[0]["to"][0]["email"], "alice@example.com")
+        self.assertEqual(
+            personalizations[0]["headers"],
+            {"List-Unsubscribe": "<https://example.com/a/>"},
+        )
+        self.assertEqual(personalizations[1]["to"][0]["email"], "bob@example.com")
+        self.assertEqual(
+            personalizations[1]["headers"],
+            {"List-Unsubscribe": "<https://example.com/b/>"},
+        )
+
+        # non-merge headers still in globals:
+        self.assertEqual(
+            data["headers"],
+            {
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+        )
+
     @override_settings(
         ANYMAIL_SENDGRID_GENERATE_MESSAGE_ID=False  # else we force custom_args
     )

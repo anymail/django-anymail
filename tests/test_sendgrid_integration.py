@@ -119,6 +119,23 @@ class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             esp_extra={
                 "merge_field_format": "%{}%",
             },
+            metadata={"meta1": "simple string", "meta2": 2},
+            merge_metadata={
+                "to1@sink.sendgrid.net": {"meta3": "recipient 1"},
+                "to2@sink.sendgrid.net": {"meta3": "recipient 2"},
+            },
+            headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+            merge_headers={
+                "to1@sink.sendgrid.net": {
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                },
+                "to2@sink.sendgrid.net": {
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
         )
         message.send()
         recipient_status = message.anymail_status.recipients
