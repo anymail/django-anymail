@@ -562,6 +562,45 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
             {"order_id": 678, "notification_batch": "zx912"},
         )
 
+    def test_merge_headers(self):
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.extra_headers = {
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+        }
+        self.message.merge_headers = {
+            "alice@example.com": {
+                "List-Unsubscribe": "<https://example.com/a/>",
+            },
+            "bob@example.com": {
+                "List-Unsubscribe": "<https://example.com/b/>",
+            },
+        }
+        self.message.send()
+
+        data = self.get_api_call_json()
+        messages = data["Messages"]
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0]["To"][0]["Email"], "alice@example.com")
+        self.assertEqual(
+            messages[0]["Headers"],
+            {"List-Unsubscribe": "<https://example.com/a/>"},
+        )
+        self.assertEqual(messages[1]["To"][0]["Email"], "bob@example.com")
+        self.assertEqual(
+            messages[1]["Headers"],
+            {"List-Unsubscribe": "<https://example.com/b/>"},
+        )
+
+        # non-merge headers still in globals:
+        self.assertEqual(
+            data["Globals"]["Headers"],
+            {
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+        )
+
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
 

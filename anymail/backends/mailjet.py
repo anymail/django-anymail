@@ -225,6 +225,13 @@ class MailjetPayload(RequestsPayload):
                     recipient_metadata = merge_metadata[email]
                 message["EventPayload"] = self.serialize_json(recipient_metadata)
 
+    def set_merge_headers(self, merge_headers):
+        self._burst_for_batch_send()
+        for message in self.data["Messages"]:
+            email = message["To"][0]["Email"]
+            if email in merge_headers:
+                message["Headers"] = merge_headers[email]
+
     def set_tags(self, tags):
         # The choices here are CustomID or Campaign, and Campaign seems closer
         # to how "tags" are handled by other ESPs -- e.g., you can view dashboard
