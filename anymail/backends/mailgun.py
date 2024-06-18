@@ -117,6 +117,7 @@ class MailgunPayload(RequestsPayload):
         self.merge_global_data = {}
         self.metadata = {}
         self.merge_metadata = {}
+        self.merge_headers = {}
         self.to_emails = []
 
         super().__init__(message, defaults, backend, auth=auth, *args, **kwargs)
@@ -191,6 +192,8 @@ class MailgunPayload(RequestsPayload):
     #     (E.g., Mailgun's custom-data "name" is set to "%recipient.name%", which picks
     #     up its per-recipient value from Mailgun's
     #     `recipient-variables[to_email]["name"]`.)
+    # (6) Anymail's `merge_headers` (per-recipient headers) maps to recipient-variables
+    #     prepended with 'h:'.
     #
     # If Anymail's `merge_data`, `template_id` (stored templates) and `metadata` (or
     # `merge_metadata`) are used together, there's a possibility of conflicting keys
@@ -268,6 +271,40 @@ class MailgunPayload(RequestsPayload):
                     {key: "%recipient.{}%".format(key) for key in merge_data_keys}
                 )
 
+        # (6) merge_headers --> Mailgun recipient_variables via 'h:'-prefixed keys
+        if self.merge_headers:
+
+            def hkey(field_name):  # 'h:Field-Name'
+                return "h:{}".format(field_name.title())
+
+            merge_header_fields = flatset(
+                recipient_headers.keys()
+                for recipient_headers in self.merge_headers.values()
+            )
+            merge_header_defaults = {
+                # existing h:Field-Name value (from extra_headers), or empty string
+                field: self.data.get(hkey(field), "")
+                for field in merge_header_fields
+            }
+            self.data.update(
+                # Set up 'h:Field-Name': '%recipient.h:Field-Name%' indirection
+                {
+                    hvar: f"%recipient.{hvar}%"
+                    for hvar in [hkey(field) for field in merge_header_fields]
+                }
+            )
+
+            for email in self.to_emails:
+                # Each recipient's recipient_variables needs _all_ merge header fields
+                recipient_headers = merge_header_defaults.copy()
+                recipient_headers.update(self.merge_headers.get(email, {}))
+                recipient_variables_for_headers = {
+                    hkey(field): value for field, value in recipient_headers.items()
+                }
+                recipient_variables.setdefault(email, {}).update(
+                    recipient_variables_for_headers
+                )
+
         # populate Mailgun params
         self.data.update({"v:%s" % key: value for key, value in custom_data.items()})
         if recipient_variables or self.is_batch():
@@ -308,8 +345,8 @@ class MailgunPayload(RequestsPayload):
             self.data["h:Reply-To"] = reply_to
 
     def set_extra_headers(self, headers):
-        for key, value in headers.items():
-            self.data["h:%s" % key] = value
+        for field, value in headers.items():
+            self.data["h:%s" % field.title()] = value
 
     def set_text_body(self, body):
         self.data["text"] = body
@@ -384,6 +421,9 @@ class MailgunPayload(RequestsPayload):
     def set_merge_metadata(self, merge_metadata):
         # Processed at serialization time (to allow combining with merge_data)
         self.merge_metadata = merge_metadata
+
+    def set_merge_headers(self, merge_headers):
+        self.merge_headers = merge_headers
 
     def set_esp_extra(self, extra):
         self.data.update(extra)

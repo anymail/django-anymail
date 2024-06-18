@@ -111,7 +111,7 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
             cc=["cc1@example.com", "Also CC <cc2@example.com>"],
             headers={
                 "Reply-To": "another@example.com",
-                "X-MyHeader": "my value",
+                "x-my-header": "my value",
                 "Message-ID": "mycustommsgid@example.com",
             },
         )
@@ -126,8 +126,8 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
         )
         self.assertEqual(data["cc"], ["cc1@example.com", "Also CC <cc2@example.com>"])
         self.assertEqual(data["h:Reply-To"], "another@example.com")
-        self.assertEqual(data["h:X-MyHeader"], "my value")
-        self.assertEqual(data["h:Message-ID"], "mycustommsgid@example.com")
+        self.assertEqual(data["h:X-My-Header"], "my value")
+        self.assertEqual(data["h:Message-Id"], "mycustommsgid@example.com")
         # multiple recipients, but not a batch send:
         self.assertNotIn("recipient-variables", data)
 
@@ -815,6 +815,51 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
             "conflicting merge_data and metadata keys ('group') when using template_id",
         ):
             self.message.send()
+
+    def test_merge_headers(self):
+        # Per-recipient merge_headers uses the same recipient-variables mechanism
+        # as above, using variable names starting with "h:"
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.extra_headers = {
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            "X-Custom": "custom-default",
+        }
+        self.message.merge_headers = {
+            "alice@example.com": {
+                "List-Unsubscribe": "<https://example.com/a/>",
+                "X-No-Default": "custom-for-alice",
+            },
+            "bob@example.com": {
+                "List-Unsubscribe": "<https://example.com/b/>",
+                "X-Custom": "custom-for-bob",
+            },
+        }
+        self.message.send()
+
+        data = self.get_api_call_data()
+        # non-merge header has fixed value:
+        self.assertEqual(data["h:List-Unsubscribe-Post"], "List-Unsubscribe=One-Click")
+        # merge headers refer to recipient-variables:
+        self.assertEqual(data["h:List-Unsubscribe"], "%recipient.h:List-Unsubscribe%")
+        self.assertEqual(data["h:X-Custom"], "%recipient.h:X-Custom%")
+        self.assertEqual(data["h:X-No-Default"], "%recipient.h:X-No-Default%")
+        # recipient-variables populates them:
+        self.assertJSONEqual(
+            data["recipient-variables"],
+            {
+                "alice@example.com": {
+                    "h:List-Unsubscribe": "<https://example.com/a/>",
+                    "h:X-Custom": "custom-default",  # from extra_headers
+                    "h:X-No-Default": "custom-for-alice",
+                },
+                "bob@example.com": {
+                    "h:List-Unsubscribe": "<https://example.com/b/>",
+                    "h:X-Custom": "custom-for-bob",
+                    "h:X-No-Default": "",  # no default in extra_headers
+                },
+            },
+        )
 
     def test_force_batch(self):
         # Mailgun uses presence of recipient-variables to indicate batch send

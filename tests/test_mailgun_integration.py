@@ -201,6 +201,36 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         # (We could try fetching the message from event["storage"]["url"]
         # to verify content and other headers.)
 
+    def test_per_recipient_options(self):
+        message = AnymailMessage(
+            from_email=formataddr(("Test From", self.from_email)),
+            to=["test+to1@anymail.dev", '"Recipient 2" <test+to2@anymail.dev>'],
+            subject="Anymail Mailgun per-recipient options test",
+            body="This is the text body",
+            merge_metadata={
+                "test+to1@anymail.dev": {"meta1": "one", "meta2": "two"},
+                "test+to2@anymail.dev": {"meta1": "recipient 2"},
+            },
+            headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+                "X-Custom-Header": "default",
+            },
+            merge_headers={
+                "test+to1@anymail.dev": {
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                    "X-Custom-Header": "custom",
+                },
+                "test+to2@anymail.dev": {
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
+        )
+        message.send()
+        recipient_status = message.anymail_status.recipients
+        self.assertEqual(recipient_status["test+to1@anymail.dev"].status, "queued")
+        self.assertEqual(recipient_status["test+to2@anymail.dev"].status, "queued")
+
     def test_stored_template(self):
         message = AnymailMessage(
             # name of a real template named in Anymail's Mailgun test account:
