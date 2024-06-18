@@ -602,12 +602,53 @@ class UnisenderGoBackendAnymailFeatureTests(UnisenderGoBackendMockAPITestCase):
         self.assertNotIn("to", headers)
         self.assertNotIn("cc", headers)
 
+    def test_merge_headers(self):
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.extra_headers = {
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+        }
+        self.message.merge_headers = {
+            "alice@example.com": {
+                "List-Unsubscribe": "<https://example.com/a/>",
+            },
+            "bob@example.com": {
+                "List-Unsubscribe": "<https://example.com/b/>",
+            },
+        }
+        self.message.send()
+        data = self.get_api_call_json()
+        headers = data["message"]["headers"]
+        recipients = data["message"]["recipients"]
+
+        self.assertEqual(headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click")
+
+        # merge_headers List-Unsubscribe is handled as substitution:
+        self.assertEqual(headers["List-Unsubscribe"], "{{Header__List_Unsubscribe}}")
+        self.assertEqual(
+            recipients[0]["substitutions"],
+            {"Header__List_Unsubscribe": "<https://example.com/a/>"},
+        )
+        self.assertEqual(
+            recipients[1]["substitutions"],
+            # Header substitutions merged with other substitutions:
+            {"Header__List_Unsubscribe": "<https://example.com/b/>", "to_name": "Bob"},
+        )
+
+    def test_unsupported_merge_headers(self):
+        # Unisender Go only allows substitutions in the List-Unsubscribe header
+        self.message.merge_headers = {"to@example.com": {"X-Other": "not supported"}}
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "'X-Other' in merge_headers"
+        ):
+            self.message.send()
+
     def test_cc_unsupported_with_batch_send(self):
         self.message.merge_data = {}
         self.message.cc = ["cc@example.com"]
         with self.assertRaisesMessage(
             AnymailUnsupportedFeature,
-            "cc with batch send (merge_data or merge_metadata)",
+            "cc with batch send (merge_data, merge_metadata, or merge_headers)",
         ):
             self.message.send()
 

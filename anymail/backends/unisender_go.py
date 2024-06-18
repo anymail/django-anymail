@@ -161,7 +161,7 @@ class UnisenderGoPayload(RequestsPayload):
             headers.pop("to", None)
             if headers.pop("cc", None):
                 self.unsupported_feature(
-                    "cc with batch send (merge_data or merge_metadata)"
+                    "cc with batch send (merge_data, merge_metadata, or merge_headers)"
                 )
 
         if not headers:
@@ -338,6 +338,27 @@ class UnisenderGoPayload(RequestsPayload):
             recipient_email = recipient["email"]
             if recipient_email in merge_metadata:
                 recipient["metadata"] = merge_metadata[recipient_email]
+
+    # Unisender Go supports header substitution only with List-Unsubscribe.
+    # (See https://godocs.unisender.ru/web-api-ref#email-send under "substitutions".)
+    SUPPORTED_MERGE_HEADERS = {"List-Unsubscribe"}
+
+    def set_merge_headers(self, merge_headers: dict[str, dict[str, str]]) -> None:
+        assert self.data["recipients"]  # must be called after set_to
+        if merge_headers:
+            for recipient in self.data["recipients"]:
+                recipient_email = recipient["email"]
+                for key, value in merge_headers.get(recipient_email, {}).items():
+                    field = key.title()  # canonicalize field name capitalization
+                    if field in self.SUPPORTED_MERGE_HEADERS:
+                        # Set up a substitution for Header__Field_Name
+                        field_sub = "Header__" + field.replace("-", "_")
+                        recipient.setdefault("substitutions", {})[field_sub] = value
+                        self.data.setdefault("headers", {})[field] = (
+                            "{{%s}}" % field_sub
+                        )
+                    else:
+                        self.unsupported_feature(f"{field!r} in merge_headers")
 
     def set_esp_extra(self, extra: dict) -> None:
         update_deep(self.data, extra)
