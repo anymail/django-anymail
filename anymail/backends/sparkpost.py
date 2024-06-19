@@ -242,6 +242,36 @@ class SparkPostPayload(RequestsPayload):
             if to_email in merge_metadata:
                 recipient["metadata"] = merge_metadata[to_email]
 
+    def set_merge_headers(self, merge_headers):
+        def header_var(field):
+            return "Header__" + field.title().replace("-", "_")
+
+        merge_header_fields = set()
+
+        for recipient in self.data["recipients"]:
+            to_email = recipient["address"]["email"]
+            if to_email in merge_headers:
+                recipient_headers = merge_headers[to_email]
+                recipient.setdefault("substitution_data", {}).update(
+                    {header_var(key): value for key, value in recipient_headers.items()}
+                )
+                merge_header_fields.update(recipient_headers.keys())
+
+        if merge_header_fields:
+            headers = self.data.setdefault("content", {}).setdefault("headers", {})
+            # Global substitution_data supplies defaults for defined headers:
+            self.data.setdefault("substitution_data", {}).update(
+                {
+                    header_var(field): headers[field]
+                    for field in merge_header_fields
+                    if field in headers
+                }
+            )
+            # Indirect merge_headers through substitution_data:
+            headers.update(
+                {field: "{{%s}}" % header_var(field) for field in merge_header_fields}
+            )
+
     def set_send_at(self, send_at):
         try:
             start_time = send_at.replace(microsecond=0).isoformat()

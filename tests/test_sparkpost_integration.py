@@ -116,6 +116,19 @@ class SparkPostBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
                 "to2@test.sink.sparkpostmail.com": {"value": "two"},
             },
             merge_global_data={"global": "global_value"},
+            merge_metadata={
+                "to1@test.sink.sparkpostmail.com": {"meta1": "one"},
+                "to2@test.sink.sparkpostmail.com": {"meta1": "two"},
+            },
+            headers={
+                "X-Custom": "custom header default",
+            },
+            merge_headers={
+                # (Note that SparkPost doesn't support custom List-Unsubscribe headers)
+                "to1@test.sink.sparkpostmail.com": {
+                    "X-Custom": "custom header one",
+                },
+            },
         )
         message.send()
         recipient_status = message.anymail_status.recipients

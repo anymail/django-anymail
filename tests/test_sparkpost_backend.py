@@ -605,6 +605,58 @@ class SparkPostBackendAnymailFeatureTests(SparkPostBackendMockAPITestCase):
         )
         self.assertEqual(data["metadata"], {"notification_batch": "zx912"})
 
+    def test_merge_headers(self):
+        self.set_mock_result(accepted=2)
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.extra_headers = {
+            "X-Custom-1": "custom 1",
+            "X-Custom-2": "custom 2 (default)",
+        }
+        self.message.merge_headers = {
+            "alice@example.com": {
+                "X-Custom-2": "custom 2 alice",
+                "X-Custom-3": "custom 3 alice",
+            },
+            "bob@example.com": {"X-Custom-2": "custom 2 bob"},
+        }
+
+        self.message.send()
+        data = self.get_api_call_json()
+        recipients = data["recipients"]
+        self.assertEqual(len(recipients), 2)
+        self.assertEqual(recipients[0]["address"]["email"], "alice@example.com")
+        self.assertEqual(
+            recipients[0]["substitution_data"],
+            {
+                "Header__X_Custom_2": "custom 2 alice",
+                "Header__X_Custom_3": "custom 3 alice",
+            },
+        )
+        self.assertEqual(recipients[1]["address"]["email"], "bob@example.com")
+        self.assertEqual(
+            recipients[1]["substitution_data"],
+            {
+                "Header__X_Custom_2": "custom 2 bob",
+            },
+        )
+        # Indirect merge_headers through template substitutions:
+        self.assertEqual(
+            data["content"]["headers"],
+            {
+                "X-Custom-1": "custom 1",  # (not a merge_header, value unchanged)
+                "X-Custom-2": "{{Header__X_Custom_2}}",
+                "X-Custom-3": "{{Header__X_Custom_3}}",
+            },
+        )
+        # Defaults for merge_headers in global substitution_data:
+        self.assertEqual(
+            data["substitution_data"],
+            {
+                "Header__X_Custom_2": "custom 2 (default)",
+                # No default specified for X-Custom-3; SparkPost will use empty string
+            },
+        )
+
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
 
