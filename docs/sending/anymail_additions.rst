@@ -101,6 +101,49 @@ an :ref:`unsupported feature <unsupported-features>` error.
         .. _how envelope sender relates to return path:
             https://www.postmastery.com/blog/about-the-return-path-header/
 
+    .. attribute:: merge_headers
+
+        .. versionadded:: 11.0
+
+        On a message with multiple recipients, if your ESP supports it,
+        you can set this to a `dict` of *per-recipient* extra email headers.
+        Each key in the dict is a recipient email (address portion only),
+        and its value is a dict of header fields and values for that recipient:
+
+        .. code-block:: python
+
+            message.to = ["wile@example.com", "R. Runner <rr@example.com>"]
+            message.extra_headers = {
+                # Headers for all recipients
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            }
+            message.merge_headers = {
+                # Per-recipient headers
+                "wile@example.com": {
+                    "List-Unsubscribe": "<https://example.com/unsubscribe/12345>",
+                },
+                "rr@example.com": {
+                    "List-Unsubscribe": "<https://example.com/unsubscribe/98765>",
+                },
+            }
+
+        When :attr:`!merge_headers` is set, Anymail will use the ESP's
+        :ref:`batch sending <batch-send>` option, so that each :attr:`to` recipient gets
+        an individual message (and doesn't see the other emails on the :attr:`to` list).
+
+        Many ESPs restrict which headers are allowed. Be sure to check Anymail's
+        :ref:`ESP-specific docs <supported-esps>` for your ESP.
+        (Also, :ref:`special handling <message-headers>` for :mailheader:`From`,
+        :mailheader:`To` and :mailheader:`Reply-To` headers does *not* apply
+        to :attr:`!merge_headers`.)
+
+        If :attr:`!merge_headers` defines a particular header for only some
+        recipients, the default for other recipients comes from the message's
+        :ref:`extra_headers <message-headers>`. If not defined there, behavior
+        varies by ESP: some will include the header field only for recipients
+        where you have provided it; other ESPs will send an empty header field
+        to the other recipients.
+
     .. attribute:: metadata
 
         If your ESP supports tracking arbitrary metadata, you can set this to

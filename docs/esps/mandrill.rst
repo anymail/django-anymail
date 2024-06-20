@@ -143,6 +143,10 @@ Limitations and quirks
   (Verified and reported to MailChimp support 4/2022;
   see `Anymail discussion #257`_ for more details.)
 
+**No merge headers support**
+  Mandrill's API does not provide a way to support Anymail's
+  :attr:`~anymail.message.AnymailMessage.merge_headers`.
+
 **Envelope sender uses only domain**
   Anymail's :attr:`~anymail.message.AnymailMessage.envelope_sender` is used to
   populate Mandrill's `'return_path_domain'`---but only the domain portion.

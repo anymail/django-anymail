@@ -48,6 +48,8 @@ The table below summarizes the Anymail features supported for each ESP.
     :widths: auto
     :class: sticky-left
 
+\* See ESP detail page for limitations and clarifications
+
 Trying to choose an ESP? Please **don't** start with this table. It's far more
 important to consider things like an ESP's deliverability stats, latency, uptime,
 and support for developers. The *number* of extra features an ESP offers is almost

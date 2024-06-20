@@ -212,6 +212,13 @@ Limitations and quirks
   :attr:`~anymail.message.AnymailMessage.merge_data` or
   :attr:`~anymail.message.AnymailMessage.merge_global_data`.
 
+**Limited merge headers support**
+  Unisender Go supports per-recipient :mailheader:`List-Unsubscribe` headers
+  (if your account has been approved to disable their unsubscribe link),
+  but trying to include any other field in Anymail's
+  :attr:`~anymail.message.AnymailMessage.merge_headers` will raise
+  an :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error.
+
 **No envelope sender overrides**
   Unisender Go does not support overriding a message's
   :attr:`~anymail.message.AnymailMessage.envelope_sender`.

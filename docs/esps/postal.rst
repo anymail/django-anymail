@@ -119,6 +119,13 @@ see :ref:`unsupported-features`.
 **Attachments must be named**
   Postal issues an `AttachmentMissingName` error when trying to send an attachment without name.
 
+**No merge features**
+  Because Postal does not support batch sending, Anymail's
+  :attr:`~anymail.message.AnymailMessage.merge_headers`,
+  :attr:`~anymail.message.AnymailMessage.merge_metadata`,
+  and :attr:`~anymail.message.AnymailMessage.merge_data`
+  are not supported.
+
 
 .. _postal-templates:
 

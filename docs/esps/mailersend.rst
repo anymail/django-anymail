@@ -219,6 +219,10 @@ see :ref:`unsupported-features`.
   Any other extra headers will raise an
   :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error.
 
+**No merge headers support**
+  MailerSend's API does not provide a way to support Anymail's
+  :attr:`~anymail.message.AnymailMessage.merge_headers`.
+
 **No metadata support**
   MailerSend does not support Anymail's
   :attr:`~anymail.message.AnymailMessage.metadata` or

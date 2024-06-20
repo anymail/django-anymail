@@ -96,6 +96,14 @@ Limitations and quirks
 **No delayed sending**
   Amazon SES does not support :attr:`~anymail.message.AnymailMessage.send_at`.
 
+**Merge features require template_id**
+  Anymail's :attr:`~anymail.message.AnymailMessage.merge_headers`,
+  :attr:`~anymail.message.AnymailMessage.merge_metadata`,
+  :attr:`~anymail.message.AnymailMessage.merge_data`, and
+  :attr:`~anymail.message.AnymailMessage.merge_global_data` are only supported
+  when sending :ref:`templated messages <amazon-ses-templates>`
+  (using Anymail's :attr:`~anymail.message.AnymailMessage.template_id`).
+
 **No global send defaults for non-Anymail options**
   With the Amazon SES backend, Anymail's :ref:`global send defaults <send-defaults>`
   are only supported for Anymail's added message options (like

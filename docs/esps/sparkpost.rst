@@ -206,6 +206,15 @@ Limitations and quirks
 
   .. versionadded:: 8.0
 
+**Extra header limitations**
+  SparkPost's API silently ignores certain email headers (specified via
+  Django's :ref:`headers or extra_headers <message-headers>` or Anymail's
+  :attr:`~anymail.message.AnymailMessage.merge_headers`). In particular,
+  attempts to provide a custom :mailheader:`List-Unsubscribe` header will
+  not work; the message will be sent with SparkPost's own subscription
+  management headers. (The list of allowed custom headers does not seem
+  to be documented.)
+
 **Envelope sender may use domain only**
   Anymail's :attr:`~anymail.message.AnymailMessage.envelope_sender` is used to
   populate SparkPost's `'return_path'` parameter. Anymail supplies the full

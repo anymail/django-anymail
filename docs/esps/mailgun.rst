@@ -247,18 +247,23 @@ Limitations and quirks
   obvious reasons, only the domain portion applies. You can use anything before
   the @, and it will be ignored.
 
-**Using merge_metadata with merge_data**
+**Using merge_metadata and merge_headers with merge_data**
   If you use both Anymail's :attr:`~anymail.message.AnymailMessage.merge_data`
   and :attr:`~anymail.message.AnymailMessage.merge_metadata` features, make sure your
-  merge_data keys do not start with ``v:``. (It's a good idea anyway to avoid colons
-  and other special characters in merge_data keys, as this isn't generally portable
-  to other ESPs.)
+  :attr:`~!anymail.message.AnymailMessage.merge_data` keys do not start with ``v:``.
+
+  Similarly, if you use Anymail's :attr:`~anymail.message.AnymailMessage.merge_headers`
+  together with :attr:`~anymail.message.AnymailMessage.merge_data`, make sure your
+  :attr:`~!anymail.message.AnymailMessage.merge_data` keys do not start with ``h:``.
+
+  (It's a good idea anyway to avoid colons and other special characters in merge data
+  keys, as this isn't generally portable to other ESPs.)
 
   The same underlying Mailgun feature ("recipient-variables") is used to implement
-  both Anymail features. To avoid conflicts, Anymail prepends ``v:`` to recipient
-  variables needed for merge_metadata. (This prefix is stripped as Mailgun prepares
-  the message to send, so it won't be present in your Mailgun API logs or the metadata
-  that is sent to tracking webhooks.)
+  all three Anymail features. To avoid conflicts, Anymail prepends ``v:`` to recipient
+  variables needed for merge metadata, and ``h:`` for merge headers recipient variables.
+  (These prefixes are stripped as Mailgun prepares the message to send, so won't appear
+  in your Mailgun API logs or the metadata that is sent to tracking webhooks.)
 
 **Additional limitations on merge_data with template_id**
   If you are using Mailgun's stored handlebars templates (Anymail's
