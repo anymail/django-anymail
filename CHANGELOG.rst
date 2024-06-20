@@ -44,9 +44,12 @@ Breaking changes
 Features
 ~~~~~~~~
 
-* **Amazon SES:** Add new ``merge_headers`` option for per-recipient
-  headers with template sends. (Requires boto3 >= 1.34.98.)
-  (Thanks to `@carrerasrodrigo`_ the implementation.)
+* Add new ``merge_headers`` option for per-recipient headers with batch sends.
+  This can be helpful to send individual *List-Unsubscribe* headers (for example).
+  Supported for all current ESPs *except* MailerSend, Mandrill and Postal. See
+  `docs <https://anymail.dev/en/latest/sending/anymail_additions/#anymail.message.AnymailMessage.merge_headers>`__.
+  (Thanks to `@carrerasrodrigo`_ for the idea, and for the base and
+  Amazon SES implementations.)
 
 * **Amazon SES:** Allow extra headers, ``metadata``, ``merge_metadata``,
   and ``tags`` when sending with a ``template_id``.
