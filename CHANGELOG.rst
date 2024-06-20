@@ -52,6 +52,13 @@ Features
   and ``tags`` when sending with a ``template_id``.
   (Requires boto3 v1.34.98 or later.)
 
+Fixes
+~~~~~
+
+* **SendGrid:** In the tracking webhook, correctly report "bounced address"
+  (recipients dropped due to earlier bounces) as reject reason ``"bounced"``.
+  (Thanks to `@vitaliyf`_.)
+
 
 v10.3
 -----
@@ -1672,4 +1679,5 @@ Features
 .. _@Tobeyforce: https://github.com/Tobeyforce
 .. _@varche1: https://github.com/varche1
 .. _@vgrebenschikov: https://github.com/vgrebenschikov
+.. _@vitaliyf: https://github.com/vitaliyf
 .. _@yourcelf: https://github.com/yourcelf
