@@ -53,11 +53,11 @@ class BrevoTrackingWebhookView(BrevoBaseWebhookView):
         "invalid_email": (EventType.BOUNCED, RejectReason.INVALID),
         "deferred": (EventType.DEFERRED, None),
         "opened": (EventType.OPENED, None),  # see also unique_opened below
+        "unique_opened": (EventType.OPENED, None),  # first open; see also opened above
         "click": (EventType.CLICKED, None),
         "unsubscribe": (EventType.UNSUBSCRIBED, None),
         # shouldn't occur for transactional messages:
         "list_addition": (EventType.SUBSCRIBED, None),
-        "unique_opened": (EventType.OPENED, None),  # first open; see also opened above
     }
 
     def esp_to_anymail_event(self, esp_event):
