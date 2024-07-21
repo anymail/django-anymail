@@ -42,7 +42,8 @@ class BrevoTrackingWebhookView(BrevoBaseWebhookView):
 
     event_types = {
         # Map Brevo event type: Anymail normalized (event type, reject reason)
-        # received even if message won't be sent (e.g., before "blocked"):
+        #
+        # received even if a message isn't sent (e.g., before "blocked" or "delivered"):
         "request": (EventType.QUEUED, None),
         "delivered": (EventType.DELIVERED, None),
         "hard_bounce": (EventType.BOUNCED, RejectReason.BOUNCED),
