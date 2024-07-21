@@ -226,6 +226,36 @@ class BrevoDeliveryTestCase(WebhookTestCase):
         )
         event = kwargs["event"]
         self.assertEqual(event.event_type, "complained")
+        self.assertEqual(event.reject_reason, "spam")
+
+    def test_complaint(self):
+        # Sadly, this is not well documented in the official Brevo API documentation.
+        raw_event = {
+            "event": "complaint",
+            "email": "example@domain.com",
+            "id": "xxxxx",
+            "date": "2020-10-09 00:00:00",
+            "ts": 1604933619,
+            "message-id": "201798300811.5787683@relay.domain.com",
+            "ts_event": 1604933654,
+            "X-Mailin-custom": '{"meta": "data"}',
+            "tags": ["transac_messages"],
+        }
+        response = self.client.post(
+            "/anymail/brevo/tracking/",
+            content_type="application/json",
+            data=json.dumps(raw_event),
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(
+            self.tracking_handler,
+            sender=BrevoTrackingWebhookView,
+            event=ANY,
+            esp_name="Brevo",
+        )
+        event = kwargs["event"]
+        self.assertEqual(event.event_type, "complained")
+        self.assertEqual(event.reject_reason, "spam")
 
     def test_invalid_email(self):
         # "If a ISP again indicated us that the email is not valid or if we discovered
@@ -257,6 +287,38 @@ class BrevoDeliveryTestCase(WebhookTestCase):
         self.assertEqual(
             event.mta_response, "(guessing invalid_email includes a reason)"
         )
+
+    def test_error_email(self):
+        # Sadly, this is not well documented in the official Brevo API documentation.
+        raw_event = {
+            "event": "error",
+            "email": "example@domain.com",
+            "id": "xxxxx",
+            "date": "2020-10-09 00:00:00",
+            "ts": 1604933619,
+            "message-id": "201798300811.5787683@relay.domain.com",
+            "ts_event": 1604933654,
+            "subject": "My first Transactional",
+            "X-Mailin-custom": '{"meta": "data"}',
+            "template_id": 22,
+            "tags": ["transac_messages"],
+            "ts_epoch": 1604933623,
+        }
+        response = self.client.post(
+            "/anymail/brevo/tracking/",
+            content_type="application/json",
+            data=json.dumps(raw_event),
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(
+            self.tracking_handler,
+            sender=BrevoTrackingWebhookView,
+            event=ANY,
+            esp_name="Brevo",
+        )
+        event = kwargs["event"]
+        self.assertEqual(event.event_type, "failed")
+        self.assertEqual(event.reject_reason, None)
 
     def test_deferred_event(self):
         # Note: the example below is an actual event capture (with 'example.com'
@@ -325,6 +387,38 @@ class BrevoDeliveryTestCase(WebhookTestCase):
             "email": "recipient@example.com",
             "ts_epoch": 1520363423000,
             "message-id": "<201803011158.9876543210@smtp-relay.mailin.fr>",
+        }
+        response = self.client.post(
+            "/anymail/brevo/tracking/",
+            content_type="application/json",
+            data=json.dumps(raw_event),
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(
+            self.tracking_handler,
+            sender=BrevoTrackingWebhookView,
+            event=ANY,
+            esp_name="Brevo",
+        )
+        event = kwargs["event"]
+        self.assertEqual(event.event_type, "opened")
+
+    def test_proxy_open_event(self):
+        # Equivalent to "Loaded via Proxy" in the Brevo UI.
+        # This is sent when a tracking pixel is loaded via a 'privacy proxy server'.
+        # This technique is used by Apple Mail, for example, to protect user's IP
+        # addresses.
+        raw_event = {
+            "event": "proxy_open",
+            "email": "example@domain.com",
+            "id": 1,
+            "date": "2020-10-09 00:00:00",
+            "message-id": "201798300811.5787683@relay.domain.com",
+            "subject": "My first Transactional",
+            "tag": ["transactionalTag"],
+            "sending_ip": "xxx.xxx.xxx.xxx",
+            "s_epoch": 1534486682000,
+            "template_id": 1,
         }
         response = self.client.post(
             "/anymail/brevo/tracking/",
