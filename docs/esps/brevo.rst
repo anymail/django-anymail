@@ -338,7 +338,12 @@ and subsequent opens. Anymail normalizes both types to "opened." To track unique
 enable only "First opening," or to track all message opens enable both. (Brevo used to
 deliver both events for the first open, so be sure to check their current behavior
 if duplicate first open events might cause problems for you. You might be able to use
-the event timestamp to de-dupe.)
+the event timestamp to de-dupe.).
+
+Furthermore, there is the "Loaded by Proxy" event. Primarily, it is sent for opens
+that happen in Apple Mail, due to Apple proxying these to protect user's IP addresses.
+Anymail normalizes this to "opened" as well. See the `Brevo docs on this`_ for more
+details.
 
 Brevo will report these Anymail :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
 queued, rejected, bounced, deferred, delivered, opened (see note above), clicked, complained,
@@ -358,6 +363,7 @@ a `dict` of raw webhook data received from Brevo.
 
 
 .. _Transactional > Email > Settings > Webhook: https://app-smtp.brevo.com/webhook
+.. _Brevo docs on this: https://help.brevo.com/hc/en-us/articles/4406537065618-How-to-handle-changes-in-Apple-s-Mail-Privacy-Protection
 
 
 .. _brevo-inbound:
