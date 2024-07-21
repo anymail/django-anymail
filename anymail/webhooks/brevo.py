@@ -50,12 +50,15 @@ class BrevoTrackingWebhookView(BrevoBaseWebhookView):
         "soft_bounce": (EventType.BOUNCED, RejectReason.BOUNCED),
         "blocked": (EventType.REJECTED, RejectReason.BLOCKED),
         "spam": (EventType.COMPLAINED, RejectReason.SPAM),
+        "complaint": (EventType.COMPLAINED, RejectReason.SPAM),
         "invalid_email": (EventType.BOUNCED, RejectReason.INVALID),
         "deferred": (EventType.DEFERRED, None),
         "opened": (EventType.OPENED, None),  # see also unique_opened below
         "unique_opened": (EventType.OPENED, None),  # first open; see also opened above
+        "proxy_open": (EventType.OPENED, None),  # loaded via proxy (e.g., Apple Mail)
         "click": (EventType.CLICKED, None),
         "unsubscribe": (EventType.UNSUBSCRIBED, None),
+        "error": (EventType.FAILED, None),
         # shouldn't occur for transactional messages:
         "list_addition": (EventType.SUBSCRIBED, None),
     }
