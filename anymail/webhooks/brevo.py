@@ -59,6 +59,8 @@ class BrevoTrackingWebhookView(BrevoBaseWebhookView):
         "unique_opened": (EventType.OPENED, None),
         # open, but "loaded via proxy" (e.g., Apple Mail)
         "proxy_open": (EventType.OPENED, None),
+        # first open; but "loaded via proxy" (e.g., Apple Mail)
+        "unique_proxy_open": (EventType.OPENED, None),
         "click": (EventType.CLICKED, None),
         "unsubscribe": (EventType.UNSUBSCRIBED, None),
         "error": (EventType.FAILED, None),

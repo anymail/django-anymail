@@ -435,6 +435,39 @@ class BrevoDeliveryTestCase(WebhookTestCase):
         event = kwargs["event"]
         self.assertEqual(event.event_type, "opened")
 
+    def test_unique_proxy_open_event(self):
+        # Sadly, undocumented in Brevo.
+        # Equivalent to "First Open but loaded via Proxy".
+        # This is sent when a tracking pixel is loaded via a 'privacy proxy server'.
+        # This technique is used by Apple Mail, for example, to protect user's IP
+        # addresses.
+        raw_event = {
+            "event": "unique_proxy_open",
+            "email": "example@domain.com",
+            "id": 1,
+            "date": "2020-10-09 00:00:00",
+            "message-id": "201798300811.5787683@relay.domain.com",
+            "subject": "My first Transactional",
+            "tag": ["transactionalTag"],
+            "sending_ip": "xxx.xxx.xxx.xxx",
+            "s_epoch": 1534486682000,
+            "template_id": 1,
+        }
+        response = self.client.post(
+            "/anymail/brevo/tracking/",
+            content_type="application/json",
+            data=json.dumps(raw_event),
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(
+            self.tracking_handler,
+            sender=BrevoTrackingWebhookView,
+            event=ANY,
+            esp_name="Brevo",
+        )
+        event = kwargs["event"]
+        self.assertEqual(event.event_type, "opened")
+
     def test_clicked_event(self):
         raw_event = {
             "event": "click",

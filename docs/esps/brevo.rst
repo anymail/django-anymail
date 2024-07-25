@@ -340,10 +340,14 @@ deliver both events for the first open, so be sure to check their current behavi
 if duplicate first open events might cause problems for you. You might be able to use
 the event timestamp to de-dupe.).
 
-Furthermore, there is the "Loaded by Proxy" event. Primarily, it is sent for opens
-that happen in Apple Mail, due to Apple proxying these to protect user's IP addresses.
+Furthermore, there is the "Loaded by Proxy" event. Primarily, it is sent for every open
+that happens in Apple Mail, due to Apple proxying these to protect user's IP addresses.
 Anymail normalizes this to "opened" as well. See the `Brevo docs on this`_ for more
 details.
+
+Unofficially, there is also a "First open but loaded by Proxy" event. This is not sent
+by default. Not even if you check the webhook event "loaded by Proxy" in the Brevo UI.
+You can, however, let the support activate it. Anymail will then handle it as "open".
 
 Brevo will report these Anymail :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
 queued, rejected, bounced, deferred, delivered, opened (see note above), clicked, complained,
