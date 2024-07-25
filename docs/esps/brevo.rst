@@ -332,29 +332,36 @@ Be sure to select the checkboxes for all the event types you want to receive. (A
 sure you are in the "Transactional" section of their site; Brevo has a separate set
 of "Campaign" webhooks, which don't apply to messages sent through Anymail.)
 
-If you are interested in tracking opens, note that Brevo has both "First opening"
-and an "Known open" event types. The latter seems to be generated only for the second
-and subsequent opens. Anymail normalizes both types to "opened." To track unique opens
-enable only "First opening," or to track all message opens enable both. (Brevo used to
-deliver both events for the first open, so be sure to check their current behavior
-if duplicate first open events might cause problems for you. You might be able to use
-the event timestamp to de-dupe.).
+If you are interested in tracking opens, note that Brevo has four different
+open event types:
 
-Furthermore, there is the "Loaded by Proxy" event. Primarily, it is sent for every open
-that happens in Apple Mail, due to Apple proxying these to protect user's IP addresses.
-Anymail normalizes this to "opened" as well. See the `Brevo docs on this`_ for more
-details.
+* "First opening": the first time a message is opened by a particular recipient.
+  (Brevo event type "opened")
+* "Known open": the second and subsequent opens. (Brevo event type "unique_opened")
+* "Loaded by proxy": a message's tracking pixel is loaded by a proxy service
+  intended to protect users' IP addresses. See Brevo's article on
+  `Apple's Mail Privacy Protection`_ for more details. As of July, 2024, Brevo
+  seems to deliver this event only for the second and subsequent loads by the
+  proxy service. (Brevo event type "proxy_open")
+* "First open but loaded by proxy": the first time a message's tracking pixel
+  is loaded by a proxy service for a particular recipient. As of July, 2024,
+  this event has not yet been exposed in Brevo's webhook control panel, and
+  you must contact Brevo support to enable it. (Brevo event type "unique_proxy_opened")
 
-Unofficially, there is also a "First open but loaded by Proxy" event. This is not sent
-by default. Not even if you check the webhook event "loaded by Proxy" in the Brevo UI.
-You can, however, let the support activate it. Anymail will then handle it as "open".
+Anymail normalizes all of these to "opened." If you need to distinguish the
+specific Brevo event types, examine the raw
+:attr:`~anymail.signals.AnymailTrackingEvent.esp_event`, e.g.:
+``if event.esp_event["event"] == "unique_opened": …``.
 
 Brevo will report these Anymail :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
 queued, rejected, bounced, deferred, delivered, opened (see note above), clicked, complained,
-unsubscribed, subscribed (though this should never occur for transactional email).
+failed, unsubscribed, subscribed (though subscribed should never occur for transactional email).
 
 For events that occur in rapid succession, Brevo frequently delivers them out of order.
 For example, it's not uncommon to receive a "delivered" event before the corresponding "queued."
+Also, note that "queued" may be received even if Brevo will not actually send the message.
+(E.g., if a recipient is on your blocked list due to a previous bounce, you may receive
+"queued" followed by "rejected.")
 
 The event's :attr:`~anymail.signals.AnymailTrackingEvent.esp_event` field will be
 a `dict` of raw webhook data received from Brevo.
@@ -365,9 +372,14 @@ a `dict` of raw webhook data received from Brevo.
     than "brevo". The old URL will still work, but is deprecated. See :ref:`brevo-rename`
     below.
 
+.. versionchanged:: 11.1
+
+    Added support for Brevo's "Complaint," "Error" and "Loaded by proxy" events.
+
 
 .. _Transactional > Email > Settings > Webhook: https://app-smtp.brevo.com/webhook
-.. _Brevo docs on this: https://help.brevo.com/hc/en-us/articles/4406537065618-How-to-handle-changes-in-Apple-s-Mail-Privacy-Protection
+.. _Apple's Mail Privacy Protection:
+    https://help.brevo.com/hc/en-us/articles/4406537065618-How-to-handle-changes-in-Apple-s-Mail-Privacy-Protection
 
 
 .. _brevo-inbound:

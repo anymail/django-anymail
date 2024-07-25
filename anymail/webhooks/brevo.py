@@ -40,10 +40,10 @@ class BrevoTrackingWebhookView(BrevoBaseWebhookView):
             )
         return [self.esp_to_anymail_event(esp_event)]
 
+    # Map Brevo event type -> Anymail normalized (event type, reject reason).
     event_types = {
-        # Map Brevo event type: Anymail normalized (event type, reject reason)
-        #
-        # received even if a message isn't sent (e.g., before "blocked" or "delivered"):
+        # Treat "request" as QUEUED rather than SENT, because it may be received
+        # even if message won't actually be sent (e.g., before "blocked").
         "request": (EventType.QUEUED, None),
         "delivered": (EventType.DELIVERED, None),
         "hard_bounce": (EventType.BOUNCED, RejectReason.BOUNCED),
@@ -53,18 +53,20 @@ class BrevoTrackingWebhookView(BrevoBaseWebhookView):
         "complaint": (EventType.COMPLAINED, RejectReason.SPAM),
         "invalid_email": (EventType.BOUNCED, RejectReason.INVALID),
         "deferred": (EventType.DEFERRED, None),
-        # see also unique_opened below
-        "opened": (EventType.OPENED, None),
-        # first open; see also opened above
+        # Brevo has four types of opened events:
+        #   - "unique_opened": first time opened
+        #   - "opened": subsequent opens
+        #   - "unique_proxy_opened": first time opened via proxy (e.g., Apple Mail)
+        #   - "proxy_open": subsequent opens via proxy
+        # Treat all of these as OPENED.
         "unique_opened": (EventType.OPENED, None),
-        # open, but "loaded via proxy" (e.g., Apple Mail)
-        "proxy_open": (EventType.OPENED, None),
-        # first open; but "loaded via proxy" (e.g., Apple Mail)
+        "opened": (EventType.OPENED, None),
         "unique_proxy_open": (EventType.OPENED, None),
+        "proxy_open": (EventType.OPENED, None),
         "click": (EventType.CLICKED, None),
         "unsubscribe": (EventType.UNSUBSCRIBED, None),
         "error": (EventType.FAILED, None),
-        # shouldn't occur for transactional messages:
+        # ("list_addition" shouldn't occur for transactional messages.)
         "list_addition": (EventType.SUBSCRIBED, None),
     }
 

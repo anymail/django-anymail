@@ -26,6 +26,18 @@ Release history
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
 
+vNext
+-----
+
+*unreleased changes*
+
+Features
+~~~~~~~~
+
+* **Brevo:** Support Brevo's new "Complaint," "Error" and "Loaded by proxy"
+  tracking events. (Thanks to `@originell`_ for the update.)
+
+
 v11.0.1
 -------
 
@@ -1695,6 +1707,7 @@ Features
 .. _@mounirmesselmeni: https://github.com/mounirmesselmeni
 .. _@mwheels: https://github.com/mwheels
 .. _@nuschk: https://github.com/nuschk
+.. _@originell: https://github.com/originell
 .. _@puru02: https://github.com/puru02
 .. _@RignonNoel: https://github.com/RignonNoel
 .. _@sblondon: https://github.com/sblondon
