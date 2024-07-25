@@ -606,7 +606,7 @@ Additional Anymail settings for use with Amazon SES:
 
 .. rubric:: AMAZON_SES_CLIENT_PARAMS
 
-Optional. Additional `client parameters`_ Anymail should use to create the boto3 session client. Example:
+Optional. Additional `client parameters`_ Anymail should be used to create the boto3 session client. Example:
 
   .. code-block:: python
 
@@ -637,7 +637,7 @@ and AWS_SESSION_TOKEN environment variables, or a shared AWS credentials file.
 
 .. rubric:: AMAZON_SES_SESSION_PARAMS
 
-Optional. Additional `session parameters`_ Anymail should use to create the boto3 Session. Example:
+Optional. Additional `session parameters`_ Anymail should be used to create the boto3 Session. Example:
 
   .. code-block:: python
 
@@ -656,7 +656,7 @@ Optional. Additional `session parameters`_ Anymail should use to create the boto
 
 .. rubric:: AMAZON_SES_CONFIGURATION_SET_NAME
 
-Optional. The name of an Amazon SES `Configuration Set`_ Anymail should use when sending messages.
+Optional. The name of an Amazon SES `Configuration Set`_ Anymail should be used when sending messages.
 The default is to send without any Configuration Set. Note that a Configuration Set is
 required to receive SES Event Publishing tracking events. See :ref:`amazon-ses-webhooks` above.
 
