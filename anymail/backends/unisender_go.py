@@ -135,8 +135,9 @@ class UnisenderGoPayload(RequestsPayload):
         http_headers["Content-Type"] = "application/json"
         http_headers["Accept"] = "application/json"
         http_headers["X-API-KEY"] = backend.api_key
+        kwargs["headers"] = http_headers
         super().__init__(
-            message, defaults, backend, headers=http_headers, *args, **kwargs
+            message, defaults, backend, *args, **kwargs
         )
 
     def get_api_endpoint(self) -> str:
@@ -297,7 +298,7 @@ class UnisenderGoPayload(RequestsPayload):
             # "Date and time in the format “YYYY-MM-DD hh:mm:ss” in the UTC time zone."
             # If send_at is a datetime, it's guaranteed to be aware, but maybe not UTC.
             # Convert to UTC, then strip tzinfo to avoid isoformat "+00:00" at end.
-            send_at_utc = send_at.astimezone(timezone.utc).replace(tzinfo=None)
+            send_at_utc = send_at.astimezone(timezone.utc).replace(tzinfo=None)  # type:ignore[union-attr]
             send_at_formatted = send_at_utc.isoformat(sep=" ", timespec="seconds")
             assert len(send_at_formatted) == 19
         except (AttributeError, TypeError):
