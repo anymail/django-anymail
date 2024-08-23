@@ -35,11 +35,11 @@ except ImportError:
             missing_package="cryptography", install_extra="postal"
         )
     )
-    serialization = error
-    hashes = error
+    serialization = error  # type: ignore[assignment]
+    hashes = error  # type: ignore[assignment]
     default_backend = error
-    padding = error
-    InvalidSignature = object
+    padding = error  # type: ignore[assignment]
+    InvalidSignature = object  # type:ignore[assignment,misc]
 
 
 class PostalBaseWebhookView(AnymailBaseWebhookView):
