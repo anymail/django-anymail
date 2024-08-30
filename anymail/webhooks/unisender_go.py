@@ -69,13 +69,12 @@ class UnisenderGoTrackingWebhookView(AnymailCoreWebhookView):
 
         So it is both auth and encryption. Also, they hash JSON without spaces.
         """
-        request_json = json.loads(request.body.decode("utf-8"))
+        request_body = request.body.decode("utf-8")
+        request_json = json.loads(request_body)
         request_auth = request_json.get("auth", "")
-        request_json["auth"] = get_anymail_setting(
-            "api_key", esp_name=self.esp_name, allow_bare=True
+        json_with_key = request_body.replace(
+            request_auth, get_anymail_setting("api_key", esp_name=self.esp_name, allow_bare=True)
         )
-        json_with_key = json.dumps(request_json, separators=(",", ":"))
-
         expected_auth = md5(json_with_key.encode("utf-8")).hexdigest()
 
         if not constant_time_compare(request_auth, expected_auth):
