@@ -6,8 +6,8 @@ Postal
 Anymail integrates with the `Postal`_ self-hosted transactional email platform,
 using their `HTTP email API`_.
 
-.. _Postal: https://postal.atech.media/
-.. _HTTP email API: https://github.com/postalhq/postal/wiki/Using-the-API
+.. _Postal: https://docs.postalserver.io/
+.. _HTTP email API: https://docs.postalserver.io/developer/api
 
 
 Settings
@@ -85,7 +85,7 @@ Example:
 messages.)
 
 
-.. _email API: https://krystal.github.io/postal-api/controllers/send/message
+.. _email API: https://apiv1.postalserver.io/controllers/send/message
 
 
 Limitations and quirks
@@ -114,7 +114,7 @@ see :ref:`unsupported-features`.
   Anymail's :attr:`~anymail.message.AnymailMessage.track_clicks` and
   :attr:`~anymail.message.AnymailMessage.track_opens` settings are unsupported.
 
-.. _see their docs on click- & open-tracking: https://github.com/postalhq/postal/wiki/Click-&-Open-Tracking
+.. _see their docs on click- & open-tracking: https://docs.postalserver.io/features/click-and-open-tracking
 
 **Attachments must be named**
   Postal issues an `AttachmentMissingName` error when trying to send an attachment without name.
@@ -158,7 +158,7 @@ Postal will report these Anymail :attr:`~anymail.signals.AnymailTrackingEvent.ev
 failed, bounced, deferred, queued, delivered, clicked.
 
 The event's :attr:`~anymail.signals.AnymailTrackingEvent.esp_event` field will be
-a `dict` of Postal's `webhook <https://github.com/postalhq/postal/wiki/Webhook-Events-&-Payloads>`_ data.
+a `dict` of Postal's `webhook <https://docs.postalserver.io/developer/webhooks>`_ data.
 
 .. _postal-inbound:
 
