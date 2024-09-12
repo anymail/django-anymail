@@ -19,6 +19,6 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip wheel
-          pip install -r requirements-dev.txt
+          pip install -e '.[amazon-ses,resend,postal]' -r requirements-dev.txt
       - name: MyPy
         run: mypy .
