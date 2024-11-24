@@ -1,5 +1,7 @@
+import typing
 import warnings
 
+from django.dispatch import Signal
 from django.http import HttpResponse
 from django.utils.crypto import constant_time_compare
 from django.utils.decorators import method_decorator
@@ -30,7 +32,7 @@ class AnymailCoreWebhookView(View):
     # Subclass implementation:
 
     # Where to send events: either ..signals.inbound or ..signals.tracking
-    signal = None
+    signal: typing.Optional[Signal] = None
 
     def validate_request(self, request):
         """Check validity of webhook post, or raise AnymailWebhookValidationFailure.

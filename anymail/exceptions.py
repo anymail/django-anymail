@@ -86,7 +86,7 @@ class AnymailAPIError(AnymailError):
     """Exception for unsuccessful response from ESP's API."""
 
 
-class AnymailRequestsAPIError(AnymailAPIError, HTTPError):
+class AnymailRequestsAPIError(AnymailAPIError, HTTPError):  # type: ignore[misc]
     """Exception for unsuccessful response from a requests API."""
 
     def __init__(self, *args, **kwargs):
