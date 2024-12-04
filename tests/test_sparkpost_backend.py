@@ -49,7 +49,7 @@ class SparkPostBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     def setUp(self):
         super().setUp()
         # Simple message useful for many tests
-        self.message = mail.EmailMultiAlternatives(
+        self.message = AnymailMessage(
             "Subject", "Text Body", "from@example.com", ["to@example.com"]
         )
 
