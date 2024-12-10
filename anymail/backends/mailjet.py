@@ -195,7 +195,8 @@ class MailjetPayload(RequestsPayload):
     def add_attachment(self, attachment):
         att = {
             "ContentType": attachment.mimetype,
-            "Filename": attachment.name or "",
+            # Mailjet requires a non-empty Filename.
+            "Filename": attachment.name or "attachment",
             "Base64Content": attachment.b64content,
         }
         if attachment.inline:

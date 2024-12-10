@@ -144,6 +144,15 @@ Limitations and quirks
   :ref:`esp-send-status`, because Mailjet's other (statistics, event tracking)
   APIs don't yet support MessageUUID.
 
+**Attachments require filenames**
+  Mailjet requires that all attachments and inline images have filenames. If you
+  don't supply a filename, Anymail will use ``"attachment"`` as the filename.
+
+  .. versionchanged:: 13.0
+
+     Earlier Anymail versions would default to an empty string, resulting in
+     a Mailjet API error.
+
 **Older limitations**
 
 .. versionchanged:: 6.0

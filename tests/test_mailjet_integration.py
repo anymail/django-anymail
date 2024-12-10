@@ -7,7 +7,7 @@ from django.test import SimpleTestCase, override_settings, tag
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path
+from .utils import AnymailTestMixin, sample_image_content
 
 ANYMAIL_TEST_MAILJET_API_KEY = os.getenv("ANYMAIL_TEST_MAILJET_API_KEY")
 ANYMAIL_TEST_MAILJET_SECRET_KEY = os.getenv("ANYMAIL_TEST_MAILJET_SECRET_KEY")
@@ -91,7 +91,7 @@ class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         )
         message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
         message.attach("attachment2.csv", "ID,Name\n1,Amy Lina", "text/csv")
-        cid = message.attach_inline_image_file(sample_image_path())
+        cid = message.attach_inline_image(sample_image_content())
         message.attach_alternative(
             "<p><b>HTML:</b> with <a href='http://example.com'>link</a>"
             "and image: <img src='cid:%s'></div>" % cid,

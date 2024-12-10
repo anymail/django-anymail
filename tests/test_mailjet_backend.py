@@ -13,7 +13,7 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import attach_inline_image_file
+from anymail.message import attach_inline_image, attach_inline_image_file
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
@@ -266,7 +266,7 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         self.assertNotIn("ContentID", attachments[1])
 
         self.assertEqual(attachments[2]["ContentType"], "application/pdf")
-        self.assertEqual(attachments[2]["Filename"], "")  # none
+        self.assertEqual(attachments[2]["Filename"], "attachment")
         self.assertEqual(decode_att(attachments[2]["Base64Content"]), pdf_content)
         self.assertNotIn("ContentID", attachments[2])
 
@@ -297,6 +297,7 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         image_data = sample_image_content(image_filename)
 
         cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
+        cid2 = attach_inline_image(self.message, image_data)
         html_content = (
             '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
         )
@@ -307,11 +308,16 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         self.assertEqual(data["Globals"]["HTMLPart"], html_content)
 
         attachments = data["Globals"]["InlinedAttachments"]
-        self.assertEqual(len(attachments), 1)
+        self.assertEqual(len(attachments), 2)
         self.assertEqual(attachments[0]["Filename"], image_filename)
         self.assertEqual(attachments[0]["ContentID"], cid)
         self.assertEqual(attachments[0]["ContentType"], "image/png")
         self.assertEqual(decode_att(attachments[0]["Base64Content"]), image_data)
+        # Mailjet requires a filename for all attachments, so make sure it's not empty:
+        self.assertEqual(attachments[1]["Filename"], "attachment")
+        self.assertEqual(attachments[1]["ContentID"], cid2)
+        self.assertEqual(attachments[1]["ContentType"], "image/png")
+        self.assertEqual(decode_att(attachments[1]["Base64Content"]), image_data)
 
         self.assertNotIn("Attachments", data["Globals"])
 
@@ -340,7 +346,7 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
                     "Base64Content": image_data_b64,
                 },
                 {
-                    "Filename": "",  # the unnamed one
+                    "Filename": "attachment",  # the unnamed one
                     "ContentType": "image/png",
                     "Base64Content": image_data_b64,
                 },

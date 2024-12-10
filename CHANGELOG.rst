@@ -37,6 +37,13 @@ Breaking changes
   (Postal's signature verification uses the "cryptography" package, which is no
   longer reliably installable with Python 3.8.)
 
+Fixes
+~~~~~
+
+* **Mailjet:** Avoid a Mailjet API error when sending an inline image without a
+  filename. (Anymail now substitutes ``"attachment"`` for the missing filename.)
+  (Thanks to `@chickahoona`_ for reporting the issue.)
+
 
 v12.0
 -----
@@ -1737,6 +1744,7 @@ Features
 .. _@b0d0nne11: https://github.com/b0d0nne11
 .. _@calvin: https://github.com/calvin
 .. _@carrerasrodrigo: https://github.com/carrerasrodrigo
+.. _@chickahoona: https://github.com/chickahoona
 .. _@chrisgrande: https://github.com/chrisgrande
 .. _@cjsoftuk: https://github.com/cjsoftuk
 .. _@costela: https://github.com/costela
