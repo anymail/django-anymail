@@ -1,5 +1,6 @@
 import base64
 import mimetypes
+import re
 from base64 import b64encode
 from collections.abc import Mapping, MutableMapping
 from copy import copy, deepcopy
@@ -342,7 +343,10 @@ class EmailAddress:
             default None uses ascii if possible, else 'utf-8'
             (quoted-printable utf-8/base64)
         """
-        return sanitize_address((self.display_name, self.addr_spec), encoding)
+        sanitized = sanitize_address((self.display_name, self.addr_spec), encoding)
+        # sanitize_address() can introduce FWS with a long, non-ASCII display name.
+        # Must unfold it:
+        return re.sub(r"(\r|\n|\r\n)[ \t]", "", sanitized)
 
     def __str__(self):
         return self.address

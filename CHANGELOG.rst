@@ -53,6 +53,9 @@ Fixes
   "queued" in the ``anymail_status`` (rather than throwing an error or reporting
   "sent"). (Thanks to `@jmduke`_ for reporting the issue.)
 
+* **Postmark:** Fix an error in inbound handling with long email address display
+  names that include non-ASCII characters.
+
 
 v12.0
 -----

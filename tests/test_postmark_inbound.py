@@ -392,3 +392,32 @@ class PostmarkInboundTestCase(WebhookTestCase):
                 )
                 # Don't care about the actual test message contents here,
                 # just want to make sure it parses and signals inbound without error.
+
+    def test_spammy_address(self):
+        # This long FromFull.Name caused an error in AnymailInboundMessage construction,
+        # due to folding introduced in EmailAddress.formataddr()
+        from_name = (
+            "* * * 💲 Snag Your Free Gift! Click Here: "
+            "https://spam.example.com/uploads/phish.php?123456 💲 * * *"
+        )
+        raw_event = {
+            "MessageStream": "inbound",
+            "FromFull": {
+                "Email": "noreply@spam.example.com",
+                "Name": from_name,
+            },
+        }
+        response = self.client.post(
+            "/anymail/postmark/inbound/",
+            content_type="application/json",
+            data=json.dumps(raw_event),
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(
+            self.inbound_handler,
+            sender=PostmarkInboundWebhookView,
+            event=ANY,
+            esp_name="Postmark",
+        )
+        message = kwargs["event"].message
+        self.assertEqual(message.from_email.display_name, from_name)
