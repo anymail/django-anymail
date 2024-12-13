@@ -1,5 +1,9 @@
 # Requirements for developing (not just using) the package
 
+django-stubs
 hatch
+mypy
 pre-commit
+requests
 tox<4
+types-requests
