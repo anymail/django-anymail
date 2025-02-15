@@ -56,6 +56,12 @@ Fixes
 * **Postmark:** Fix an error in inbound handling with long email address display
   names that include non-ASCII characters.
 
+Other
+~~~~~
+
+* **SendGrid:** Remove Anymail's workaround for an earlier SendGrid API bug with
+  punctuation in address display names. SendGrid has fixed the bug.
+
 
 v12.0
 -----
