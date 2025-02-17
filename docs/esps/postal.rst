@@ -46,7 +46,7 @@ nor ``ANYMAIL_POSTAL_API_KEY`` is set.
 
 .. rubric:: POSTAL_API_URL
 
-Required. The base URL of your Postal server (without /api/v1 or any API paths). 
+Required. The base URL of your Postal server (without /api/v1 or any API paths).
 Anymail will automatically append the required API paths.
 
   .. code-block:: python
