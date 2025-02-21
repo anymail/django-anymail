@@ -59,6 +59,9 @@ Fixes
 Other
 ~~~~~
 
+* **Resend:** Remove Anymail's workaround for an earlier Resend API bug with
+  punctuation in address display names. Resend has fixed the bug.
+
 * **SendGrid:** Remove Anymail's workaround for an earlier SendGrid API bug with
   punctuation in address display names. SendGrid has fixed the bug.
 

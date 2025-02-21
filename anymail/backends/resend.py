@@ -1,7 +1,4 @@
 import mimetypes
-from email.charset import QP, Charset
-from email.header import decode_header, make_header
-from email.headerregistry import Address
 
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
@@ -11,11 +8,6 @@ from ..utils import (
     get_anymail_setting,
 )
 from .base_requests import AnymailRequestsBackend, RequestsPayload
-
-# Used to force RFC-2047 encoded word
-# in address formatting workaround
-QP_CHARSET = Charset("utf-8")
-QP_CHARSET.header_encoding = QP
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -39,18 +31,6 @@ class EmailBackend(AnymailRequestsBackend):
         )
         if not api_url.endswith("/"):
             api_url += "/"
-
-        # Undocumented setting to control workarounds for Resend display-name issues
-        # (see below). If/when Resend improves their API, you can disable Anymail's
-        # workarounds by adding `"RESEND_WORKAROUND_DISPLAY_NAME_BUGS": False`
-        # to your `ANYMAIL` settings.
-        self.workaround_display_name_bugs = get_anymail_setting(
-            "workaround_display_name_bugs",
-            esp_name=esp_name,
-            kwargs=kwargs,
-            default=True,
-        )
-
         super().__init__(api_url, **kwargs)
 
     def build_message_payload(self, message, defaults):
@@ -118,7 +98,7 @@ class ResendPayload(RequestsPayload):
             payload = []
             for to_email, to in zip(to_emails, self.to_recipients):
                 data = self.data.copy()
-                data["to"] = [to_email]  # formatted for Resend (w/ workarounds)
+                data["to"] = [to_email]
                 if to.addr_spec in self.merge_metadata:
                     # Merge global metadata with any per-recipient metadata.
                     recipient_metadata = self.metadata.copy()
@@ -149,59 +129,14 @@ class ResendPayload(RequestsPayload):
     def init_payload(self):
         self.data = {}  # becomes json
 
-    def _resend_email_address(self, address):
-        """
-        Return EmailAddress address formatted for use with Resend.
-
-        Works around a Resend bug that rejects properly formatted RFC 5322
-        addresses that have the display-name enclosed in double quotes (e.g.,
-        any display-name containing a comma), by substituting an RFC 2047
-        encoded word.
-
-        This works for all Resend address fields _except_ `from` (see below).
-        """
-        formatted = address.address
-        if self.backend.workaround_display_name_bugs:
-            if formatted.startswith('"'):
-                # Workaround: force RFC-2047 encoded word
-                formatted = str(
-                    Address(
-                        display_name=QP_CHARSET.header_encode(address.display_name),
-                        addr_spec=address.addr_spec,
-                    )
-                )
-        return formatted
-
     def set_from_email(self, email):
-        # Can't use the address header workaround above for the `from` field:
-        #   self.data["from"] = self._resend_email_address(email)
-        # When `from` uses RFC-2047 encoding, Resend returns a "security_error"
-        # status 451, "The email payload contain invalid characters".
-        formatted = email.address
-        if self.backend.workaround_display_name_bugs:
-            if formatted.startswith("=?"):
-                # Workaround: use an *unencoded* (Unicode str) display-name.
-                # This allows use of non-ASCII characters (which Resend rejects when
-                # encoded with RFC 2047). Some punctuation will still result in unusual
-                # behavior or cause an "invalid `from` field" 422 error, but there's
-                # nothing we can do about that.
-                formatted = str(
-                    # email.headerregistry.Address str format uses unencoded Unicode
-                    Address(
-                        # Convert RFC 2047 display name back to Unicode str
-                        display_name=str(
-                            make_header(decode_header(email.display_name))
-                        ),
-                        addr_spec=email.addr_spec,
-                    )
-                )
-        self.data["from"] = formatted
+        self.data["from"] = email.address
 
     def set_recipients(self, recipient_type, emails):
         assert recipient_type in ["to", "cc", "bcc"]
         if emails:
             field = recipient_type
-            self.data[field] = [self._resend_email_address(email) for email in emails]
+            self.data[field] = [email.address for email in emails]
             self.recipients += emails
             if recipient_type == "to":
                 self.to_recipients = emails
@@ -211,9 +146,7 @@ class ResendPayload(RequestsPayload):
 
     def set_reply_to(self, emails):
         if emails:
-            self.data["reply_to"] = [
-                self._resend_email_address(email) for email in emails
-            ]
+            self.data["reply_to"] = [email.address for email in emails]
 
     def set_extra_headers(self, headers):
         # Resend requires header values to be strings (not integers) as of 2023-10-20.
