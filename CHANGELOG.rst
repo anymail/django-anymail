@@ -6,7 +6,7 @@ Among other things, this means that minor updates (1.x to 1.y)
 should always be backwards-compatible, and breaking changes will
 always increment the major version number (1.x to 2.0).
 
-.. _semver: http://semver.org
+.. _semver: https://semver.org
 
 
 ..  This changelog is designed to be readable standalone on GitHub,

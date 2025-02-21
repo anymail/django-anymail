@@ -24,10 +24,9 @@ See the `contributor chart`_ for a list of some of the people who have helped
 improve Anymail.
 
 Anymail evolved from the `Djrill`_ project. Special thanks to the
-folks from `brack3t`_ who developed the original version of Djrill.
+folks from Brack3t who developed the original version of Djrill.
 
 .. _contributor chart: https://github.com/anymail/django-anymail/graphs/contributors
-.. _brack3t: http://brack3t.com/
 .. _Djrill: https://github.com/brack3t/Djrill
 
 
