@@ -56,6 +56,13 @@ Fixes
 * **Postmark:** Fix an error in inbound handling with long email address display
   names that include non-ASCII characters.
 
+* **SendGrid:** Improve handling of non-string values in ``merge_data`` when using
+  legacy templates or inline merge fields. To avoid a confusing SendGrid API error
+  message, Anymail now converts numeric merge data values to strings, but will raise
+  an AnymailSerializationError for other non-string data in SendGrid substitutions.
+  (SendGrid's newer *dynamic* transactional templates do not have this limitation.)
+  (Thanks to `@PlusAsh`_ for reporting the issue.)
+
 Other
 ~~~~~
 
@@ -1798,6 +1805,7 @@ Features
 .. _@mwheels: https://github.com/mwheels
 .. _@nuschk: https://github.com/nuschk
 .. _@originell: https://github.com/originell
+.. _@PlusAsh: https://github.com/PlusAsh
 .. _@puru02: https://github.com/puru02
 .. _@RignonNoel: https://github.com/RignonNoel
 .. _@rodrigondec: https://github.com/rodrigondec

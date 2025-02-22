@@ -3,7 +3,11 @@ import warnings
 
 from requests.structures import CaseInsensitiveDict
 
-from ..exceptions import AnymailConfigurationError, AnymailWarning
+from ..exceptions import (
+    AnymailConfigurationError,
+    AnymailSerializationError,
+    AnymailWarning,
+)
 from ..message import AnymailRecipientStatus
 from ..utils import BASIC_NUMERIC_TYPES, Mapping, get_anymail_setting, update_deep
 from .base_requests import AnymailRequestsBackend, RequestsPayload
@@ -159,6 +163,20 @@ class SendGridPayload(RequestsPayload):
         """
         Change personalizations[...]['dynamic_template_data'] to ...['substitutions]
         """
+
+        def transform_substitution_value(value):
+            # SendGrid substitutions must be string or null, or SendGrid issues the
+            # cryptic error `{"field": null, "message": "Bad Request", "help": null}`.
+            # Anymail will convert numbers; treat anything else as an error.
+            if isinstance(value, str) or value is None:
+                return value
+            if isinstance(value, BASIC_NUMERIC_TYPES):
+                return str(value)
+            raise AnymailSerializationError(
+                "SendGrid legacy substitutions require string values."
+                f" Don't know how to handle {type(value).__name__}."
+            )
+
         merge_field_format = self.merge_field_format or "{}"
 
         all_merge_fields = set()
@@ -171,7 +189,7 @@ class SendGridPayload(RequestsPayload):
                 # Convert dynamic_template_data keys for substitutions,
                 # using merge_field_format
                 personalization["substitutions"] = {
-                    merge_field_format.format(field): data
+                    merge_field_format.format(field): transform_substitution_value(data)
                     for field, data in dynamic_template_data.items()
                 }
                 all_merge_fields.update(dynamic_template_data.keys())

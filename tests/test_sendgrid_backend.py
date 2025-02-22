@@ -831,6 +831,56 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         with self.assertWarnsRegex(AnymailWarning, r"SENDGRID_MERGE_FIELD_FORMAT"):
             self.message.send()
 
+    def test_legacy_data_conversion(self):
+        """
+        SendGrid requires string (or null) substitution values.
+        Anymail will convert numbers.
+        """
+        # (Legacy substitutions path because not using dynamic template id.)
+        self.message.to = ["alice@example.com"]
+        self.message.merge_data = {
+            "alice@example.com": {
+                ":integer": 1,
+                ":float": 1.0,
+                ":null": None,
+            }
+        }
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["personalizations"][0]["substitutions"],
+            {
+                ":integer": "1",
+                ":float": "1.0",
+                ":null": None,
+            },
+        )
+
+    def test_legacy_unsupported_string_conversion(self):
+        """
+        SendGrid requires string substitution values (and issues a cryptic
+        error otherwise). Anymail treats non-convertible data as an error.
+        """
+        # (Legacy substitutions path because not using dynamic template id.)
+        self.message.to = ["alice@example.com"]
+        cases = [
+            ["array"],
+            {"dict": 1},
+            Decimal("1.0"),
+        ]
+        for case in cases:
+            with self.subTest(case=case):
+                self.message.merge_data = {
+                    "alice@example.com": {
+                        ":value": case,
+                    }
+                }
+                with self.assertRaisesMessage(
+                    AnymailSerializationError,
+                    "SendGrid legacy substitutions require string values",
+                ):
+                    self.message.send()
+
     def test_merge_metadata(self):
         self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
         self.message.merge_metadata = {
