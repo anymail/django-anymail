@@ -66,6 +66,8 @@ Fixes
 Other
 ~~~~~
 
+* Test against Django 5.2 pre-release.
+
 * **Resend:** Remove Anymail's workaround for an earlier Resend API bug with
   punctuation in address display names. Resend has fixed the bug.
 
