@@ -44,6 +44,7 @@ jobs:
           - { tox: django41-py310-mailersend, python: "3.12" }
           - { tox: django41-py310-mailgun, python: "3.12" }
           - { tox: django41-py310-mailjet, python: "3.12" }
+          - { tox: django41-py310-mailtrap, python: "3.12" }
           - { tox: django41-py310-mandrill, python: "3.12" }
           - { tox: django41-py310-postal, python: "3.12" }
           - { tox: django41-py310-postmark, python: "3.12" }
