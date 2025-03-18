@@ -1,138 +1,97 @@
 .. _securing-webhooks:
 
-Securing webhooks
+Securing Webhooks
 =================
 
-If not used carefully, webhooks can create security vulnerabilities
-in your Django application.
+Webhooks are a powerful way to receive event notifications from external services, but if not secured properly, they can expose your Django application to security vulnerabilities.
 
-At minimum, you should **use https** and a **shared authentication secret**
-for your Anymail webhooks. (Really, for *any* webhooks.)
+At a minimum, you should **use HTTPS** and a **shared authentication secret** for your Anymail webhooks. These practices apply to *any* webhook implementation, not just Anymail.
 
+.. sidebar:: Why does this matter?
 
-.. sidebar:: Does this really matter?
+    Short answer: **Yes, it matters!**
 
-    Short answer: yes!
+    Webhooks function as APIs that your application exposes. If left unsecured, attackers can:
 
-    Do you allow unauthorized access to your APIs? Would you want
-    someone eavesdropping on API calls? Of course not. Well, a webhook
-    is just another API.
+    * Collect your customers' email addresses.
+    * Send fake bounces and spam reports, leading to blocked valid users.
+    * Intercept email contents.
+    * Spoof incoming mail to execute malicious commands in your app.
+    * Flood your database with garbage data, impacting performance.
 
-    Think about the data your ESP sends and what your app does with it.
-    If your webhooks aren't secured, an attacker could...
+    Secure your webhooks to prevent these risks.
 
-    * accumulate a list of your customers' email addresses
-    * fake bounces and spam reports, so you block valid user emails
-    * see the full contents of email from your users
-    * convincingly forge incoming mail, tricking your app into publishing
-      spam or acting on falsified commands
-    * overwhelm your DB with garbage data (do you store tracking info?
-      incoming attachments?)
-
-    ... or worse. Why take a chance?
-
-
-Use https
+Use HTTPS
 ---------
 
-For security, your Django site must use https. The webhook URLs you
-give your ESP need to start with *https* (not *http*).
+Your Django application **must use HTTPS** to receive webhooks securely. The webhook URLs you provide to your ESP should always begin with `https://`.
 
-Without https, the data your ESP sends your webhooks is exposed in transit.
-This can include your customers' email addresses, the contents of messages
-you receive through your ESP, the shared secret used to authorize calls
-to your webhooks (described in the next section), and other data you'd
-probably like to keep private.
+Without HTTPS, webhook payloads travel unencrypted, exposing sensitive data like email addresses, message contents, and authentication secrets. This can lead to data leaks and potential account takeovers.
 
-Configuring https is beyond the scope of Anymail, but there are many good
-tutorials on the web. If you've previously dismissed https as too expensive
-or too complicated, please take another look. Free https certificates are
-available from `Let's Encrypt`_, and many hosting providers now offer easy
-https configuration using Let's Encrypt or their own no-cost option.
+Setting up HTTPS is outside the scope of Anymail, but here are some helpful resources:
 
-If you aren't able to use https on your Django site, then you should
-not set up your ESP's webhooks.
+* Use `Let's Encrypt`_ for free SSL certificates.
+* Many hosting providers offer built-in HTTPS support.
+* Check web tutorials for configuring HTTPS on your web server.
+
+If you **cannot** enable HTTPS on your Django site, you **should not** configure ESP webhooks.
 
 .. _Let's Encrypt: https://letsencrypt.org/
 
-
 .. setting:: ANYMAIL_WEBHOOK_SECRET
 
-Use a shared authentication secret
-----------------------------------
+Use a Shared Authentication Secret
+-----------------------------------
 
-A webhook is an ordinary URL---anyone can post anything to it.
-To avoid receiving random (or malicious) data in your webhook,
-you should use a shared random secret that your ESP can present
-with webhook data, to prove the post is coming from your ESP.
+Since a webhook URL is a public endpoint, **anyone** can send requests to it. To ensure only your ESP can send valid webhook data, use a shared secret for authentication.
 
-Most ESPs recommend using HTTP basic authentication as this shared
-secret. Anymail includes support for this, via the
-:setting:`!ANYMAIL_WEBHOOK_SECRET` setting.
-Basic usage is covered in the
-:ref:`webhooks configuration <webhooks-configuration>` docs.
+Most ESPs recommend **HTTP Basic Authentication** for securing webhooks. Anymail supports this via the :setting:`!ANYMAIL_WEBHOOK_SECRET` setting.
 
-If something posts to your webhooks without the required shared
-secret as basic auth in the HTTP *Authorization* header, Anymail will
-raise an :exc:`AnymailWebhookValidationFailure` error, which is
-a subclass of Django's :exc:`~django.core.exceptions.SuspiciousOperation`.
-This will result in an HTTP 400 "bad request" response, without further processing
-the data or calling your signal receiver function.
+When configured, Anymail validates webhook requests using Basic Authentication. If a request lacks the correct credentials, Anymail raises an :exc:`AnymailWebhookValidationFailure` exception, preventing further processing. This exception is a subclass of Django's :exc:`~django.core.exceptions.SuspiciousOperation` and results in an HTTP 400 "Bad Request" response.
 
-In addition to a single "random:random" string, you can give a list
-of authentication strings. Anymail will permit webhook calls that match
-any of the authentication strings:
+Here’s how to configure multiple authentication secrets for easy rotation:
 
-   .. code-block:: python
+.. code-block:: python
 
-      ANYMAIL = {
-          ...
-          'WEBHOOK_SECRET': [
-              'abcdefghijklmnop:qrstuvwxyz0123456789',
-              'ZYXWVUTSRQPONMLK:JIHGFEDCBA9876543210',
-          ],
-      }
+   ANYMAIL = {
+       ...
+       'WEBHOOK_SECRET': [
+           'abcdefghijklmnop:qrstuvwxyz0123456789',
+           'ZYXWVUTSRQPONMLK:JIHGFEDCBA9876543210',
+       ],
+   }
 
-This facilitates credential rotation: first, append a new authentication
-string to the list, and deploy your Django site. Then, update the webhook
-URLs at your ESP to use the new authentication. Finally, remove the old
-(now unused) authentication string from the list and re-deploy.
+**Credential Rotation Steps:**
+1. Add a new authentication string to the list and deploy your Django site.
+2. Update the webhook URLs at your ESP to use the new authentication.
+3. Remove the old authentication string after confirming all requests use the new one.
 
 .. warning::
 
-    If your webhook URLs don't use https, this shared authentication
-    secret won't stay secret, defeating its purpose.
+    If your webhook URLs don’t use HTTPS, your authentication secret could be exposed, rendering it useless.
 
-
-Signed webhooks
+Signed Webhooks
 ---------------
 
-Some ESPs implement webhook signing, which is another method of verifying
-the webhook data came from your ESP. Anymail will verify these signatures
-for ESPs that support them. See the docs for your
-:ref:`specific ESP <supported-esps>` for more details and configuration
-that may be required.
+Some ESPs offer **signed webhooks**, which allow you to verify that the webhook payload was not tampered with in transit. Anymail supports signature verification for ESPs that provide this feature.
 
-Even with signed webhooks, it doesn't hurt to also use a shared secret.
+Check the documentation for your :ref:`specific ESP <supported-esps>` to configure webhook signing.
 
+Even with signed webhooks, using a shared secret for authentication adds an extra layer of security.
 
-Additional steps
-----------------
+Additional Security Measures
+----------------------------
 
-Webhooks aren't unique to Anymail or to ESPs. They're used for many
-different types of inter-site communication, and you can find additional
-recommendations for improving webhook security on the web.
+Beyond HTTPS and authentication secrets, consider these additional security steps:
 
-For example, you might consider:
+* **Prevent Replay Attacks:** Track :attr:`~anymail.signals.AnymailTrackingEvent.event_id` to avoid processing duplicate events.
+* **Validate Timestamps:** Ensure :attr:`~anymail.signals.AnymailTrackingEvent.timestamp` is recent to mitigate replay attacks.
+* **Restrict Incoming Requests:** If your ESP provides a list of IP addresses, configure your firewall to accept requests only from those addresses.
+* **Rate-Limit Requests:** Use web server rate-limiting or a tool like :pypi:`django-ratelimit` to prevent abuse.
 
-* Tracking :attr:`~anymail.signals.AnymailTrackingEvent.event_id`,
-  to avoid accidental double-processing of the same events (or replay attacks)
-* Checking the webhook's :attr:`~anymail.signals.AnymailTrackingEvent.timestamp`
-  is reasonably close the current time
-* Configuring your firewall to reject webhook calls that come from
-  somewhere other than your ESP's documented IP addresses (if your ESP
-  provides this information)
-* Rate-limiting webhook calls in your web server or using something
-  like :pypi:`django-ratelimit`
+### Testing Your Webhooks
 
-But you should start with using https and a random shared secret via HTTP auth.
+To test your webhook security, you can use API request inspection tools such as:
+
+* **[Beeceptor](https://beeceptor.com/)** – Create a custom endpoint to inspect webhook payloads before integrating them into your application.
+* **[Typed Webhook](https://typedwebhook.tools/)** – A tool that helps validate and debug webhook requests with structured analysis.
