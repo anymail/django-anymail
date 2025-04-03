@@ -19,6 +19,12 @@ jobs:
     steps:
       - name: Get code
         uses: actions/checkout@v4
+      - name: Setup default Python
+        # Change default Python version to something consistent
+        # for installing/running tox
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
       - name: Install tox-gh-matrix
         run: |
           python -m pip install 'tox<4' 'tox-gh-matrix<0.3'
@@ -52,7 +58,7 @@ jobs:
         # for installing/running tox
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
       - name: Install tox
         run: |
           set -x
