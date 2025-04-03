@@ -78,7 +78,11 @@ mailgun = []
 mailjet = []
 mandrill = []
 postmark = []
-resend = ["svix"]
+resend = [
+    # Svix v1.63.0 actually requires Python 3.10, but claims otherwise.
+    "svix<1.63.0; python_version < '3.10'",
+    "svix; python_version >= '3.10'"
+]
 sendgrid = []
 sendinblue = []
 sparkpost = []

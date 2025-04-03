@@ -56,6 +56,9 @@ Fixes
 * **Postmark:** Fix an error in inbound handling with long email address display
   names that include non-ASCII characters.
 
+* **Resend:** Avoid installing a broken version of the ``svix`` package
+  (which is used to validate Resend webhooks).
+
 * **SendGrid:** Improve handling of non-string values in ``merge_data`` when using
   legacy templates or inline merge fields. To avoid a confusing SendGrid API error
   message, Anymail now converts numeric merge data values to strings, but will raise
