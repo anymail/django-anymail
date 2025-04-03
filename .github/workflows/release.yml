@@ -18,12 +18,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-22.04
-    environment: release
-    permissions:
-      # `gh release` requires write permission on repo contents
-      contents: write
+    outputs:
+      anchor: ${{ steps.version.outputs.anchor }}
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Get code
         uses: actions/checkout@v4
@@ -52,29 +52,59 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "anchor=${TAG//[^[:alnum:]]/-}" >> $GITHUB_OUTPUT
 
-      - name: Build
+      - name: Build distribution
         run: |
           rm -rf build dist django_anymail.egg-info
           python -m build
+
+      - name: Check metadata
+        run: |
           python -m twine check dist/*
 
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-          # For test PyPI, set release var PYPI_REPOSITORY_URL=https://test.pypi.org/legacy/.
-          # For production PyPI, leave unset (or set to empty string).
-          TWINE_REPOSITORY_URL: ${{ vars.PYPI_REPOSITORY_URL }}
-        run: |
-          python -m twine upload --disable-progress-bar --non-interactive dist/*
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
 
+  publish:
+    needs: [build]
+    runs-on: ubuntu-22.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/django-anymail
+    permissions:
+      # Required for PyPI trusted publishing
+      id-token: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  release:
+    needs: [build, publish]
+    runs-on: ubuntu-22.04
+    permissions:
+      # `gh release` requires write permission on repo contents
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - name: Release to GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
-          TITLE: ${{ steps.version.outputs.tag }}
+          TAG: ${{ needs.build.outputs.tag }}
+          TITLE: ${{ needs.build.outputs.tag }}
           NOTES: |
-            [Changelog](https://anymail.dev/en/stable/changelog/#${{ steps.version.outputs.anchor }})
+            [Changelog](https://anymail.dev/en/stable/changelog/#${{ needs.build.outputs.anchor }})
         run: |
           if ! gh release edit "$TAG" --verify-tag --target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES"; then
             gh release create "$TAG" --verify-tag --target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES"
