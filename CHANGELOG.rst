@@ -25,6 +25,18 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes*
+
+Fixes
+~~~~~
+
+* **Amazon SES:** Require boto3 1.24.6 or later to ensure support for the SESv2 
+  close method. (Thanks to `@mgibeau`_ for identifying the issue.)
+
+
 v13.0
 -----
 
@@ -1802,6 +1814,7 @@ Features
 .. _@mark-mishyn: https://github.com/mark-mishyn
 .. _@martinezleoml: https://github.com/martinezleoml
 .. _@mbk-ok: https://github.com/mbk-ok
+.. _@mgibeau: https://github.com/mgibeau
 .. _@MikeVL: https://github.com/MikeVL
 .. _@mounirmesselmeni: https://github.com/mounirmesselmeni
 .. _@mwheels: https://github.com/mwheels
