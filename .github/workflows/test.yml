@@ -9,16 +9,22 @@ on:
   schedule:
     # Weekly test (on branch main) every Thursday at 12:00 UTC.
     # (Used to monitor compatibility with Django patches/dev and other dependencies.)
-    - cron: "0 12 * * 4"
+    - cron: "0 12 * * 4" # zizmor: ignore[cache-poisoning] not used for publishing
+
+permissions: {}
 
 jobs:
   get-envlist:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
     outputs:
       envlist: ${{ steps.generate-envlist.outputs.envlist }}
     steps:
       - name: Get code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Setup default Python
         # Change default Python version to something consistent
         # for installing/running tox
@@ -38,6 +44,8 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     needs: get-envlist
+    permissions:
+      contents: read
     strategy:
       matrix:
         tox: ${{ fromJSON(needs.get-envlist.outputs.envlist) }}
@@ -48,6 +56,8 @@ jobs:
     steps:
       - name: Get code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Setup Python ${{ matrix.tox.python.version }}
         # Ensure matrix Python version is installed and available for tox
         uses: actions/setup-python@v5
