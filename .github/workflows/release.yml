@@ -17,9 +17,13 @@ on:
     tags: ["v[0-9]*"]
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
     outputs:
       anchor: ${{ steps.version.outputs.anchor }}
       tag: ${{ steps.version.outputs.tag }}
@@ -27,6 +31,8 @@ jobs:
     steps:
       - name: Get code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -84,7 +90,8 @@ jobs:
           name: dist
           path: dist/
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        # Official PyPA publishing action, and we want any security/dependency updates.
+        uses: pypa/gh-action-pypi-publish@release/v1 # zizmor: ignore[unpinned-uses]
 
   release:
     needs: [build, publish]
@@ -100,7 +107,7 @@ jobs:
           path: dist/
       - name: Release to GitHub
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.build.outputs.tag }}
           TITLE: ${{ needs.build.outputs.tag }}
           NOTES: |
