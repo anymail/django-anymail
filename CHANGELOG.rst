@@ -33,7 +33,7 @@ vNext
 Fixes
 ~~~~~
 
-* **Amazon SES:** Require boto3 1.24.6 or later to ensure support for the SESv2 
+* **Amazon SES:** Require boto3 1.24.6 or later to ensure support for the SESv2
   close method. (Thanks to `@mgibeau`_ for identifying the issue.)
 
 
