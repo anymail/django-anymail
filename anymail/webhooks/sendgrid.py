@@ -1,10 +1,16 @@
+import base64
 import json
 import warnings
 from datetime import datetime, timezone
 from email.parser import BytesParser
 from email.policy import default as default_policy
 
-from ..exceptions import AnymailNotSupportedWarning
+from ..exceptions import (
+    AnymailImproperlyInstalled,
+    AnymailNotSupportedWarning,
+    AnymailWebhookValidationFailure,
+    _LazyError,
+)
 from ..inbound import AnymailInboundMessage
 from ..signals import (
     AnymailInboundEvent,
@@ -14,10 +20,89 @@ from ..signals import (
     inbound,
     tracking,
 )
+from ..utils import get_anymail_setting
 from .base import AnymailBaseWebhookView
 
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+except ImportError:
+    # This module gets imported by anymail.urls, so don't complain about cryptography
+    # missing unless one of the Postal webhook views is actually used and needs it
+    error = _LazyError(
+        AnymailImproperlyInstalled(
+            missing_package="cryptography", install_extra="sendgrid"
+        )
+    )
+    serialization = error
+    hashes = error
+    default_backend = error
+    ec = error
+    InvalidSignature = Exception
 
-class SendGridTrackingWebhookView(AnymailBaseWebhookView):
+
+class SendGridWebhookSignatureVerificationMixin:
+    webhook_key = (
+        None  # optional; defaults to None -> signature verification is skipped
+    )
+
+    def __init__(self, **kwargs):
+        webhook_key = get_anymail_setting(
+            "webhook_key",
+            esp_name=self.esp_name,
+            default=None,
+            kwargs=kwargs,
+            allow_bare=True,
+        )
+        if webhook_key:
+            self.webhook_key = serialization.load_pem_public_key(
+                (
+                    "-----BEGIN PUBLIC KEY-----\n"
+                    + self.webhook_key
+                    + "\n-----END PUBLIC KEY-----"
+                ).encode("utf-8"),
+                backend=default_backend(),
+            )
+        super().__init__(**kwargs)
+
+    def validate_request(self, request):
+        # Do basic auth validation first, since it's probably cheaper than signature validation
+        super().validate_request(request)
+        if self.webhook_key:
+            try:
+                signature = request.META["X-Twilio-Email-Event-Webhook-Signature"]
+            except KeyError:
+                raise AnymailWebhookValidationFailure(
+                    "X-Twilio-Email-Event-Webhook-Signature header missing from webhook"
+                )
+            try:
+                timestamp = request.META["X-Twilio-Email-Event-Webhook-Timestamp"]
+            except KeyError:
+                raise AnymailWebhookValidationFailure(
+                    "X-Twilio-Email-Event-Webhook-Timestamp header missing from webhook"
+                )
+
+            timestamped_payload = (timestamp + request.body).encode("utf-8")
+            decoded_signature = base64.b64decode(signature)
+
+            try:
+                self.webhook_key.verify(
+                    decoded_signature,
+                    timestamped_payload,
+                    ec.ECDSA(hashes.SHA256()),
+                )
+            except InvalidSignature:
+                raise AnymailWebhookValidationFailure(
+                    "SendGrid webhook called with incorrect signature"
+                )
+
+
+class SendGridTrackingWebhookView(
+    SendGridWebhookSignatureVerificationMixin,
+    AnymailBaseWebhookView,
+):
     """Handler for SendGrid delivery and engagement tracking webhooks"""
 
     esp_name = "SendGrid"
@@ -140,7 +225,10 @@ class SendGridTrackingWebhookView(AnymailBaseWebhookView):
     }
 
 
-class SendGridInboundWebhookView(AnymailBaseWebhookView):
+class SendGridInboundWebhookView(
+    SendGridWebhookSignatureVerificationMixin,
+    AnymailBaseWebhookView,
+):
     """Handler for SendGrid inbound webhook"""
 
     esp_name = "SendGrid"

@@ -79,7 +79,13 @@ mailjet = []
 mandrill = []
 postmark = []
 resend = ["svix"]
-sendgrid = []
+sendgrid = [
+    # Sendgrid requires cryptography for verifying webhook signatures.
+    # Cryptography's wheels are broken on darwin-arm64 before Python 3.9,
+    # and unbuildable on PyPy 3.8 due to PyO3 limitations. Since cpython 3.8
+    # has also passed EOL, just require Python 3.9+ with Postal.
+    "cryptography; python_version >= '3.9'"
+]
 sendinblue = []
 sparkpost = []
 unisender-go = []
