@@ -1,4 +1,5 @@
 import base64
+import binascii
 import json
 import warnings
 from datetime import datetime, timezone
@@ -60,7 +61,7 @@ class SendGridWebhookSignatureVerificationMixin:
             self.webhook_key = serialization.load_pem_public_key(
                 (
                     "-----BEGIN PUBLIC KEY-----\n"
-                    + self.webhook_key
+                    + webhook_key
                     + "\n-----END PUBLIC KEY-----"
                 ).encode("utf-8"),
                 backend=default_backend(),
@@ -68,32 +69,40 @@ class SendGridWebhookSignatureVerificationMixin:
         super().__init__(**kwargs)
 
     def validate_request(self, request):
+        # TODO: Remove this call to super(), since this is handled automatically without needing
+        #       superclass chaining
         # Do basic auth validation first, since it's probably cheaper than signature validation
         super().validate_request(request)
         if self.webhook_key:
             try:
-                signature = request.META["X-Twilio-Email-Event-Webhook-Signature"]
+                signature = request.headers["X-Twilio-Email-Event-Webhook-Signature"]
             except KeyError:
                 raise AnymailWebhookValidationFailure(
                     "X-Twilio-Email-Event-Webhook-Signature header missing from webhook"
                 )
             try:
-                timestamp = request.META["X-Twilio-Email-Event-Webhook-Timestamp"]
+                timestamp = request.headers["X-Twilio-Email-Event-Webhook-Timestamp"]
             except KeyError:
                 raise AnymailWebhookValidationFailure(
                     "X-Twilio-Email-Event-Webhook-Timestamp header missing from webhook"
                 )
 
-            timestamped_payload = (timestamp + request.body).encode("utf-8")
-            decoded_signature = base64.b64decode(signature)
+            timestamped_payload = timestamp.encode("utf-8") + request.body
 
             try:
+                decoded_signature = base64.b64decode(signature)
                 self.webhook_key.verify(
                     decoded_signature,
                     timestamped_payload,
                     ec.ECDSA(hashes.SHA256()),
                 )
-            except InvalidSignature:
+            # We intentionally respond the same to both of these issues, see below
+            # binascii.Error may come from attempting to base64-decode the signature
+            # InvalidSignature will come from self.webhook_key.verify(...)
+            except (binascii.Error, InvalidSignature):
+                # We intentionally don't give out too much information here, because that would
+                # make it easier used to characterize the issue and workaround the signature
+                # verification
                 raise AnymailWebhookValidationFailure(
                     "SendGrid webhook called with incorrect signature"
                 )
