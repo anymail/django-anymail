@@ -48,6 +48,14 @@ The table below summarizes the Anymail features supported for each ESP.
     :widths: auto
     :class: sticky-left
 
+.. [#support-status]
+    "Full" support indicates the Anymail project has an account with the ESP and
+    regularly runs live integration tests against their API. "Limited" indicates
+    Anymail has access to the ESP for testing and debugging issues, but doesn't
+    run integration tests regularly. "Unsupported" means Anymail does not have
+    testing access to the ESP. (The ESP's detail page will provide more details
+    on "Limited" and "Unsupported".)
+
 .. [#caveats]
     Some restrictions apply---see the ESP detail page
     (usually under "Limitations and Quirks").
@@ -56,8 +64,8 @@ The table below summarizes the Anymail features supported for each ESP.
     The ESP supports tracking, but Anymail can't enable/disable it
     for individual messages. See the ESP detail page for more information.
 
-Trying to choose an ESP? Please **don't** start with this table. It's far more
-important to consider things like an ESP's deliverability stats, latency, uptime,
+Trying to choose an ESP? Please **don't** start with the feature checklist. It's far
+more important to consider things like an ESP's deliverability stats, latency, uptime,
 and support for developers. The *number* of extra features an ESP offers is almost
 meaningless. (And even specific features don't matter if you don't plan to use them.)
 

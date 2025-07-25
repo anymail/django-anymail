@@ -7,7 +7,7 @@ from email.mime.image import MIMEImage
 from unittest.mock import patch
 
 from django.core import mail
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, ignore_warnings, override_settings, tag
 from django.utils.timezone import (
     get_fixed_timezone,
     override as override_current_timezone,
@@ -16,6 +16,7 @@ from django.utils.timezone import (
 from anymail.exceptions import (
     AnymailAPIError,
     AnymailConfigurationError,
+    AnymailNotSupportedWarning,
     AnymailSerializationError,
     AnymailUnsupportedFeature,
     AnymailWarning,
@@ -39,6 +40,7 @@ from .utils import (
     EMAIL_BACKEND="anymail.backends.sendgrid.EmailBackend",
     ANYMAIL={"SENDGRID_API_KEY": "test_api_key"},
 )
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     # SendGrid v3 success responses are empty:
     DEFAULT_RAW_RESPONSE = b""
@@ -63,8 +65,16 @@ class SendGridBackendMockAPITestCase(RequestsBackendMockAPITestCase):
 
 
 @tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
     """Test backend support for Django standard email features"""
+
+    def test_not_supported_warning(self):
+        with self.assertWarns(
+            AnymailNotSupportedWarning,
+            msg="django-anymail has dropped official support for SendGrid.",
+        ):
+            mail.get_connection()
 
     def test_send_mail(self):
         """Test basic API for simple send"""
@@ -461,6 +471,7 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
 
 
 @tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
     """Test backend support for Anymail added features"""
 
@@ -1298,6 +1309,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
 
 
 @tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendRecipientsRefusedTests(SendGridBackendMockAPITestCase):
     """
     Should raise AnymailRecipientsRefused when *all* recipients are rejected or invalid
@@ -1310,6 +1322,7 @@ class SendGridBackendRecipientsRefusedTests(SendGridBackendMockAPITestCase):
 
 
 @tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendSessionSharingTestCase(
     SessionSharingTestCases, SendGridBackendMockAPITestCase
 ):
@@ -1320,6 +1333,7 @@ class SendGridBackendSessionSharingTestCase(
 
 @tag("sendgrid")
 @override_settings(EMAIL_BACKEND="anymail.backends.sendgrid.EmailBackend")
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
     """Test ESP backend without required settings in place"""
 
@@ -1330,6 +1344,7 @@ class SendGridBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase)
 
 @tag("sendgrid")
 @override_settings(EMAIL_BACKEND="anymail.backends.sendgrid.EmailBackend")
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendDisallowsV2Tests(AnymailTestMixin, SimpleTestCase):
     """Using v2-API-only features should cause errors with v3 backend"""
 

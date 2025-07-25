@@ -1,4 +1,5 @@
 Email Service Provider,:ref:`amazon-ses-backend`,:ref:`brevo-backend`,:ref:`mailersend-backend`,:ref:`mailgun-backend`,:ref:`mailjet-backend`,:ref:`mandrill-backend`,:ref:`postal-backend`,:ref:`postmark-backend`,:ref:`resend-backend`,:ref:`sendgrid-backend`,:ref:`sparkpost-backend`,:ref:`unisender-go-backend`
+Anymail support status [#support-status]_,Full,Full,Full,Full,Full,Limited,Limited,Full,Full,**Unsupported**,Full,Full
 .. rubric:: :ref:`Anymail send options <anymail-send-options>`,,,,,,,,,,,,
 :attr:`~AnymailMessage.envelope_sender`,Yes,No,No,Domain only,Yes,Domain only,Yes,No,No,No,Yes,No
 :attr:`~AnymailMessage.merge_headers`,Yes [#caveats]_,Yes,No,Yes,Yes,No,No,Yes,Yes,Yes,Yes [#caveats]_,Yes [#caveats]_

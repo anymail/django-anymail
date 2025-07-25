@@ -3,9 +3,34 @@
 SendGrid
 ========
 
-Anymail integrates with the Twilio `SendGrid`_ email service, using their `Web API v3`_.
+Anymail integrates with the Twilio `SendGrid`_ email service, using their `Web API`_.
 
-.. important::
+.. warning:: **Unsupported since June 2025**
+
+    Anymail's SendGrid integration hasn't been tested against the live SendGrid API
+    since June 2025. As a result, SendGrid is no longer officially supported in
+    django-anymail. See `issue #432`_ for background and recommendations.
+
+    Although it will *probably* keep working, future bugs will likely be discovered
+    in production, by users like you, and we won't be able to verify proposed fixes.
+
+    To alert users to the change in support status, django-anymail 13.0.1 and later
+    will issue warnings when SendGrid features are used. If you are comfortable using
+    code that is no longer fully tested, you can disable these warnings by adding this
+    to your settings.py:
+
+    .. code-block:: python
+
+        SILENCED_SYSTEM_CHECKS = ["anymail.W003"]
+
+        import warnings
+        warnings.filterwarnings(
+            "ignore",
+            message="django-anymail has dropped official support for SendGrid",
+        )
+
+
+.. note::
 
     **Troubleshooting:**
     If your SendGrid messages aren't being delivered as expected, be sure to look for
@@ -15,7 +40,8 @@ Anymail integrates with the Twilio `SendGrid`_ email service, using their `Web A
     to succeed, and reports these errors as drop events.
 
 .. _SendGrid: https://sendgrid.com/
-.. _Web API v3: https://www.twilio.com/docs/sendgrid/api-reference
+.. _Web API: https://www.twilio.com/docs/sendgrid/api-reference
+.. _issue #432: https://github.com/anymail/django-anymail/issues/432
 .. _activity feed: https://app.sendgrid.com/email_activity?events=drops
 
 

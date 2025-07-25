@@ -48,7 +48,7 @@ jobs:
           - { tox: django52-py313-postal, python: "3.13" }
           - { tox: django52-py313-postmark, python: "3.13" }
           - { tox: django52-py313-resend, python: "3.13" }
-          - { tox: django52-py313-sendgrid, python: "3.13" }
+          # - { tox: django52-py313-sendgrid, python: "3.13" }
           - { tox: django52-py313-sparkpost, python: "3.13" }
           - { tox: django52-py313-unisender_go, python: "3.13" }
 
@@ -96,7 +96,7 @@ jobs:
           ANYMAIL_TEST_RESEND_API_KEY: ${{ secrets.ANYMAIL_TEST_RESEND_API_KEY }}
           ANYMAIL_TEST_RESEND_DOMAIN: ${{ secrets.ANYMAIL_TEST_RESEND_DOMAIN }}
           ANYMAIL_TEST_SENDGRID_API_KEY: ${{ secrets.ANYMAIL_TEST_SENDGRID_API_KEY }}
-          ANYMAIL_TEST_SENDGRID_DOMAIN: ${{ secrets.ANYMAIL_TEST_SENDGRID_DOMAIN }}
+          ANYMAIL_TEST_SENDGRID_DOMAIN: ${{ vars.ANYMAIL_TEST_SENDGRID_DOMAIN }}
           ANYMAIL_TEST_SENDGRID_TEMPLATE_ID: ${{ secrets.ANYMAIL_TEST_SENDGRID_TEMPLATE_ID }}
           ANYMAIL_TEST_SPARKPOST_API_KEY: ${{ secrets.ANYMAIL_TEST_SPARKPOST_API_KEY }}
           ANYMAIL_TEST_SPARKPOST_DOMAIN: ${{ secrets.ANYMAIL_TEST_SPARKPOST_DOMAIN }}

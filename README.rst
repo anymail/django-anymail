@@ -35,7 +35,7 @@ Anymail currently supports these ESPs:
 * **Postal** (self-hosted ESP)
 * **Postmark** (ActiveCampaign transactional email)
 * **Resend**
-* **SendGrid** (Twilio transactional email)
+* **SendGrid** (Twilio transactional email; no longer tested)
 * **SparkPost** (Bird transactional email)
 * **Unisender Go**
 
@@ -94,7 +94,7 @@ Anymail 1-2-3
 .. This quickstart section is also included in docs/quickstart.rst
 
 Here's how to send a message.
-This example uses Mailgun, but you can substitute Mailjet or Postmark or SendGrid
+This example uses Mailgun, but you can substitute Amazon SES or Mailjet or Postmark
 or SparkPost or any other supported ESP where you see "mailgun":
 
 1. Install Anymail from PyPI:
@@ -122,7 +122,7 @@ or SparkPost or any other supported ESP where you see "mailgun":
             "MAILGUN_API_KEY": "<your Mailgun key>",
             "MAILGUN_SENDER_DOMAIN": 'mg.example.com',  # your Mailgun domain, if needed
         }
-        EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"  # or sendgrid.EmailBackend, or...
+        EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"  # or amazon_ses.EmailBackend, or...
         DEFAULT_FROM_EMAIL = "you@example.com"  # if you don't already have this in settings
         SERVER_EMAIL = "your-server@example.com"  # ditto (default from-email for Django errors)
 

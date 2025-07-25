@@ -3,8 +3,9 @@ from io import BytesIO
 from textwrap import dedent
 from unittest.mock import ANY
 
-from django.test import tag
+from django.test import ignore_warnings, tag
 
+from anymail.exceptions import AnymailNotSupportedWarning
 from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent
 from anymail.webhooks.sendgrid import SendGridInboundWebhookView
@@ -20,7 +21,15 @@ from .webhook_cases import WebhookTestCase
 
 
 @tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendgridInboundTestCase(WebhookTestCase):
+    def test_not_supported_warning(self):
+        with self.assertWarns(
+            AnymailNotSupportedWarning,
+            msg="django-anymail has dropped official support for SendGrid.",
+        ):
+            self.client.post("/anymail/sendgrid/inbound/", data={"email": ""})
+
     def test_inbound_basics(self):
         raw_event = {
             "headers": dedent(

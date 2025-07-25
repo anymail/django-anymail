@@ -38,6 +38,20 @@ class DeprecatedSettingsTests(AnymailTestMixin, SimpleTestCase):
             ],
         )
 
+    @override_settings(EMAIL_BACKEND="anymail.backends.sendgrid.EmailBackend")
+    def test_sendgrid_unsupported(self):
+        errors = check_deprecated_settings(None)
+        self.assertEqual(
+            errors,
+            [
+                checks.Warning(
+                    "django-anymail has dropped official support for SendGrid.",
+                    hint="See https://github.com/anymail/django-anymail/issues/432.",
+                    id="anymail.W003",
+                )
+            ],
+        )
+
 
 class InsecureSettingsTests(AnymailTestMixin, SimpleTestCase):
     @override_settings(ANYMAIL={"DEBUG_API_REQUESTS": True})

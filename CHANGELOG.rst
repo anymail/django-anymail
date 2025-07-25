@@ -25,10 +25,21 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
-vNext
------
+v13.0.1
+-------
 
 *Unreleased changes*
+
+Breaking changes (external)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* **SendGrid:** Anymail no longer officially supports SendGrid, because we are
+  unable to test it. Although it will *probably* keep working, you'll get
+  warnings about this change in status. See `#432`_ for details, and the
+  `docs <https://anymail.dev/en/stable/esps/sendgrid/>`__ if you want
+  to suppress the warnings. (Since this breaking change is due to external
+  causes and impacts SendGrid users on all versions of Anymail, it is being
+  handled as a minor patch rather than a semver major version change.)
 
 Fixes
 ~~~~~
@@ -1777,6 +1788,7 @@ Features
 .. _#148: https://github.com/anymail/django-anymail/issues/148
 .. _#153: https://github.com/anymail/django-anymail/issues/153
 .. _#304: https://github.com/anymail/django-anymail/issues/304
+.. _#432: https://github.com/anymail/django-anymail/issues/432
 
 .. _@ailionx: https://github.com/ailionx
 .. _@alee: https://github.com/alee

@@ -197,6 +197,10 @@ class AnymailDeprecationWarning(AnymailWarning, DeprecationWarning):
     """Warning for deprecated Anymail features"""
 
 
+class AnymailNotSupportedWarning(AnymailWarning):
+    """Warning for ESP integrations that are no longer being tested"""
+
+
 # Helpers
 
 

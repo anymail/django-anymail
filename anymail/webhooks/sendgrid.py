@@ -1,8 +1,10 @@
 import json
+import warnings
 from datetime import datetime, timezone
 from email.parser import BytesParser
 from email.policy import default as default_policy
 
+from ..exceptions import AnymailNotSupportedWarning
 from ..inbound import AnymailInboundMessage
 from ..signals import (
     AnymailInboundEvent,
@@ -20,6 +22,14 @@ class SendGridTrackingWebhookView(AnymailBaseWebhookView):
 
     esp_name = "SendGrid"
     signal = tracking
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        warnings.warn(
+            "django-anymail has dropped official support for SendGrid."
+            " See https://github.com/anymail/django-anymail/issues/432.",
+            AnymailNotSupportedWarning,
+        )
 
     def parse_events(self, request):
         esp_events = json.loads(request.body.decode("utf-8"))
@@ -135,6 +145,14 @@ class SendGridInboundWebhookView(AnymailBaseWebhookView):
 
     esp_name = "SendGrid"
     signal = inbound
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        warnings.warn(
+            "django-anymail has dropped official support for SendGrid."
+            " See https://github.com/anymail/django-anymail/issues/432.",
+            AnymailNotSupportedWarning,
+        )
 
     def parse_events(self, request):
         return [self.esp_to_anymail_event(request)]

@@ -2,8 +2,9 @@ import json
 from datetime import datetime, timezone
 from unittest.mock import ANY
 
-from django.test import tag
+from django.test import ignore_warnings, tag
 
+from anymail.exceptions import AnymailNotSupportedWarning
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.sendgrid import SendGridTrackingWebhookView
 
@@ -11,6 +12,7 @@ from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 
 
 @tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridWebhookSecurityTestCase(WebhookBasicAuthTestCase):
     def call_webhook(self):
         return self.client.post(
@@ -23,7 +25,19 @@ class SendGridWebhookSecurityTestCase(WebhookBasicAuthTestCase):
 
 
 @tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridDeliveryTestCase(WebhookTestCase):
+    def test_not_supported_warning(self):
+        with self.assertWarns(
+            AnymailNotSupportedWarning,
+            msg="django-anymail has dropped official support for SendGrid.",
+        ):
+            self.client.post(
+                "/anymail/sendgrid/tracking/",
+                content_type="application/json",
+                data=json.dumps([]),
+            )
+
     def test_processed_event(self):
         raw_events = [
             {

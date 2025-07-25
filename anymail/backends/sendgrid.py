@@ -5,6 +5,7 @@ from requests.structures import CaseInsensitiveDict
 
 from ..exceptions import (
     AnymailConfigurationError,
+    AnymailNotSupportedWarning,
     AnymailSerializationError,
     AnymailWarning,
 )
@@ -23,6 +24,12 @@ class EmailBackend(AnymailRequestsBackend):
     def __init__(self, **kwargs):
         """Init options from Django settings"""
         esp_name = self.esp_name
+
+        warnings.warn(
+            "django-anymail has dropped official support for SendGrid."
+            " See https://github.com/anymail/django-anymail/issues/432.",
+            AnymailNotSupportedWarning,
+        )
 
         # Warn if v2-only username or password settings found
         username = get_anymail_setting(
