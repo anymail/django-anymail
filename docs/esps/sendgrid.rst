@@ -82,6 +82,25 @@ nor ``ANYMAIL_SENDGRID_API_KEY`` is set.
 .. _SendGrid API key settings: https://app.sendgrid.com/settings/api_keys
 
 
+.. setting:: ANYMAIL_SENDGRID_WEBHOOK_KEY
+
+.. rubric:: SENDGRID_WEBHOOK_KEY
+
+Optional additional public-key verification when using status tracking or
+inbound webhooks. When set, webhooks from SendGrid will be rejected if they
+fail verification. Can be used in conjunction with credentials in the URL.
+
+This should be set to the verification key provided in the Event Webhook page
+of SendGrid Mail Settings.
+
+  .. code-block:: python
+
+      ANYMAIL = {
+          ...
+          "SENDGRID_WEBHOOK_KEY": "A8f746...9fuVqQ==",
+      }
+
+
 .. setting:: ANYMAIL_SENDGRID_GENERATE_MESSAGE_ID
 
 .. rubric:: SENDGRID_GENERATE_MESSAGE_ID
@@ -416,6 +435,10 @@ the url in your `SendGrid mail settings`_, under "Event Notification":
      * *yoursite.example.com* is your Django site
 
 Be sure to check the boxes in the SendGrid settings for the event types you want to receive.
+
+SendGrid can be optionally configured to sign their webhook payloads, providing you with a
+verification key. If you would like to use this functionality, you need to set
+:setting:`ANYMAIL_SENDGRID_WEBHOOK_KEY`.
 
 SendGrid will report these Anymail :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
 queued, rejected, bounced, deferred, delivered, opened, clicked, complained, unsubscribed,
