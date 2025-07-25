@@ -111,7 +111,7 @@ jobs:
             --verify-tag \
             --target "$GITHUB_SHA" \
             --title "$TITLE" \
-            --notes "$NOTES"\
+            --notes "$NOTES"
           then
             gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
