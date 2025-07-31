@@ -4,9 +4,13 @@ from base64 import b64encode
 from datetime import datetime, timezone
 from unittest.mock import ANY
 
-from django.test import ignore_warnings, tag
+from django.test import ignore_warnings, override_settings, tag
 
-from anymail.exceptions import AnymailNotSupportedWarning
+from anymail.exceptions import (
+    AnymailImproperlyInstalled,
+    AnymailInsecureWebhookWarning,
+    AnymailNotSupportedWarning,
+)
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.sendgrid import SendGridTrackingWebhookView
 
@@ -27,23 +31,11 @@ class SendGridWebhookSecurityTestCase(WebhookBasicAuthTestCase):
     # Actual tests are in WebhookBasicAuthTestCase
 
 
-@tag("sendgrid")
-@ignore_warnings(category=AnymailNotSupportedWarning)
-@unittest.skipUnless(
-    ClientWithSendGridSignature, "Install 'cryptography' to run sendgrid webhook tests"
-)
-class SendGridSignedWebhookSecurityTestCase(WebhookTestCase):
-    client_class = ClientWithSendGridSignature
-
-    def setUp(self):
-        super().setUp()
-        self.clear_basic_auth()
-
-        self.private_key = make_key()
-        self.client.set_private_key(self.private_key)
-
-    def test_successful_signature_check(self):
-        raw_events = [
+class BaseSendGridWebhookTestCase(WebhookTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.raw_events = [
             {
                 "email": "recipient@example.com",
                 "timestamp": 1461095246,
@@ -58,24 +50,112 @@ class SendGridSignedWebhookSecurityTestCase(WebhookTestCase):
                 "custom2": "value2",
             }
         ]
-        data = json.dumps(raw_events)
+        cls.data = json.dumps(cls.raw_events)
+
+
+@tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
+@unittest.skipUnless(
+    ClientWithSendGridSignature, "Install 'cryptography' to run sendgrid webhook tests"
+)
+class SendGridWebhookTestCase(BaseSendGridWebhookTestCase):
+    def setUp(self):
+        super().setUp()
+        self.clear_basic_auth()
+
+    @override_settings(ANYMAIL={"WEBHOOK_SECRET": None})
+    def test_successful_webhook_without_signature_or_http_auth(self):
         timestamp = "data timestamp"
-        signature = b64encode(sign(self.private_key, timestamp, message=data))
+        private_key = make_key()
+        signature = sign(private_key, timestamp, message=self.data)
 
+        with self.assertWarns(AnymailInsecureWebhookWarning):
+            response = self.client.post(
+                "/anymail/sendgrid/tracking/",
+                content_type="application/json",
+                data=self.raw_events,
+                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP=timestamp,
+                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(signature),
+            )
+            self.assertEqual(response.status_code, 200)
+
+
+@tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
+@unittest.skipIf(
+    bool(ClientWithSendGridSignature),
+    "Uninstall 'cryptography' to test for graceful error handling in the sendgrid webhook tests",
+)
+class SendGridSignedWebhookMissingCryptographyTestCase(BaseSendGridWebhookTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.creds = [("cred1", "pass1"), ("cred1", "pass2")]
+
+    @override_settings(
+        ANYMAIL={
+            "SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY": (
+                "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0ObrPrfwL/37SbZ52HNp4Gq0j2"
+                "j4Nu8LvcNuazePhgFJlNnuk20Efm67BHVVQVNUGyPDrchn8IvF24ccppLpbw=="
+            )
+        }
+    )
+    def test_configured_verification_key_without_cryptography(self):
+        with self.assertRaises(AnymailImproperlyInstalled):
+            self.client.post(
+                "/anymail/sendgrid/tracking/",
+                content_type="application/json",
+                data=self.raw_events,
+                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
+                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(
+                    "invalid".encode("utf-8")
+                ),
+            )
+
+    @override_settings(ANYMAIL={"WEBHOOK_SECRET": ["cred1:pass1", "cred2:pass2"]})
+    def test_unconfigured_verification_key_but_with_http_basic_auth(self):
+        for creds in self.creds:
+            with self.subTest(creds=creds):
+                self.set_basic_auth(*creds)
+                self.client.post(
+                    "/anymail/sendgrid/tracking/",
+                    content_type="application/json",
+                    data=self.raw_events,
+                    HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
+                    HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(
+                        "invalid".encode("utf-8")
+                    ),
+                )
+
+
+class BaseSendGridSignedWebhookSecurityTestCase(BaseSendGridWebhookTestCase):
+    client_class = ClientWithSendGridSignature
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.private_key = make_key()
+
+    def setUp(self):
+        super().setUp()
+        self.client.set_private_key(self.private_key)
+
+
+@tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
+@unittest.skipUnless(
+    ClientWithSendGridSignature, "Install 'cryptography' to run sendgrid webhook tests"
+)
+class SendGridSignedWebhookSecurityTestCase(BaseSendGridSignedWebhookSecurityTestCase):
+    def setUp(self):
+        super().setUp()
+        self.clear_basic_auth()
+
+    def test_invalid_signature(self):
         response = self.client.post(
             "/anymail/sendgrid/tracking/",
             content_type="application/json",
-            data=data,
-            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP=timestamp,
-            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=signature,
-        )
-        self.assertEqual(response.status_code, 200)
-
-    def test_failed_signature_check(self):
-        response = self.client.post(
-            "/anymail/sendgrid/tracking/",
-            content_type="application/json",
-            data=json.dumps({"some": "data"}),
+            data=self.raw_events,
             HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
             HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(
                 "invalid".encode("utf-8")
@@ -83,23 +163,173 @@ class SendGridSignedWebhookSecurityTestCase(WebhookTestCase):
         )
         self.assertEqual(response.status_code, 400)
 
-        response = self.client.post(
-            "/anymail/sendgrid/tracking/",
-            content_type="application/json",
-            data=json.dumps({"some": "data"}),
-            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
-            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE="garbage",
-        )
-        self.assertEqual(response.status_code, 400)
+    def test_invalid_timestamp(self):
+        timestamp = "data timestamp"
+        signature = sign(self.private_key, timestamp, message=self.data)
 
         response = self.client.post(
             "/anymail/sendgrid/tracking/",
             content_type="application/json",
-            data=json.dumps({"some": "data"}),
+            data=self.raw_events,
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="invalid data timestamp",
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(signature),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_invalid_timestamp_and_invalid_signature(self):
+        timestamp = "data timestamp"
+        different_private_key = make_key()
+        incorrect_signature = sign(different_private_key, timestamp, message=self.data)
+
+        response = self.client.post(
+            "/anymail/sendgrid/tracking/",
+            content_type="application/json",
+            data=self.raw_events,
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="invalid data timestamp",
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(incorrect_signature),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_empty_signature_(self):
+        response = self.client.post(
+            "/anymail/sendgrid/tracking/",
+            content_type="application/json",
+            data=self.raw_events,
             HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
             HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE="",
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_empty_timestamp(self):
+        timestamp = "data timestamp"
+        signature = sign(self.private_key, timestamp, message=self.data)
+
+        response = self.client.post(
+            "/anymail/sendgrid/tracking/",
+            content_type="application/json",
+            data=self.raw_events,
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="",
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(signature),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_empty_timestamp_and_empty_signature(self):
+        response = self.client.post(
+            "/anymail/sendgrid/tracking/",
+            content_type="application/json",
+            data=self.raw_events,
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="",
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE="",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_missing_signature(self):
+        response = self.client.post(
+            "/anymail/sendgrid/tracking/",
+            content_type="application/json",
+            data=self.raw_events,
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_missing_timestamp(self):
+        # Should be a valid signature
+        signature = sign(self.private_key, "", message=self.data)
+
+        response = self.client.post(
+            "/anymail/sendgrid/tracking/",
+            content_type="application/json",
+            data=self.raw_events,
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(signature),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_missing_timestamp_and_missing_signature(self):
+        response = self.client.post(
+            "/anymail/sendgrid/tracking/",
+            content_type="application/json",
+            data=self.raw_events,
+            automatically_set_timestamp_and_signature_headers=False,
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_successful_signature_check_without_http_auth(self):
+        timestamp = "data timestamp"
+        signature = b64encode(sign(self.private_key, timestamp, message=self.data))
+
+        response = self.client.post(
+            "/anymail/sendgrid/tracking/",
+            content_type="application/json",
+            data=self.raw_events,
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP=timestamp,
+            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=signature,
+        )
+        self.assertEqual(response.status_code, 200)
+
+
+@tag("sendgrid")
+@ignore_warnings(category=AnymailNotSupportedWarning)
+@unittest.skipUnless(
+    ClientWithSendGridSignature, "Install 'cryptography' to run sendgrid webhook tests"
+)
+@override_settings(ANYMAIL={"WEBHOOK_SECRET": ["cred1:pass1", "cred2:pass2"]})
+class SendGridSignedWebhookSecurityAndHttpBasicAuthTestCase(
+    BaseSendGridSignedWebhookSecurityTestCase
+):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.creds = [("cred1", "pass1"), ("cred1", "pass2")]
+
+    def test_invalid_timestamp_and_invalid_signature_with_http_auth(self):
+        timestamp = "data timestamp"
+
+        for creds in self.creds:
+            with self.subTest(creds=creds):
+                private_key = make_key()
+                signature = sign(private_key, timestamp, message=self.data)
+
+                self.set_basic_auth(*creds)
+
+                response = self.client.post(
+                    "/anymail/sendgrid/tracking/",
+                    content_type="application/json",
+                    data=self.raw_events,
+                    HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="invalid data timestamp",
+                    HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(signature),
+                )
+                self.assertEqual(response.status_code, 400)
+
+    def test_missing_timestamp_and_missing_signature_with_http_auth(self):
+        for creds in self.creds:
+            with self.subTest(creds=creds):
+                self.set_basic_auth(*creds)
+                response = self.client.post(
+                    "/anymail/sendgrid/tracking/",
+                    content_type="application/json",
+                    data=self.raw_events,
+                    automatically_set_timestamp_and_signature_headers=False,
+                )
+                self.assertEqual(response.status_code, 400)
+
+    def test_successful_signature_check_with_basic_http_auth(self):
+        for creds in self.creds:
+            with self.subTest(creds=creds):
+                self.set_basic_auth(*creds)
+
+                timestamp = "data timestamp"
+                signature = b64encode(
+                    sign(self.private_key, timestamp, message=self.data)
+                )
+
+                response = self.client.post(
+                    "/anymail/sendgrid/tracking/",
+                    content_type="application/json",
+                    data=self.raw_events,
+                    HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP=timestamp,
+                    HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=signature,
+                )
+                self.assertEqual(response.status_code, 200)
 
 
 @tag("sendgrid")

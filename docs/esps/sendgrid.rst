@@ -82,13 +82,13 @@ nor ``ANYMAIL_SENDGRID_API_KEY`` is set.
 .. _SendGrid API key settings: https://app.sendgrid.com/settings/api_keys
 
 
-.. setting:: ANYMAIL_SENDGRID_WEBHOOK_KEY
+.. setting:: ANYMAIL_SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY
 
-.. rubric:: SENDGRID_WEBHOOK_KEY
+.. rubric:: SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY
 
-Optional additional public-key verification when using status tracking or
-inbound webhooks. When set, webhooks from SendGrid will be rejected if they
-fail verification. Can be used in conjunction with credentials in the URL.
+Optional additional public-key verification when using status tracking
+webhooks. When set, webhooks from SendGrid will be rejected if they fail
+verification. Can be used in conjunction with credentials in the URL.
 
 This should be set to the verification key provided in the Event Webhook page
 of SendGrid Mail Settings.
@@ -97,7 +97,7 @@ of SendGrid Mail Settings.
 
       ANYMAIL = {
           ...
-          "SENDGRID_WEBHOOK_KEY": "A8f746...9fuVqQ==",
+          "SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY": "A8f746...9fuVqQ==",
       }
 
 

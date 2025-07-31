@@ -44,36 +44,45 @@ except ImportError:
     InvalidSignature = Exception
 
 
-class SendGridWebhookSignatureVerificationMixin:
-    webhook_key = (
+class SendGridBaseWebhookView(AnymailBaseWebhookView):
+    webhook_verification_key = (
         None  # optional; defaults to None -> signature verification is skipped
     )
+    webhook_type: str
 
     def __init__(self, **kwargs):
-        webhook_key = get_anymail_setting(
-            "webhook_key",
+        verification_key: str | None = get_anymail_setting(
+            f"{self.webhook_type}_webhook_verification_key",
             esp_name=self.esp_name,
             default=None,
             kwargs=kwargs,
             allow_bare=True,
         )
-        if webhook_key:
-            self.webhook_key = serialization.load_pem_public_key(
+        if verification_key:
+            self.webhook_verification_key = serialization.load_pem_public_key(
                 (
                     "-----BEGIN PUBLIC KEY-----\n"
-                    + webhook_key
+                    + verification_key
                     + "\n-----END PUBLIC KEY-----"
                 ).encode("utf-8"),
                 backend=default_backend(),
             )
+        if self.webhook_verification_key:
+            # If the webhook key is successfully configured, then we don't need to warn about
+            # missing basic auth
+            self.warn_if_no_basic_auth = False
+        else:
+            # Purely defensive programming; should already be set to True
+            self.warn_if_no_basic_auth = True
         super().__init__(**kwargs)
+        warnings.warn(
+            "django-anymail has dropped official support for SendGrid."
+            " See https://github.com/anymail/django-anymail/issues/432.",
+            AnymailNotSupportedWarning,
+        )
 
     def validate_request(self, request):
-        # TODO: Remove this call to super(), since this is handled automatically without needing
-        #       superclass chaining
-        # Do basic auth validation first, since it's probably cheaper than signature validation
-        super().validate_request(request)
-        if self.webhook_key:
+        if self.webhook_verification_key:
             try:
                 signature = request.headers["X-Twilio-Email-Event-Webhook-Signature"]
             except KeyError:
@@ -91,7 +100,7 @@ class SendGridWebhookSignatureVerificationMixin:
 
             try:
                 decoded_signature = base64.b64decode(signature)
-                self.webhook_key.verify(
+                self.webhook_verification_key.verify(
                     decoded_signature,
                     timestamped_payload,
                     ec.ECDSA(hashes.SHA256()),
@@ -105,25 +114,16 @@ class SendGridWebhookSignatureVerificationMixin:
                 # verification
                 raise AnymailWebhookValidationFailure(
                     "SendGrid webhook called with incorrect signature"
+                    " (check Anymail SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY setting)"
                 )
 
 
-class SendGridTrackingWebhookView(
-    SendGridWebhookSignatureVerificationMixin,
-    AnymailBaseWebhookView,
-):
+class SendGridTrackingWebhookView(SendGridBaseWebhookView):
     """Handler for SendGrid delivery and engagement tracking webhooks"""
 
     esp_name = "SendGrid"
+    webhook_type = "tracking"
     signal = tracking
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        warnings.warn(
-            "django-anymail has dropped official support for SendGrid."
-            " See https://github.com/anymail/django-anymail/issues/432.",
-            AnymailNotSupportedWarning,
-        )
 
     def parse_events(self, request):
         esp_events = json.loads(request.body.decode("utf-8"))
@@ -234,10 +234,7 @@ class SendGridTrackingWebhookView(
     }
 
 
-class SendGridInboundWebhookView(
-    SendGridWebhookSignatureVerificationMixin,
-    AnymailBaseWebhookView,
-):
+class SendGridInboundWebhookView(AnymailBaseWebhookView):
     """Handler for SendGrid inbound webhook"""
 
     esp_name = "SendGrid"
