@@ -1,10 +1,17 @@
+import base64
+import binascii
 import json
 import warnings
 from datetime import datetime, timezone
 from email.parser import BytesParser
 from email.policy import default as default_policy
 
-from ..exceptions import AnymailNotSupportedWarning
+from ..exceptions import (
+    AnymailImproperlyInstalled,
+    AnymailNotSupportedWarning,
+    AnymailWebhookValidationFailure,
+    _LazyError,
+)
 from ..inbound import AnymailInboundMessage
 from ..signals import (
     AnymailInboundEvent,
@@ -14,22 +21,109 @@ from ..signals import (
     inbound,
     tracking,
 )
+from ..utils import get_anymail_setting
 from .base import AnymailBaseWebhookView
 
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+except ImportError:
+    # This module gets imported by anymail.urls, so don't complain about cryptography
+    # missing unless one of the Postal webhook views is actually used and needs it
+    error = _LazyError(
+        AnymailImproperlyInstalled(
+            missing_package="cryptography", install_extra="sendgrid"
+        )
+    )
+    serialization = error
+    hashes = error
+    default_backend = error
+    ec = error
+    InvalidSignature = Exception
 
-class SendGridTrackingWebhookView(AnymailBaseWebhookView):
-    """Handler for SendGrid delivery and engagement tracking webhooks"""
 
-    esp_name = "SendGrid"
-    signal = tracking
+class SendGridBaseWebhookView(AnymailBaseWebhookView):
+    webhook_verification_key = (
+        None  # optional; defaults to None -> signature verification is skipped
+    )
+    webhook_type: str
 
     def __init__(self, **kwargs):
+        verification_key: str | None = get_anymail_setting(
+            f"{self.webhook_type}_webhook_verification_key",
+            esp_name=self.esp_name,
+            default=None,
+            kwargs=kwargs,
+            allow_bare=True,
+        )
+        if verification_key:
+            self.webhook_verification_key = serialization.load_pem_public_key(
+                (
+                    "-----BEGIN PUBLIC KEY-----\n"
+                    + verification_key
+                    + "\n-----END PUBLIC KEY-----"
+                ).encode("utf-8"),
+                backend=default_backend(),
+            )
+        if self.webhook_verification_key:
+            # If the webhook key is successfully configured, then we don't need to warn about
+            # missing basic auth
+            self.warn_if_no_basic_auth = False
+        else:
+            # Purely defensive programming; should already be set to True
+            self.warn_if_no_basic_auth = True
         super().__init__(**kwargs)
         warnings.warn(
             "django-anymail has dropped official support for SendGrid."
             " See https://github.com/anymail/django-anymail/issues/432.",
             AnymailNotSupportedWarning,
         )
+
+    def validate_request(self, request):
+        if self.webhook_verification_key:
+            try:
+                signature = request.headers["X-Twilio-Email-Event-Webhook-Signature"]
+            except KeyError:
+                raise AnymailWebhookValidationFailure(
+                    "X-Twilio-Email-Event-Webhook-Signature header missing from webhook"
+                )
+            try:
+                timestamp = request.headers["X-Twilio-Email-Event-Webhook-Timestamp"]
+            except KeyError:
+                raise AnymailWebhookValidationFailure(
+                    "X-Twilio-Email-Event-Webhook-Timestamp header missing from webhook"
+                )
+
+            timestamped_payload = timestamp.encode("utf-8") + request.body
+
+            try:
+                decoded_signature = base64.b64decode(signature)
+                self.webhook_verification_key.verify(
+                    decoded_signature,
+                    timestamped_payload,
+                    ec.ECDSA(hashes.SHA256()),
+                )
+            # We intentionally respond the same to both of these issues, see below
+            # binascii.Error may come from attempting to base64-decode the signature
+            # InvalidSignature will come from self.webhook_key.verify(...)
+            except (binascii.Error, InvalidSignature):
+                # We intentionally don't give out too much information here, because that would
+                # make it easier used to characterize the issue and workaround the signature
+                # verification
+                raise AnymailWebhookValidationFailure(
+                    "SendGrid webhook called with incorrect signature"
+                    " (check Anymail SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY setting)"
+                )
+
+
+class SendGridTrackingWebhookView(SendGridBaseWebhookView):
+    """Handler for SendGrid delivery and engagement tracking webhooks"""
+
+    esp_name = "SendGrid"
+    webhook_type = "tracking"
+    signal = tracking
 
     def parse_events(self, request):
         esp_events = json.loads(request.body.decode("utf-8"))
