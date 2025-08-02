@@ -33,6 +33,9 @@ vNext
 Features
 ~~~~~~~~
 
+* **Scaleway:** Add support for this ESP
+  (`docs <https://anymail.dev/en/stable/esps/scaleway/>`__).
+
 * **SendGrid:** Add optional signature verification for tracking webhooks.
   To support this, Anymail now includes the :pypi:`cryptography` package when
   installed with the ``django-anymail[sendgrid]`` extra.

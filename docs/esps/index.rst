@@ -24,6 +24,7 @@ and notes about any quirks or limitations:
    sendgrid
    sparkpost
    unisender_go
+   scaleway
 
 
 Anymail feature support
