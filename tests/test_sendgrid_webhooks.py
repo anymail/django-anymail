@@ -6,18 +6,22 @@ from unittest.mock import ANY
 
 from django.test import ignore_warnings, override_settings, tag
 
-from anymail.exceptions import (
-    AnymailImproperlyInstalled,
-    AnymailInsecureWebhookWarning,
-    AnymailNotSupportedWarning,
-)
+from anymail.exceptions import AnymailImproperlyInstalled, AnymailNotSupportedWarning
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.sendgrid import SendGridTrackingWebhookView
 
-from .utils_sendgrid import ClientWithSendGridSignature, make_key, sign
+from .utils_sendgrid import (
+    ClientWithSendGridSignature,
+    derive_public_webhook_key,
+    make_key,
+    sign,
+)
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 
+CRYPTOGRAPHY_INSTALLED = ClientWithSendGridSignature is not None
 
+
+# These tests run both with and without cryptograpy installed
 @tag("sendgrid")
 @ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridWebhookSecurityTestCase(WebhookBasicAuthTestCase):
@@ -31,6 +35,7 @@ class SendGridWebhookSecurityTestCase(WebhookBasicAuthTestCase):
     # Actual tests are in WebhookBasicAuthTestCase
 
 
+@ignore_warnings(category=AnymailNotSupportedWarning)
 class BaseSendGridWebhookTestCase(WebhookTestCase):
     @classmethod
     def setUpClass(cls):
@@ -54,37 +59,9 @@ class BaseSendGridWebhookTestCase(WebhookTestCase):
 
 
 @tag("sendgrid")
-@ignore_warnings(category=AnymailNotSupportedWarning)
-@unittest.skipUnless(
-    ClientWithSendGridSignature, "Install 'cryptography' to run sendgrid webhook tests"
-)
-class SendGridWebhookTestCase(BaseSendGridWebhookTestCase):
-    def setUp(self):
-        super().setUp()
-        self.clear_basic_auth()
-
-    @override_settings(ANYMAIL={"WEBHOOK_SECRET": None})
-    def test_successful_webhook_without_signature_or_http_auth(self):
-        timestamp = "data timestamp"
-        private_key = make_key()
-        signature = sign(private_key, timestamp, message=self.data)
-
-        with self.assertWarns(AnymailInsecureWebhookWarning):
-            response = self.client.post(
-                "/anymail/sendgrid/tracking/",
-                content_type="application/json",
-                data=self.raw_events,
-                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP=timestamp,
-                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(signature),
-            )
-            self.assertEqual(response.status_code, 200)
-
-
-@tag("sendgrid")
-@ignore_warnings(category=AnymailNotSupportedWarning)
 @unittest.skipIf(
-    bool(ClientWithSendGridSignature),
-    "Uninstall 'cryptography' to test for graceful error handling in the sendgrid webhook tests",
+    CRYPTOGRAPHY_INSTALLED,
+    "Uninstall 'cryptography' to test graceful error handling in SendGrid webhook tests",
 )
 class SendGridSignedWebhookMissingCryptographyTestCase(BaseSendGridWebhookTestCase):
     @classmethod
@@ -101,7 +78,7 @@ class SendGridSignedWebhookMissingCryptographyTestCase(BaseSendGridWebhookTestCa
         }
     )
     def test_configured_verification_key_without_cryptography(self):
-        with self.assertRaises(AnymailImproperlyInstalled):
+        with self.assertRaisesMessage(AnymailImproperlyInstalled, "cryptography"):
             self.client.post(
                 "/anymail/sendgrid/tracking/",
                 content_type="application/json",
@@ -113,7 +90,7 @@ class SendGridSignedWebhookMissingCryptographyTestCase(BaseSendGridWebhookTestCa
             )
 
     @override_settings(ANYMAIL={"WEBHOOK_SECRET": ["cred1:pass1", "cred2:pass2"]})
-    def test_unconfigured_verification_key_but_with_http_basic_auth(self):
+    def test_unconfigured_verification_key_but_with_webhook_secret(self):
         for creds in self.creds:
             with self.subTest(creds=creds):
                 self.set_basic_auth(*creds)
@@ -142,9 +119,9 @@ class BaseSendGridSignedWebhookSecurityTestCase(BaseSendGridWebhookTestCase):
 
 
 @tag("sendgrid")
-@ignore_warnings(category=AnymailNotSupportedWarning)
 @unittest.skipUnless(
-    ClientWithSendGridSignature, "Install 'cryptography' to run sendgrid webhook tests"
+    CRYPTOGRAPHY_INSTALLED,
+    "Install 'cryptography' to test SendGrid signature verification",
 )
 class SendGridSignedWebhookSecurityTestCase(BaseSendGridSignedWebhookSecurityTestCase):
     def setUp(self):
@@ -152,16 +129,21 @@ class SendGridSignedWebhookSecurityTestCase(BaseSendGridSignedWebhookSecurityTes
         self.clear_basic_auth()
 
     def test_invalid_signature(self):
-        response = self.client.post(
-            "/anymail/sendgrid/tracking/",
-            content_type="application/json",
-            data=self.raw_events,
-            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
-            HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(
-                "invalid".encode("utf-8")
-            ),
-        )
+        # This also verifies that the error log references the correct setting to check.
+        with self.assertLogs() as logs:
+            response = self.client.post(
+                "/anymail/sendgrid/tracking/",
+                content_type="application/json",
+                data=self.raw_events,
+                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
+                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(
+                    "invalid".encode("utf-8")
+                ),
+            )
         self.assertEqual(response.status_code, 400)
+        self.assertIn(
+            "check Anymail SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY", logs.output[0]
+        )
 
     def test_invalid_timestamp(self):
         timestamp = "data timestamp"
@@ -266,11 +248,23 @@ class SendGridSignedWebhookSecurityTestCase(BaseSendGridSignedWebhookSecurityTes
         )
         self.assertEqual(response.status_code, 200)
 
+    def test_verification_key_view_params(self):
+        """Webhook verification key can be provided as a view param"""
+        key = make_key()
+        view = SendGridTrackingWebhookView.as_view(
+            tracking_webhook_verification_key=derive_public_webhook_key(key),
+        )
+        view_instance = view.view_class(**view.view_initkwargs)
+        self.assertEqual(
+            view_instance.webhook_verification_key.public_numbers(),
+            key.public_key().public_numbers(),
+        )
+
 
 @tag("sendgrid")
-@ignore_warnings(category=AnymailNotSupportedWarning)
 @unittest.skipUnless(
-    ClientWithSendGridSignature, "Install 'cryptography' to run sendgrid webhook tests"
+    CRYPTOGRAPHY_INSTALLED,
+    "Install 'cryptography' to test SendGrid signature verification",
 )
 @override_settings(ANYMAIL={"WEBHOOK_SECRET": ["cred1:pass1", "cred2:pass2"]})
 class SendGridSignedWebhookSecurityAndHttpBasicAuthTestCase(

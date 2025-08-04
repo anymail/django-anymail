@@ -125,13 +125,10 @@ class AnymailBasicAuthMixin(AnymailCoreWebhookView):
             # no esp_name -- auth is shared between ESPs
             kwargs=kwargs,
         )
-
-        # Allow a single string:
-        if isinstance(self.basic_auth, str):
+        # Allow a single, non-empty string:
+        if isinstance(self.basic_auth, str) and self.basic_auth:
             self.basic_auth = [self.basic_auth]
-        if self.warn_if_no_basic_auth and (
-            not self.basic_auth or len(self.basic_auth) < 1
-        ):
+        if self.warn_if_no_basic_auth and not self.basic_auth:
             warnings.warn(
                 "Your Anymail webhooks are insecure and open to anyone on the web. "
                 "You should set WEBHOOK_SECRET in your ANYMAIL settings. "

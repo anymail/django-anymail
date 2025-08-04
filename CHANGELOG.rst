@@ -25,6 +25,24 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*unreleased changes*
+
+Features
+~~~~~~~~
+
+* **SendGrid:** Add optional signature verification for tracking webhooks.
+  To support this, Anymail now includes the :pypi:`cryptography` package when
+  installed with the ``django-anymail[sendgrid]`` extra.
+  (Thanks to `@blag`_ for contributing this improvement. Note this was tested
+  against SendGrid's live API by its contributor at the time it was added,
+  but cannot be independently verified by Anymail's maintainers as we
+  `no longer have access <https://github.com/anymail/django-anymail/issues/432>`__
+  to a SendGrid test account.)
+
+
 v13.0.1
 -------
 
@@ -1796,6 +1814,7 @@ Features
 .. _@anstosa: https://github.com/anstosa
 .. _@Arondit: https://github.com/Arondit
 .. _@b0d0nne11: https://github.com/b0d0nne11
+.. _@blag: https://github.com/blag
 .. _@calvin: https://github.com/calvin
 .. _@carrerasrodrigo: https://github.com/carrerasrodrigo
 .. _@chickahoona: https://github.com/chickahoona
