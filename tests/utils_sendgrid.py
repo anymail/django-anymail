@@ -47,10 +47,9 @@ class _ClientWithSendGridSignature(ClientWithCsrfChecks):
         self.private_key = private_key
 
     def post(self, *args, **kwargs):
-        timestamp = (
-            "timestamp"  # Will be a date string, but the exact value doesn't actually
-        )
+        # Timestamp will be a date string, but the exact value doesn't actually
         # matter for verification purposes
+        timestamp = "timestamp"
         signature = b64encode(
             sign(
                 self.private_key,

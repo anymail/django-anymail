@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import binascii
 import json
@@ -28,10 +30,10 @@ try:
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric import ec, types
 except ImportError:
     # This module gets imported by anymail.urls, so don't complain about cryptography
-    # missing unless one of the Postal webhook views is actually used and needs it
+    # missing unless one of the SendGrid webhook views is actually used and needs it
     error = _LazyError(
         AnymailImproperlyInstalled(
             missing_package="cryptography", install_extra="sendgrid"
@@ -45,14 +47,24 @@ except ImportError:
 
 
 class SendGridBaseWebhookView(AnymailBaseWebhookView):
-    webhook_verification_key = (
-        None  # optional; defaults to None -> signature verification is skipped
-    )
-    webhook_type: str
+    # Derived classes must set to name of webhook verification key setting
+    # (lowercase, don't include esp_name).
+    key_setting_name: str
+
+    # Loaded from key_setting_name; None -> signature verification is skipped
+    webhook_verification_key: "types.PublicKeyTypes | None" = None
+
+    @classmethod
+    def as_view(cls, **initkwargs):
+        if not hasattr(cls, cls.key_setting_name):
+            # The attribute must exist on the class before View.as_view
+            # will allow overrides via kwarg
+            setattr(cls, cls.key_setting_name, None)
+        return super().as_view(**initkwargs)
 
     def __init__(self, **kwargs):
         verification_key: str | None = get_anymail_setting(
-            f"{self.webhook_type}_webhook_verification_key",
+            self.key_setting_name,
             esp_name=self.esp_name,
             default=None,
             kwargs=kwargs,
@@ -74,6 +86,7 @@ class SendGridBaseWebhookView(AnymailBaseWebhookView):
         else:
             # Purely defensive programming; should already be set to True
             self.warn_if_no_basic_auth = True
+
         super().__init__(**kwargs)
         warnings.warn(
             "django-anymail has dropped official support for SendGrid."
@@ -112,9 +125,10 @@ class SendGridBaseWebhookView(AnymailBaseWebhookView):
                 # We intentionally don't give out too much information here, because that would
                 # make it easier used to characterize the issue and workaround the signature
                 # verification
+                setting_name = f"{self.esp_name}_{self.key_setting_name}".upper()
                 raise AnymailWebhookValidationFailure(
                     "SendGrid webhook called with incorrect signature"
-                    " (check Anymail SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY setting)"
+                    f" (check Anymail {setting_name} setting)"
                 )
 
 
@@ -122,7 +136,7 @@ class SendGridTrackingWebhookView(SendGridBaseWebhookView):
     """Handler for SendGrid delivery and engagement tracking webhooks"""
 
     esp_name = "SendGrid"
-    webhook_type = "tracking"
+    key_setting_name = "tracking_webhook_verification_key"
     signal = tracking
 
     def parse_events(self, request):
@@ -239,6 +253,16 @@ class SendGridInboundWebhookView(AnymailBaseWebhookView):
 
     esp_name = "SendGrid"
     signal = inbound
+
+    # The inbound webhook does not currently implement signature validation
+    # because we don't have access to a SendGrid account that could test it.
+    # It *should* only require changing to SendGridBaseWebhookView and
+    # providing the setting name:
+    #
+    #     class SendGridInboundWebhookView(SendGridBaseWebhookView):
+    #         key_setting_name = "inbound_webhook_verification_key"
+    #
+    # and then setting SENDGRID_INBOUND_WEBHOOK_VERIFICATION_KEY.
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
