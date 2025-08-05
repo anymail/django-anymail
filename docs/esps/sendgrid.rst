@@ -484,7 +484,7 @@ To configure Anymail status tracking for SendGrid, enter one of these urls
 in your `SendGrid mail settings`_ under "Event Notification" (substituting
 your Django site for *yoursite.example.com*):
 
-*   If are *not* using Anymail's shared webhook secret:
+*   If you are *not* using Anymail's shared webhook secret:
 
         :samp:`https://{yoursite.example.com}/anymail/sendgrid/tracking/`
 
