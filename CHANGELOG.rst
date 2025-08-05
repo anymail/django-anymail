@@ -25,6 +25,18 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+v13.1.0
+-------
+
+*2025-08-03*
+
+Features
+~~~~~~~~
+
+* **Scaleway:** Add support for this ESP
+  (`docs <https://anymail.dev/en/stable/esps/scaleway/>`__).
+
+
 v13.0.1
 -------
 

@@ -37,6 +37,10 @@ Anymail currently supports these ESPs:
 * **Resend**
 * **SendGrid** (Twilio transactional email; no longer tested)
 * **SparkPost** (Bird transactional email)
+* **Resend**
+* **Scaleway TEM** (Scaleway transactional email)
+* **SendGrid** (Twilio transactional email; no longer tested)
+* **SparkPost** (Bird transactional email)
 * **Unisender Go**
 
 Anymail includes:
