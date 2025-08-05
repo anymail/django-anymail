@@ -45,6 +45,31 @@ Anymail integrates with the Twilio `SendGrid`_ email service, using their `Web A
 .. _activity feed: https://app.sendgrid.com/email_activity?events=drops
 
 
+.. _sendgrid-installation:
+
+Installation
+------------
+
+Anymail optionally uses the :pypi:`cryptography` package to validate SendGrid webhook
+signatures. If you will use Anymail's :ref:`status tracking <event-tracking>` webhook
+with SendGrid signature verification, be sure to include the ``[sendgrid]`` option
+when you install Anymail:
+
+    .. code-block:: console
+
+        $ python -m pip install 'django-anymail[sendgrid]'
+
+(Or separately run ``python -m pip install cryptography``.)
+
+If you don't plan to use SendGrid signature verification, cryptography
+is not required. To avoid installing it, omit the ``[sendgrid]`` option.
+See :ref:`sendgrid-webhooks` below for details.
+
+.. versionchanged:: vNext
+
+    Added cryptography to the ``[sendgrid]`` extras.
+
+
 Settings
 --------
 
@@ -80,6 +105,27 @@ root of the settings file if neither ``ANYMAIL["SENDGRID_API_KEY"]``
 nor ``ANYMAIL_SENDGRID_API_KEY`` is set.
 
 .. _SendGrid API key settings: https://app.sendgrid.com/settings/api_keys
+
+
+.. setting:: ANYMAIL_SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY
+
+.. rubric:: SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY
+
+Optional additional public-key verification when using status tracking
+webhooks. See :ref:`sendgrid-webhooks` below.
+
+This should be set to the verification key provided in the Event Webhook page
+of SendGrid Mail Settings.
+
+  .. code-block:: python
+
+      ANYMAIL = {
+          ...
+          "SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY": "A8f746...9fuVqQ==",
+      }
+
+(Note this works only with SendGrid's cryptographic signature verification,
+*not* their OAuth 2.0 option.)
 
 
 .. setting:: ANYMAIL_SENDGRID_GENERATE_MESSAGE_ID
@@ -407,13 +453,45 @@ in either Anymail settings or esp_extra as described above.)
 Status tracking webhooks
 ------------------------
 
-If you are using Anymail's normalized :ref:`status tracking <event-tracking>`, enter
-the url in your `SendGrid mail settings`_, under "Event Notification":
+Anymail's normalized :ref:`status tracking <event-tracking>` works
+with SendGrid's webhooks.
 
-   :samp:`https://{random}:{random}@{yoursite.example.com}/anymail/sendgrid/tracking/`
+SendGrid optionally provides webhook signature verification. You have three
+choices for securing the status tracking webhook:
 
-     * *random:random* is an :setting:`ANYMAIL_WEBHOOK_SECRET` shared secret
-     * *yoursite.example.com* is your Django site
+* Use SendGrid's signature verification: follow their
+  `Event Webhook Security Features`_ documentation and set
+  :setting:`SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY <ANYMAIL_SENDGRID_TRACKING_WEBHOOK_VERIFICATION_KEY>`
+  (requires the :pypi:`cryptography` package---see :ref:`sendgrid-installation`)
+* Use Anymail's shared secret validation, by setting
+  :setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>`
+  (does not require cryptography)
+* Use both
+
+Signature verification is recommended, unless you do not want to add
+cryptography to your dependencies.
+
+.. versionchanged:: vNext
+
+    Added support for SendGrid webhook signature verification.
+    (Earlier releases supported only shared secret validation.)
+
+.. _Event Webhook Security Features:
+    https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/getting-started-event-webhook-security-features#the-signed-event-webhook
+
+
+To configure Anymail status tracking for SendGrid, enter one of these urls
+in your `SendGrid mail settings`_ under "Event Notification" (substituting
+your Django site for *yoursite.example.com*):
+
+*   If you are *not* using Anymail's shared webhook secret:
+
+        :samp:`https://{yoursite.example.com}/anymail/sendgrid/tracking/`
+
+*   Or if you *are* using Anymail's :setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>`,
+    include the *random:random* shared secret in the URL:
+
+        :samp:`https://{random}:{random}@{yoursite.example.com}/sendgrid/tracking/`
 
 Be sure to check the boxes in the SendGrid settings for the event types you want to receive.
 
@@ -445,6 +523,8 @@ The Destination URL setting will be:
 
      * *random:random* is an :setting:`ANYMAIL_WEBHOOK_SECRET` shared secret
      * *yoursite.example.com* is your Django site
+
+(Anymail does not currently support signature verification for the inbound parse webhook.)
 
 You should enable SendGrid's "POST the raw, full MIME message" checkbox (see note below).
 And be sure the URL has a trailing slash. (SendGrid's inbound processing won't follow Django's
