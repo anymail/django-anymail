@@ -61,15 +61,17 @@ class ScalewayIntegrationTests(AnymailTestMixin, SimpleTestCase):
             subject="Anymail Scaleway all-options test",
             body="This is a test message from Anymail.",
             from_email=f"from@{ANYMAIL_TEST_SCALEWAY_DOMAIN}",
-            to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
+            to=["test+to1@anymail.dev", '"Recipient 2, OK?" <test+to2@anymail.dev>'],
             cc=["test+cc1@anymail.dev", "Copy 2 <test+cc2@anymail.dev>"],
             bcc=["test+bcc1@anymail.dev", "Blind Copy 2 <test+bcc2@anymail.dev>"],
             reply_to=["reply1@example.com", "Reply 2 <reply2@example.com>"],
-            headers={"X-Anymail-Test": "all-options"},
+            headers={"X-Anymail-Test": "all-options", "X-Anymail-Count": 3},
+            metadata={"meta1": "simple string", "meta2": 2},
+            tags=["tag 1", "tag 2"],
         )
         message.attach_alternative("<p>HTML content</p>", "text/html")
-        message.attach("attachment.txt", "This is a text attachment.", "text/plain")
-        message.attach("attachment.html", "<p>HTML attachment</p>", "text/html")
+        message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
+        message.attach("attachment2.csv", "ID,Name\n1,Amy Lina", "text/csv")
 
         message.send()
         self.assertEqual(len(message.anymail_status.recipients), 6)
