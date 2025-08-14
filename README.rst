@@ -35,6 +35,7 @@ Anymail currently supports these ESPs:
 * **Postal** (self-hosted ESP)
 * **Postmark** (ActiveCampaign transactional email)
 * **Resend**
+* **Scaleway TEM**
 * **SendGrid** (Twilio transactional email; no longer tested)
 * **SparkPost** (Bird transactional email)
 * **Unisender Go**

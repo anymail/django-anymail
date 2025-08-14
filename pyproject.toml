@@ -14,7 +14,7 @@ authors = [
 description = """\
 Django email backends and webhooks for Amazon SES, Brevo,
  MailerSend, Mailgun, Mailjet, Mandrill, Postal, Postmark, Resend,
- SendGrid, SparkPost and Unisender Go
+ SendGrid, SparkPost, Unisender Go and Scaleway
  (EmailBackend, transactional email tracking and inbound email signals)\
 """
 # readme: see tool.hatch.metadata.hooks.custom below
@@ -30,6 +30,10 @@ keywords = [
     "Postal",
     "Postmark", "ActiveCampaign",
     "Resend",
+    "SendGrid", "Twilio",
+    "SparkPost", "Bird",
+    "Resend",
+    "Scaleway",
     "SendGrid", "Twilio",
     "SparkPost", "Bird",
     "Unisender Go",
@@ -79,6 +83,7 @@ mailjet = []
 mandrill = []
 postmark = []
 resend = ["svix"]
+scaleway = []
 sendgrid = [
     # SendGrid optionally uses cryptography for verifying webhook signatures.
     # Cryptography's wheels are broken on darwin-arm64 before Python 3.9,

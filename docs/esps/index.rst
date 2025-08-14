@@ -21,6 +21,7 @@ and notes about any quirks or limitations:
    postal
    postmark
    resend
+   scaleway
    sendgrid
    sparkpost
    unisender_go
