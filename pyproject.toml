@@ -13,8 +13,8 @@ authors = [
 ]
 description = """\
 Django email backends and webhooks for Amazon SES, Brevo,
- MailerSend, Mailgun, Mailjet, Mandrill, Postal, Postmark, Resend,
- SendGrid, SparkPost, Unisender Go and Scaleway
+ MailerSend, Mailgun, Mailjet, Mailtrap, Mandrill, Postal, Postmark,
+ Resend, Scaleway, SendGrid, SparkPost and Unisender Go
  (EmailBackend, transactional email tracking and inbound email signals)\
 """
 # readme: see tool.hatch.metadata.hooks.custom below
@@ -26,12 +26,10 @@ keywords = [
     "Brevo", "SendinBlue",
     "MailerSend",
     "Mailgun", "Mailjet", "Sinch",
+    "Mailtrap",
     "Mandrill", "MailChimp",
     "Postal",
     "Postmark", "ActiveCampaign",
-    "Resend",
-    "SendGrid", "Twilio",
-    "SparkPost", "Bird",
     "Resend",
     "Scaleway",
     "SendGrid", "Twilio",
@@ -69,6 +67,7 @@ dependencies = [
     "django>=4.0",
     "requests>=2.4.3",
     "urllib3>=1.25.0",  # requests dependency: fixes RFC 7578 header encoding
+    "typing_extensions>=4.12;python_version<'3.11'",  # for older Python compatibility
 ]
 
 [project.optional-dependencies]
@@ -80,6 +79,7 @@ brevo = []
 mailersend = []
 mailgun = []
 mailjet = []
+mailtrap = []
 mandrill = []
 postmark = []
 resend = ["svix"]
