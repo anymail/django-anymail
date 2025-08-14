@@ -1,4 +1,4 @@
-.. mailtrap-backend:
+.. _mailtrap-backend:
 
 Mailtrap
 ========
