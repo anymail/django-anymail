@@ -65,7 +65,7 @@ If you don't plan to use SendGrid signature verification, cryptography
 is not required. To avoid installing it, omit the ``[sendgrid]`` option.
 See :ref:`sendgrid-webhooks` below for details.
 
-.. versionchanged:: vNext
+.. versionchanged:: 13.1
 
     Added cryptography to the ``[sendgrid]`` extras.
 
@@ -471,7 +471,7 @@ choices for securing the status tracking webhook:
 Signature verification is recommended, unless you do not want to add
 cryptography to your dependencies.
 
-.. versionchanged:: vNext
+.. versionchanged:: 13.1
 
     Added support for SendGrid webhook signature verification.
     (Earlier releases supported only shared secret validation.)

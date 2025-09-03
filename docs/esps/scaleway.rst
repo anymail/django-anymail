@@ -3,7 +3,7 @@
 Scaleway TEM
 ============
 
-.. versionadded:: vNext
+.. versionadded:: 13.1
 
 Anymail integrates with `Scaleway Transactional Email (TEM)`_ using
 their `Transactional Email REST API <TEM_API_>`_.

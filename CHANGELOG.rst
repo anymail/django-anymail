@@ -25,16 +25,16 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
-vNext
+v13.1
 -----
 
-*unreleased changes*
+*2025-09-03*
 
 Features
 ~~~~~~~~
 
 * **Scaleway:** Add support for this ESP.
-  (See `docs <https://anymail.dev/en/latest/esps/scaleway/>`__.
+  (See `docs <https://anymail.dev/en/stable/esps/scaleway/>`__.
   Thanks to `@hleroy`_ for the contribution.)
 
 * **SendGrid:** Add optional signature verification for tracking webhooks.
