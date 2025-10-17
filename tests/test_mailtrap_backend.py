@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import unittest
 from datetime import datetime
 from decimal import Decimal
@@ -39,6 +41,19 @@ class MailtrapBackendMockAPITestCase(RequestsBackendMockAPITestCase):
             "Subject", "Body", "from@example.com", ["to@example.com"]
         )
 
+    def set_mock_response_message_ids(self, message_ids: list[str] | int):
+        if isinstance(message_ids, int):
+            message_ids = [f"message-id-{i}" for i in range(message_ids)]
+        self.set_mock_response(
+            json_data={
+                "success": True,
+                "message_ids": message_ids,
+            },
+        )
+
+
+@tag("mailtrap")
+class MailtrapStandardEmailTests(MailtrapBackendMockAPITestCase):
     def test_send_email(self):
         """Test sending a basic email"""
         response = self.message.send()
@@ -101,7 +116,9 @@ class MailtrapBackendMockAPITestCase(RequestsBackendMockAPITestCase):
 
     def test_send_with_invalid_api_token(self):
         """Test sending an email with an invalid API token"""
-        self.set_mock_response(status_code=401, raw=b'{"error": "Invalid API token"}')
+        self.set_mock_response(
+            status_code=401, json_data={"success": False, "error": "Invalid API token"}
+        )
         with self.assertRaises(AnymailAPIError):
             self.message.send()
 
@@ -119,13 +136,40 @@ class MailtrapBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     def test_send_with_api_error(self):
         """Test sending an email with a generic API error"""
         self.set_mock_response(
-            status_code=500, raw=b'{"error": "Internal server error"}'
+            status_code=500, json_data={"error": "Internal server error"}
         )
-        with self.assertRaises(AnymailAPIError):
+        with self.assertRaisesMessage(AnymailAPIError, "Internal server error"):
+            self.message.send()
+
+    def test_unexpected_success_false(self):
+        """Test sending an email with an unexpected API response"""
+        self.set_mock_response(
+            status_code=200,
+            json_data={"success": False, "message_ids": ["message-id-1"]},
+        )
+        with self.assertRaisesMessage(
+            AnymailAPIError, "Unexpected API failure fields with response status 200"
+        ):
+            self.message.send()
+
+    def test_unexpected_errors(self):
+        """Test sending an email with an unexpected API response"""
+        self.set_mock_response(
+            status_code=200,
+            json_data={
+                "success": True,
+                "errors": ["oops"],
+                "message_ids": ["message-id-1"],
+            },
+        )
+        with self.assertRaisesMessage(
+            AnymailAPIError, "Unexpected API failure fields with response status 200"
+        ):
             self.message.send()
 
     def test_send_with_headers_and_recipients(self):
         """Test sending an email with headers and multiple recipients"""
+        self.set_mock_response_message_ids(6)
         email = mail.EmailMessage(
             "Subject",
             "Body goes here",
@@ -219,6 +263,8 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         self.assertEqual(data["template_uuid"], "template_id")
 
     def test_merge_data(self):
+        # TODO: merge_data should switch to /api/batch
+        #   and populate requests[].template_variables
         self.message.merge_data = {"to@example.com": {"name": "Recipient"}}
         with self.assertRaises(AnymailUnsupportedFeature):
             self.message.send()
@@ -249,7 +295,7 @@ class MailtrapBackendRecipientsRefusedTests(MailtrapBackendMockAPITestCase):
     @unittest.skip("TODO: is this test correct/necessary?")
     def test_recipients_refused(self):
         self.set_mock_response(
-            status_code=400, raw=b'{"error": "All recipients refused"}'
+            status_code=400, json_data={"error": "All recipients refused"}
         )
         with self.assertRaises(AnymailRecipientsRefused):
             self.message.send()
@@ -259,7 +305,7 @@ class MailtrapBackendRecipientsRefusedTests(MailtrapBackendMockAPITestCase):
     )
     def test_fail_silently(self):
         self.set_mock_response(
-            status_code=400, raw=b'{"error": "All recipients refused"}'
+            status_code=400, json_data={"error": "All recipients refused"}
         )
         self.message.fail_silently = True
         sent = self.message.send()

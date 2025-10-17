@@ -26,7 +26,6 @@ ANYMAIL_TEST_MAILTRAP_TEMPLATE_UUID = os.getenv("ANYMAIL_TEST_MAILTRAP_TEMPLATE_
     ANYMAIL={
         "MAILTRAP_API_TOKEN": ANYMAIL_TEST_MAILTRAP_API_TOKEN,
         # Use Mailtrap sandbox (testing) API so we don't actually send email
-        "MAILTRAP_TESTING": True,
         "MAILTRAP_TEST_INBOX_ID": ANYMAIL_TEST_MAILTRAP_TEST_INBOX_ID,
         # You can override MAILTRAP_TEST_API_URL via env if needed; default is fine
     },
@@ -134,7 +133,6 @@ class MailtrapBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     @override_settings(
         ANYMAIL={
             "MAILTRAP_API_TOKEN": "Hey, that's not an API token!",
-            "MAILTRAP_TESTING": True,
             "MAILTRAP_TEST_INBOX_ID": ANYMAIL_TEST_MAILTRAP_TEST_INBOX_ID,
         }
     )

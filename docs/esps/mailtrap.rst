@@ -4,31 +4,25 @@ Mailtrap
 ========
 
 Anymail integrates with `Mailtrap <https://mailtrap.io/>`_'s
-transactional, bulk, or test email services, using the corresponding
-`REST API`_.
+transactional or test (sandbox) email services, using the
+`Mailtrap REST API v2`_.
 
-.. note::
-
-    By default, Anymail connects to Mailtrap's transactional API servers.
-    If you are using Mailtrap's bulk send service, be sure to change the
-    :setting:`MAILTRAP_API_URL <ANYMAIL_MAILTRAP_API_URL>` Anymail setting
-    as shown below. Likewise, if you are using Mailtrap's test email service,
-    be sure to set :setting:`MAILTRAP_TESTING_ENABLED <ANYMAIL_MAILTRAP_TESTING_ENABLED>`
-    and :setting:`MAILTRAP_TEST_INBOX_ID <ANYMAIL_MAILTRAP_TEST_INBOX_ID>`.
-
-.. _REST API: https://api-docs.mailtrap.io/docs/mailtrap-api-docs/
+.. _Mailtrap REST API v2: https://api-docs.mailtrap.io/docs/mailtrap-api-docs/
 
 
 Settings
 --------
-
-.. rubric:: EMAIL_BACKEND
 
 To use Anymail's Mailtrap backend, set:
 
   .. code-block:: python
 
       EMAIL_BACKEND = "anymail.backends.mailtrap.EmailBackend"
+      ANYMAIL = {
+          "MAILTRAP_API_TOKEN": "<your API token>",
+          # Optional, to use the sandbox API:
+          "MAILTRAP_TEST_INBOX_ID": <your test inbox id>,
+      }
 
 in your settings.py.
 
@@ -51,48 +45,48 @@ root of the settings file if neither ``ANYMAIL["MAILTRAP_API_TOKEN"]``
 nor ``ANYMAIL_MAILTRAP_API_TOKEN`` is set.
 
 
+.. setting:: ANYMAIL_MAILTRAP_TEST_INBOX_ID
+
+.. rubric:: MAILTRAP_TEST_INBOX_ID
+
+Required to use Mailtrap's test inbox. (If not provided, emails will be sent
+using Mailbox's transactional API.)
+
+  .. code-block:: python
+
+      ANYMAIL = {
+          ...
+          "MAILTRAP_TEST_INBOX_ID": 12345,
+      }
+
+
 .. setting:: ANYMAIL_MAILTRAP_API_URL
 
 .. rubric:: MAILTRAP_API_URL
 
 The base url for calling the Mailtrap API.
 
-The default is ``MAILTRAP_API_URL = "https://send.api.mailtrap.io/api"``, which connects
-to Mailtrap's transactional service. You must change this if you are using Mailtrap's bulk
-send service. For example, to use the bulk send service:
+The default is ``MAILTRAP_API_URL = "https://send.api.mailtrap.io/api/"``
+(Mailtrap's transactional service)
+if :setting:`MAILTRAP_TEST_INBOX_ID <ANYMAIL_MAILTRAP_TEST_INBOX_ID>` is not set,
+or ``"https://sandbox.api.mailtrap.io/api/"`` (Mailbox's sandbox testing service)
+when a test inbox id is provided.
+
+Most users should not need to change this setting. However, you could set it
+to use Mailtrap's bulk send service:
 
   .. code-block:: python
 
       ANYMAIL = {
-        "MAILTRAP_API_TOKEN": "...",
-        "MAILTRAP_API_URL": "https://bulk.api.mailtrap.io/api",
-        # ...
+        ...
+        "MAILTRAP_API_URL": "https://bulk.api.mailtrap.io/api/",
       }
 
+(Note that Anymail has not been tested for use with Mailtrap's bulk API.)
 
-.. setting:: ANYMAIL_MAILTRAP_TESTING_ENABLED
+The value must be only the API base URL: do not include the ``"/send"`` endpoint
+or your test inbox id.
 
-.. rubric:: MAILTRAP_TESTING_ENABLED
-
-Use Mailtrap's test email service by setting this to ``True``, and providing
-:setting:`MAILTRAP_TEST_INBOX_ID <ANYMAIL_MAILTRAP_TEST_INBOX_ID>`:
-
-  .. code-block:: python
-
-      ANYMAIL = {
-        "MAILTRAP_API_TOKEN": "...",
-        "MAILTRAP_TESTING_ENABLED": True,
-        "MAILTRAP_TEST_INBOX_ID": "<your test inbox id>",
-        # ...
-      }
-
-By default, Anymail will switch to using Mailtrap's test email service API: ``https://sandbox.api.mailtrap.io/api``.
-
-.. setting:: ANYMAIL_MAILTRAP_TEST_INBOX_ID
-
-.. rubric:: MAILTRAP_TEST_INBOX_ID
-
-Required if :setting:`MAILTRAP_TESTING_ENABLED <ANYMAIL_MAILTRAP_TESTING_ENABLED>` is ``True``.
 
 
 .. _mailtrap-quirks:
@@ -100,10 +94,10 @@ Required if :setting:`MAILTRAP_TESTING_ENABLED <ANYMAIL_MAILTRAP_TESTING_ENABLED
 Limitations and quirks
 ----------------------
 
-**merge_metadata unsupported**
+**merge_data and merge_metadata not yet supported**
   Mailtrap supports :ref:`ESP stored templates <esp-stored-templates>`,
-  but does NOT support per-recipient merge data via their :ref:`batch sending <batch-send>`
-  service.
+  but Anymail does not yet support per-recipient merge data with their
+  batch sending APIs.
 
 
 .. _mailtrap-webhooks:

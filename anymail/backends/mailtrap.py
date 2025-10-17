@@ -39,7 +39,7 @@ MailtrapData = TypedDict(
         "text": str,
         "html": NotRequired[str],
         "category": NotRequired[str],
-        "template_id": NotRequired[str],
+        "template_uuid": NotRequired[str],
         "template_variables": NotRequired[Dict[str, Any]],
     },
 )
@@ -73,7 +73,7 @@ class MailtrapPayload(RequestsPayload):
         )
 
     def get_api_endpoint(self):
-        if self.backend.testing_enabled:
+        if self.backend.use_sandbox:
             test_inbox_id = quote(self.backend.test_inbox_id, safe="")
             return f"send/{test_inbox_id}"
         return "send"
@@ -188,47 +188,31 @@ class EmailBackend(AnymailRequestsBackend):
 
     esp_name = "Mailtrap"
 
+    DEFAULT_API_URL = "https://send.api.mailtrap.io/api/"
+    DEFAULT_SANDBOX_API_URL = "https://sandbox.api.mailtrap.io/api/"
+
     def __init__(self, **kwargs):
         """Init options from Django settings"""
         self.api_token = get_anymail_setting(
             "api_token", esp_name=self.esp_name, kwargs=kwargs, allow_bare=True
         )
+        self.test_inbox_id = get_anymail_setting(
+            "test_inbox_id", esp_name=self.esp_name, kwargs=kwargs, default=None
+        )
+        self.use_sandbox = self.test_inbox_id is not None
+
         api_url = get_anymail_setting(
             "api_url",
             esp_name=self.esp_name,
             kwargs=kwargs,
-            default="https://send.api.mailtrap.io/api/",
+            default=(
+                self.DEFAULT_SANDBOX_API_URL
+                if self.use_sandbox
+                else self.DEFAULT_API_URL
+            ),
         )
         if not api_url.endswith("/"):
             api_url += "/"
-
-        test_api_url = get_anymail_setting(
-            "test_api_url",
-            esp_name=self.esp_name,
-            kwargs=kwargs,
-            default="https://sandbox.api.mailtrap.io/api/",
-        )
-        if not test_api_url.endswith("/"):
-            test_api_url += "/"
-        self.test_api_url = test_api_url
-
-        self.testing_enabled = get_anymail_setting(
-            "testing",
-            esp_name=self.esp_name,
-            kwargs=kwargs,
-            default=False,
-        )
-
-        if self.testing_enabled:
-            self.test_inbox_id = get_anymail_setting(
-                "test_inbox_id",
-                esp_name=self.esp_name,
-                kwargs=kwargs,
-                # (no default means required -- error if not set)
-            )
-            api_url = self.test_api_url
-        else:
-            self.test_inbox_id = None
 
         super().__init__(api_url, **kwargs)
 
@@ -240,27 +224,53 @@ class EmailBackend(AnymailRequestsBackend):
     ):
         parsed_response = self.deserialize_json_response(response, payload, message)
 
-        # TODO: how to handle fail_silently?
-        if not self.fail_silently and (
-            not parsed_response.get("success")
-            or ("errors" in parsed_response and parsed_response["errors"])
-            or ("message_ids" not in parsed_response)
-        ):
+        if parsed_response.get("errors") or not parsed_response.get("success"):
+            # Superclass has already filtered error status responses, so this shouldn't happen.
+            status = response.status_code
             raise AnymailRequestsAPIError(
-                email_message=message, payload=payload, response=response, backend=self
+                f"Unexpected API failure fields with response status {status}",
+                email_message=message,
+                payload=payload,
+                response=response,
+                backend=self,
             )
-        else:
-            # message-ids will be in this order
-            recipient_status_order = [
-                *payload.recipients_to,
-                *payload.recipients_cc,
-                *payload.recipients_bcc,
-            ]
-            recipient_status = {
-                email: AnymailRecipientStatus(
-                    message_id=parsed_response["message_ids"][0],
-                    status="sent",
-                )
-                for email in recipient_status_order
-            }
-            return recipient_status
+
+        try:
+            message_ids = parsed_response["message_ids"]
+        except KeyError:
+            raise AnymailRequestsAPIError(
+                "Unexpected API response format",
+                email_message=message,
+                payload=payload,
+                response=response,
+                backend=self,
+            )
+
+        # The sandbox API always returns a single message id for all recipients;
+        # the production API returns one message id per recipient in this order:
+        recipients = [
+            *payload.recipients_to,
+            *payload.recipients_cc,
+            *payload.recipients_bcc,
+        ]
+        expected_count = 1 if self.use_sandbox else len(recipients)
+        actual_count = len(message_ids)
+        if expected_count != actual_count:
+            raise AnymailRequestsAPIError(
+                f"Expected {expected_count} message_ids, got {actual_count}",
+                email_message=message,
+                payload=payload,
+                response=response,
+                backend=self,
+            )
+        if self.use_sandbox:
+            message_ids = [message_ids[0]] * expected_count
+
+        recipient_status = {
+            email: AnymailRecipientStatus(
+                message_id=parsed_response["message_ids"][0],
+                status="sent",
+            )
+            for email, message_id in zip(recipients, message_ids)
+        }
+        return recipient_status

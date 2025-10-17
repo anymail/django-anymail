@@ -25,6 +25,18 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes*
+
+Features
+~~~~~~~~
+
+* **Mailtrap:** Add support for this ESP.
+  (See `docs <https://anymail.dev/en/latest/esps/mailtrap/>`__.
+  Thanks to `@cahna`_ for the contribution.)
+
 v13.1
 -----
 
@@ -1819,6 +1831,7 @@ Features
 .. _@Arondit: https://github.com/Arondit
 .. _@b0d0nne11: https://github.com/b0d0nne11
 .. _@blag: https://github.com/blag
+.. _@cahna: https://github.com/cahna
 .. _@calvin: https://github.com/calvin
 .. _@carrerasrodrigo: https://github.com/carrerasrodrigo
 .. _@chickahoona: https://github.com/chickahoona
