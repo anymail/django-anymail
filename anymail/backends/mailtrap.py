@@ -28,15 +28,17 @@ class MailtrapAttachment(TypedDict):
 MailtrapData = TypedDict(
     "MailtrapData",
     {
-        "from": MailtrapAddress,
+        # Although "from" and "subject" are technically required,
+        # allow Mailtrap's API to enforce that.
+        "from": NotRequired[MailtrapAddress],
         "to": NotRequired[List[MailtrapAddress]],
         "cc": NotRequired[List[MailtrapAddress]],
         "bcc": NotRequired[List[MailtrapAddress]],
         "attachments": NotRequired[List[MailtrapAttachment]],
         "headers": NotRequired[Dict[str, str]],
         "custom_variables": NotRequired[Dict[str, str]],
-        "subject": str,
-        "text": str,
+        "subject": NotRequired[str],
+        "text": NotRequired[str],
         "html": NotRequired[str],
         "category": NotRequired[str],
         "template_uuid": NotRequired[str],
@@ -74,7 +76,7 @@ class MailtrapPayload(RequestsPayload):
 
     def get_api_endpoint(self):
         if self.backend.use_sandbox:
-            test_inbox_id = quote(self.backend.test_inbox_id, safe="")
+            test_inbox_id = quote(str(self.backend.test_inbox_id), safe="")
             return f"send/{test_inbox_id}"
         return "send"
 
@@ -86,13 +88,7 @@ class MailtrapPayload(RequestsPayload):
     #
 
     def init_payload(self):
-        self.data: MailtrapData = {
-            "from": {
-                "email": "",
-            },
-            "subject": "",
-            "text": "",
-        }
+        self.data: MailtrapData = {}
 
     @staticmethod
     def _mailtrap_email(email: EmailAddress) -> MailtrapAddress:
@@ -122,18 +118,24 @@ class MailtrapPayload(RequestsPayload):
                 self.recipients_bcc = [email.addr_spec for email in emails]
 
     def set_subject(self, subject):
-        self.data["subject"] = subject
+        if subject:
+            # (must ignore default empty subject for use with template_uuid)
+            self.data["subject"] = subject
 
     def set_reply_to(self, emails: List[EmailAddress]):
-        self.data.setdefault("headers", {})["Reply-To"] = ", ".join(
-            email.address for email in emails
-        )
+        if emails:
+            # Use header rather than "reply_to" param
+            # to allow multiple reply-to addresses
+            self.data.setdefault("headers", {})["Reply-To"] = ", ".join(
+                email.address for email in emails
+            )
 
     def set_extra_headers(self, headers):
         self.data.setdefault("headers", {}).update(headers)
 
     def set_text_body(self, body):
-        self.data["text"] = body
+        if body:
+            self.data["text"] = body
 
     def set_html_body(self, body):
         if "html" in self.data:
@@ -144,19 +146,17 @@ class MailtrapPayload(RequestsPayload):
 
     def add_attachment(self, attachment: Attachment):
         att: MailtrapAttachment = {
-            "disposition": "attachment",
-            "filename": attachment.name,
+            # Mailtrap requires filename even for inline attachments.
+            # Provide a fallback filename like the Mailjet backend does.
+            "filename": attachment.name or "attachment",
             "content": attachment.b64content,
+            # default disposition is "attachment"
         }
         if attachment.mimetype:
             att["type"] = attachment.mimetype
         if attachment.inline:
-            if not attachment.cid:
-                self.unsupported_feature("inline attachment without content-id")
             att["disposition"] = "inline"
             att["content_id"] = attachment.cid
-        elif not attachment.name:
-            self.unsupported_feature("attachment without filename")
         self.data.setdefault("attachments", []).append(att)
 
     def set_tags(self, tags: List[str]):
@@ -264,11 +264,11 @@ class EmailBackend(AnymailRequestsBackend):
                 backend=self,
             )
         if self.use_sandbox:
-            message_ids = [message_ids[0]] * expected_count
+            message_ids = [message_ids[0]] * len(recipients)
 
         recipient_status = {
             email: AnymailRecipientStatus(
-                message_id=parsed_response["message_ids"][0],
+                message_id=message_id,
                 status="sent",
             )
             for email, message_id in zip(recipients, message_ids)
