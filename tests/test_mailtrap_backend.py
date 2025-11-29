@@ -483,17 +483,17 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         )
 
         recipients = message.anymail_status.recipients
-        self.assertEqual(recipients["alice@example.com"].status, "sent")
+        self.assertEqual(recipients["alice@example.com"].status, "queued")
         self.assertEqual(
             recipients["alice@example.com"].message_id,
             "message-id-alice-to",
         )
-        self.assertEqual(recipients["bob@example.com"].status, "sent")
+        self.assertEqual(recipients["bob@example.com"].status, "queued")
         self.assertEqual(
             recipients["bob@example.com"].message_id,
             "message-id-bob-to",
         )
-        self.assertEqual(recipients["cam@example.com"].status, "sent")
+        self.assertEqual(recipients["cam@example.com"].status, "queued")
         self.assertEqual(
             recipients["cam@example.com"].message_id,
             "message-id-cam-to",
@@ -677,12 +677,12 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         )
 
         recipients = message.anymail_status.recipients
-        self.assertEqual(recipients["alice@example.com"].status, "sent")
+        self.assertEqual(recipients["alice@example.com"].status, "queued")
         self.assertEqual(
             recipients["alice@example.com"].message_id,
             "message-id-alice-to",
         )
-        self.assertEqual(recipients["bob@example.com"].status, "sent")
+        self.assertEqual(recipients["bob@example.com"].status, "queued")
         self.assertEqual(
             recipients["bob@example.com"].message_id,
             "message-id-bob-to",
@@ -690,17 +690,17 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         # anymail_status.recipients can't represent separate statuses for batch
         # cc and bcc recipients. For Mailtrap, the status will reflect the cc/bcc
         # for the last 'to' recipient:
-        self.assertEqual(recipients["cc0@example.com"].status, "sent")
+        self.assertEqual(recipients["cc0@example.com"].status, "queued")
         self.assertEqual(
             recipients["cc0@example.com"].message_id,
             "message-id-bob-cc0",
         )
-        self.assertEqual(recipients["cc1@example.com"].status, "sent")
+        self.assertEqual(recipients["cc1@example.com"].status, "queued")
         self.assertEqual(
             recipients["cc1@example.com"].message_id,
             "message-id-bob-cc1",
         )
-        self.assertEqual(recipients["bcc0@example.com"].status, "sent")
+        self.assertEqual(recipients["bcc0@example.com"].status, "queued")
         self.assertEqual(
             recipients["bcc0@example.com"].message_id,
             "message-id-bob-bcc0",
@@ -726,7 +726,7 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         message.send()
 
         recipients = message.anymail_status.recipients
-        self.assertEqual(recipients["alice@example.com"].status, "sent")
+        self.assertEqual(recipients["alice@example.com"].status, "queued")
         self.assertEqual(
             recipients["alice@example.com"].message_id,
             "message-id-alice-to",
@@ -785,23 +785,23 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         )
         sent = msg.send()
         self.assertEqual(sent, 1)
-        self.assertEqual(msg.anymail_status.status, {"sent"})
+        self.assertEqual(msg.anymail_status.status, {"queued"})
         self.assertEqual(
             msg.anymail_status.message_id,
             {"id-to1", "id-to2", "id-cc1", "id-cc2", "id-bcc1", "id-bcc2"},
         )
         recipients = msg.anymail_status.recipients
-        self.assertEqual(recipients["to1@example.com"].status, "sent")
+        self.assertEqual(recipients["to1@example.com"].status, "queued")
         self.assertEqual(recipients["to1@example.com"].message_id, "id-to1")
-        self.assertEqual(recipients["to2@example.com"].status, "sent")
+        self.assertEqual(recipients["to2@example.com"].status, "queued")
         self.assertEqual(recipients["to2@example.com"].message_id, "id-to2")
-        self.assertEqual(recipients["cc1@example.com"].status, "sent")
+        self.assertEqual(recipients["cc1@example.com"].status, "queued")
         self.assertEqual(recipients["cc1@example.com"].message_id, "id-cc1")
-        self.assertEqual(recipients["cc2@example.com"].status, "sent")
+        self.assertEqual(recipients["cc2@example.com"].status, "queued")
         self.assertEqual(recipients["cc2@example.com"].message_id, "id-cc2")
-        self.assertEqual(recipients["bcc1@example.com"].status, "sent")
+        self.assertEqual(recipients["bcc1@example.com"].status, "queued")
         self.assertEqual(recipients["bcc1@example.com"].message_id, "id-bcc1")
-        self.assertEqual(recipients["bcc2@example.com"].status, "sent")
+        self.assertEqual(recipients["bcc2@example.com"].status, "queued")
         self.assertEqual(recipients["bcc2@example.com"].message_id, "id-bcc2")
         self.assertEqual(msg.anymail_status.esp_response.json(), response_content)
 
@@ -820,7 +820,7 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         self.message.send()
 
         self.assert_esp_called("https://sandbox.api.mailtrap.io/api/send/12345")
-        self.assertEqual(self.message.anymail_status.status, {"sent"})
+        self.assertEqual(self.message.anymail_status.status, {"queued"})
         self.assertEqual(
             self.message.anymail_status.message_id,
             "sandbox-single-id",

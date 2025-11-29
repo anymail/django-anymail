@@ -382,7 +382,7 @@ class EmailBackend(AnymailRequestsBackend):
         recipient_status = {
             email: AnymailRecipientStatus(
                 message_id=message_id,
-                status="sent",
+                status="queued",
             )
             for email, message_id in zip(recipients, message_ids)
         }
