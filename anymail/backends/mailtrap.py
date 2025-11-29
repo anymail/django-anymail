@@ -46,6 +46,14 @@ MailtrapData = TypedDict(
     },
 )
 
+MailtrapBatchData = TypedDict(
+    "MailtrapBatchData",
+    {
+        "base": MailtrapData,
+        "requests": List[MailtrapData],
+    },
+)
+
 
 class MailtrapPayload(RequestsPayload):
     def __init__(
@@ -63,7 +71,11 @@ class MailtrapPayload(RequestsPayload):
         }
         # Yes, the parent sets this, but setting it here, too, gives type hints
         self.backend = backend
-        self.metadata = None
+
+        # Late bound batch send data
+        self.merge_data: Dict[str, Any] = {}
+        self.merge_metadata: Dict[str, Dict[str, str]] = {}
+        self.merge_headers: Dict[str, Dict[str, str]] = {}
 
         # needed for backend.parse_recipient_status
         self.recipients_to: List[str] = []
@@ -75,13 +87,47 @@ class MailtrapPayload(RequestsPayload):
         )
 
     def get_api_endpoint(self):
+        endpoint = "batch" if self.is_batch() else "send"
         if self.backend.use_sandbox:
             test_inbox_id = quote(str(self.backend.test_inbox_id), safe="")
-            return f"send/{test_inbox_id}"
-        return "send"
+            return f"{endpoint}/{test_inbox_id}"
+        else:
+            return endpoint
 
     def serialize_data(self):
-        return self.serialize_json(self.data)
+        data = self.burst_for_batch() if self.is_batch() else self.data
+        return self.serialize_json(data)
+
+    def burst_for_batch(self) -> MailtrapBatchData:
+        """Transform self.data into the payload for a batch send."""
+        # One batch send request for each 'to' address.
+        # Any cc and bcc recipients are duplicated to every request.
+        to = self.data.pop("to", [])
+        cc = self.data.pop("cc", None)
+        bcc = self.data.pop("bcc", None)
+        base_template_variables = self.data.get("template_variables", {})
+        base_custom_variables = self.data.get("custom_variables", {})
+        base_headers = self.data.get("headers", {})
+        requests = []
+        for recipient in to:
+            email = recipient["email"]
+            request: MailtrapData = {"to": [recipient]}
+            if cc:
+                request["cc"] = cc
+            if bcc:
+                request["bcc"] = bcc
+            # Any request props completely override base props, so must merge base.
+            if email in self.merge_data:
+                request["template_variables"] = base_template_variables.copy()
+                request["template_variables"].update(self.merge_data[email])
+            if email in self.merge_metadata:
+                request["custom_variables"] = base_custom_variables.copy()
+                request["custom_variables"].update(self.merge_metadata[email])
+            if email in self.merge_headers:
+                request["headers"] = base_headers.copy()
+                request["headers"].update(self.merge_headers[email])
+            requests.append(request)
+        return {"base": self.data, "requests": requests}
 
     #
     # Payload construction
@@ -93,7 +139,7 @@ class MailtrapPayload(RequestsPayload):
     @staticmethod
     def _mailtrap_email(email: EmailAddress) -> MailtrapAddress:
         """Expand an Anymail EmailAddress into Mailtrap's {"email", "name"} dict"""
-        result = {"email": email.addr_spec}
+        result: MailtrapAddress = {"email": email.addr_spec}
         if email.display_name:
             result["name"] = email.display_name
         return result
@@ -131,6 +177,9 @@ class MailtrapPayload(RequestsPayload):
             )
 
     def set_extra_headers(self, headers):
+        # Note: Mailtrap appears to correctly RFC 2047 encode non-ASCII header
+        # values for us, even though its docs say that we "must ensure these
+        # are properly encoded if they contain unicode characters."
         self.data.setdefault("headers", {}).update(headers)
 
     def set_text_body(self, body):
@@ -169,13 +218,24 @@ class MailtrapPayload(RequestsPayload):
         self.data.setdefault("custom_variables", {}).update(
             {str(k): str(v) for k, v in metadata.items()}
         )
-        self.metadata = metadata  # save for set_merge_metadata
 
     def set_template_id(self, template_id):
         self.data["template_uuid"] = template_id
 
+    def set_merge_data(self, merge_data):
+        # Late-bound in burst_for_batch
+        self.merge_data = merge_data
+
+    def set_merge_headers(self, merge_headers):
+        # Late-bound in burst_for_batch
+        self.merge_headers = merge_headers
+
     def set_merge_global_data(self, merge_global_data: Dict[str, Any]):
         self.data.setdefault("template_variables", {}).update(merge_global_data)
+
+    def set_merge_metadata(self, merge_metadata):
+        # Late-bound in burst_for_batch
+        self.merge_metadata = merge_metadata
 
     def set_esp_extra(self, extra):
         update_deep(self.data, extra)
@@ -225,7 +285,8 @@ class EmailBackend(AnymailRequestsBackend):
         parsed_response = self.deserialize_json_response(response, payload, message)
 
         if parsed_response.get("errors") or not parsed_response.get("success"):
-            # Superclass has already filtered error status responses, so this shouldn't happen.
+            # Superclass has already filtered http error status responses,
+            # so errors here (or general batch send error) shouldn't be possible.
             status = response.status_code
             raise AnymailRequestsAPIError(
                 f"Unexpected API failure fields with response status {status}",
@@ -235,24 +296,76 @@ class EmailBackend(AnymailRequestsBackend):
                 backend=self,
             )
 
+        if payload.is_batch():
+            try:
+                responses = parsed_response["responses"]
+            except KeyError:
+                raise AnymailRequestsAPIError("")
+            if len(payload.recipients_to) != len(responses):
+                raise AnymailRequestsAPIError(
+                    f"Expected {len(payload.recipients_to)} batch send responses"
+                    f" but got {len(responses)}",
+                    email_message=message,
+                    payload=payload,
+                    response=response,
+                    backend=self,
+                )
+
+            # Merge recipient statuses for each item in the batch.
+            # Each API response includes message_ids in the order 'to', 'cc, 'bcc'.
+            recipient_status: Dict[str, AnymailRecipientStatus] = {}
+            for to, one_response in zip(payload.recipients_to, responses):
+                recipients = [to, *payload.recipients_cc, *payload.recipients_bcc]
+                one_status = self.parse_one_response(
+                    one_response, recipients, response, payload, message
+                )
+                recipient_status.update(one_status)
+        else:
+            # Non-batch send.
+            # API response includes message_ids in the order 'to', 'cc, 'bcc'.
+            recipients = [
+                *payload.recipients_to,
+                *payload.recipients_cc,
+                *payload.recipients_bcc,
+            ]
+            recipient_status = self.parse_one_response(
+                parsed_response, recipients, response, payload, message
+            )
+
+        return recipient_status
+
+    def parse_one_response(
+        self,
+        one_response,
+        recipients: List[str],
+        raw_response,
+        payload: MailtrapPayload,
+        message: AnymailMessage,
+    ) -> Dict[str, AnymailRecipientStatus]:
+        """
+        Return parsed status for recipients in one_response, which is either
+        a top-level send response or an individual 'responses' item for batch send.
+        """
+        if not one_response["success"]:
+            # (Could try to parse status out of one_response["errors"].)
+            return {
+                email: AnymailRecipientStatus(message_id=None, status="failed")
+                for email in recipients
+            }
+
         try:
-            message_ids = parsed_response["message_ids"]
+            message_ids = one_response["message_ids"]
         except KeyError:
             raise AnymailRequestsAPIError(
                 "Unexpected API response format",
                 email_message=message,
                 payload=payload,
-                response=response,
+                response=raw_response,
                 backend=self,
             )
 
         # The sandbox API always returns a single message id for all recipients;
-        # the production API returns one message id per recipient in this order:
-        recipients = [
-            *payload.recipients_to,
-            *payload.recipients_cc,
-            *payload.recipients_bcc,
-        ]
+        # the production API returns one message id per recipient.
         expected_count = 1 if self.use_sandbox else len(recipients)
         actual_count = len(message_ids)
         if expected_count != actual_count:
@@ -260,7 +373,7 @@ class EmailBackend(AnymailRequestsBackend):
                 f"Expected {expected_count} message_ids, got {actual_count}",
                 email_message=message,
                 payload=payload,
-                response=response,
+                response=raw_response,
                 backend=self,
             )
         if self.use_sandbox:

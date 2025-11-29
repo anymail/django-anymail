@@ -400,7 +400,7 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
             merge_global_data={"name": "Alice", "group": "Developers"},
         )
         message.send()
-        self.assert_esp_called("/send")
+        self.assert_esp_called("/api/send")
         data = self.get_api_call_json()
         self.assertEqual(data["template_uuid"], "template-uuid")
         self.assertEqual(
@@ -411,8 +411,328 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         self.assertNotIn("text", data)
         self.assertNotIn("html", data)
 
-    # TODO: merge_data, merge_metadata, merge_headers and batch sending API
-    # TODO: does Mailtrap support inline templates?
+    _mock_batch_response = {
+        "success": True,
+        "responses": [
+            {"success": True, "message_ids": ["message-id-alice-to"]},
+            {"success": True, "message_ids": ["message-id-bob-to"]},
+            {"success": True, "message_ids": ["message-id-cam-to"]},
+        ],
+    }
+
+    def test_merge_data(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        message = AnymailMessage(
+            from_email="from@example.com",
+            to=["alice@example.com", "Bob <bob@example.com>", "cam@example.com"],
+            template_id="template-uuid",
+            merge_data={
+                "alice@example.com": {"name": "Alice", "group": "Developers"},
+                "bob@example.com": {"name": "Bob"},  # and leave group undefined
+                "nobody@example.com": {"name": "Not a recipient for this message"},
+            },
+            merge_global_data={"group": "Users", "site": "ExampleCo"},
+        )
+        message.send()
+
+        # Use batch send endpoint
+        self.assert_esp_called("/api/batch")
+        data = self.get_api_call_json()
+
+        # Common parameters in "base":
+        self.assertEqual(data["base"]["from"], {"email": "from@example.com"})
+        self.assertEqual(data["base"]["template_uuid"], "template-uuid")
+        self.assertEqual(
+            data["base"]["template_variables"], {"group": "Users", "site": "ExampleCo"}
+        )
+        self.assertNotIn("subject", data["base"])  # invalid with template_uuid
+        self.assertNotIn("text", data["base"])
+        self.assertNotIn("html", data["base"])
+
+        # Per-recipient parameters in "requests" array:
+        self.assertEqual(len(data["requests"]), 3)
+        self.assertEqual(
+            data["requests"][0],
+            {
+                "to": [{"email": "alice@example.com"}],
+                # Completely overrides base template_variables
+                "template_variables": {
+                    "name": "Alice",
+                    "group": "Developers",
+                    "site": "ExampleCo",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][1],
+            {
+                "to": [{"email": "bob@example.com", "name": "Bob"}],
+                "template_variables": {
+                    "name": "Bob",
+                    "group": "Users",
+                    "site": "ExampleCo",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][2],
+            {
+                "to": [{"email": "cam@example.com"}],
+                # No template_variables (no merge_data for cam, so global base applies)
+            },
+        )
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["alice@example.com"].status, "sent")
+        self.assertEqual(
+            recipients["alice@example.com"].message_id,
+            "message-id-alice-to",
+        )
+        self.assertEqual(recipients["bob@example.com"].status, "sent")
+        self.assertEqual(
+            recipients["bob@example.com"].message_id,
+            "message-id-bob-to",
+        )
+        self.assertEqual(recipients["cam@example.com"].status, "sent")
+        self.assertEqual(
+            recipients["cam@example.com"].message_id,
+            "message-id-cam-to",
+        )
+
+    def test_merge_metadata(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        self.message.to = [
+            "alice@example.com",
+            "Bob <bob@example.com>",
+            "cam@example.com",
+        ]
+        self.message.merge_metadata = {
+            "alice@example.com": {"order_id": 123, "tier": "premium"},
+            "bob@example.com": {"order_id": 678},
+        }
+        self.message.metadata = {"notification_batch": "zx912", "tier": "basic"}
+        self.message.send()
+
+        self.assert_esp_called("/api/batch")
+        data = self.get_api_call_json()
+        self.assertEqual(data["base"]["from"], {"email": "from@example.com"})
+        self.assertEqual(data["base"]["subject"], "Subject")
+        self.assertEqual(data["base"]["text"], "Body")
+        self.assertEqual(
+            data["base"]["custom_variables"],
+            {"notification_batch": "zx912", "tier": "basic"},
+        )
+
+        self.assertEqual(len(data["requests"]), 3)
+        self.assertEqual(
+            data["requests"][0],
+            {
+                "to": [{"email": "alice@example.com"}],
+                "custom_variables": {
+                    "order_id": 123,
+                    "tier": "premium",
+                    "notification_batch": "zx912",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][1],
+            {
+                "to": [{"email": "bob@example.com", "name": "Bob"}],
+                "custom_variables": {
+                    "order_id": 678,
+                    "notification_batch": "zx912",
+                    "tier": "basic",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][2],
+            {
+                "to": [{"email": "cam@example.com"}],
+                # No custom_variables (no merge_data for cam, so global base applies)
+            },
+        )
+
+    def test_merge_headers(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        self.message.to = [
+            "alice@example.com",
+            "Bob <bob@example.com>",
+            "cam@example.com",
+        ]
+        self.message.extra_headers = {
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+        }
+        self.message.merge_headers = {
+            "alice@example.com": {
+                "List-Unsubscribe": "<https://example.com/a/>",
+            },
+            "bob@example.com": {
+                "List-Unsubscribe": "<https://example.com/b/>",
+            },
+        }
+        self.message.send()
+
+        self.assert_esp_called("/api/batch")
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["base"]["headers"],
+            {
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+        )
+
+        self.assertEqual(len(data["requests"]), 3)
+        self.assertEqual(
+            data["requests"][0],
+            {
+                "to": [{"email": "alice@example.com"}],
+                "headers": {
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][1],
+            {
+                "to": [{"email": "bob@example.com", "name": "Bob"}],
+                "headers": {
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][2],
+            {
+                "to": [{"email": "cam@example.com"}],
+                # No headers (no merge_data for cam, so global base applies)
+            },
+        )
+
+    def test_batch_send_with_cc_and_bcc(self):
+        self.set_mock_response(
+            json_data={
+                "success": True,
+                "responses": [
+                    {
+                        "success": True,
+                        "message_ids": [
+                            "message-id-alice-to",
+                            "message-id-alice-cc0",
+                            "message-id-alice-cc1",
+                            "message-id-alice-bcc0",
+                        ],
+                    },
+                    {
+                        "success": True,
+                        "message_ids": [
+                            "message-id-bob-to",
+                            "message-id-bob-cc0",
+                            "message-id-bob-cc1",
+                            "message-id-bob-bcc0",
+                        ],
+                    },
+                ],
+            }
+        )
+        message = AnymailMessage(
+            to=["alice@example.com", "Bob <bob@example.com>"],
+            cc=["cc0@example.com", "Also CC <cc1@example.com>"],
+            bcc=["bcc0@example.com"],
+            merge_metadata={},  # force batch send
+        )
+        message.send()
+
+        self.assert_esp_called("/api/batch")
+
+        # cc and bcc must be copied to each subrequest (cannot be in base)
+        data = self.get_api_call_json()
+        self.assertEqual(len(data["requests"]), 2)
+        self.assertEqual(
+            data["requests"][0],
+            {
+                "to": [{"email": "alice@example.com"}],
+                "cc": [
+                    {"email": "cc0@example.com"},
+                    {"email": "cc1@example.com", "name": "Also CC"},
+                ],
+                "bcc": [{"email": "bcc0@example.com"}],
+            },
+        )
+        self.assertEqual(
+            data["requests"][1],
+            {
+                "to": [{"email": "bob@example.com", "name": "Bob"}],
+                "cc": [
+                    {"email": "cc0@example.com"},
+                    {"email": "cc1@example.com", "name": "Also CC"},
+                ],
+                "bcc": [{"email": "bcc0@example.com"}],
+            },
+        )
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["alice@example.com"].status, "sent")
+        self.assertEqual(
+            recipients["alice@example.com"].message_id,
+            "message-id-alice-to",
+        )
+        self.assertEqual(recipients["bob@example.com"].status, "sent")
+        self.assertEqual(
+            recipients["bob@example.com"].message_id,
+            "message-id-bob-to",
+        )
+        # anymail_status.recipients can't represent separate statuses for batch
+        # cc and bcc recipients. For Mailtrap, the status will reflect the cc/bcc
+        # for the last 'to' recipient:
+        self.assertEqual(recipients["cc0@example.com"].status, "sent")
+        self.assertEqual(
+            recipients["cc0@example.com"].message_id,
+            "message-id-bob-cc0",
+        )
+        self.assertEqual(recipients["cc1@example.com"].status, "sent")
+        self.assertEqual(
+            recipients["cc1@example.com"].message_id,
+            "message-id-bob-cc1",
+        )
+        self.assertEqual(recipients["bcc0@example.com"].status, "sent")
+        self.assertEqual(
+            recipients["bcc0@example.com"].message_id,
+            "message-id-bob-bcc0",
+        )
+
+    def test_batch_send_with_mixed_responses(self):
+        self.set_mock_response(
+            json_data={
+                "success": True,
+                "responses": [
+                    {
+                        "success": True,
+                        "message_ids": ["message-id-alice-to"],
+                    },
+                    {"success": False, "errors": ["address is invalid in 'to' 0"]},
+                ],
+            }
+        )
+        message = AnymailMessage(
+            to=["alice@example.com", "invalid@address"],
+            merge_metadata={},  # force batch send
+        )
+        message.send()
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["alice@example.com"].status, "sent")
+        self.assertEqual(
+            recipients["alice@example.com"].message_id,
+            "message-id-alice-to",
+        )
+        self.assertEqual(recipients["invalid@address"].status, "failed")
+        self.assertIsNone(recipients["invalid@address"].message_id)
 
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
@@ -512,6 +832,50 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         self.assertEqual(
             self.message.anymail_status.recipients["to2@example.com"].message_id,
             "sandbox-single-id",
+        )
+
+    @override_settings(
+        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_TEST_INBOX_ID": 12345}
+    )
+    def test_sandbox_batch_send(self):
+        self.set_mock_response(
+            json_data={
+                "success": True,
+                "responses": [
+                    # Sandbox returns single message_id per request,
+                    # even with multiple recipients via cc/bcc.
+                    {"success": True, "message_ids": ["sandbox-single-id-1"]},
+                    {"success": True, "message_ids": ["sandbox-single-id-2"]},
+                ],
+            }
+        )
+        message = AnymailMessage(
+            "Subject",
+            "Body",
+            "from@example.com",
+            ["Recipient #1 <to1@example.com>", "to2@example.com"],
+            cc=["cc@example.com"],
+            merge_data={},  # force batch send
+        )
+        message.send()
+
+        self.assert_esp_called("https://sandbox.api.mailtrap.io/api/batch/12345")
+        self.assertEqual(
+            message.anymail_status.message_id,
+            {"sandbox-single-id-1", "sandbox-single-id-2"},
+        )
+        self.assertEqual(
+            message.anymail_status.recipients["to1@example.com"].message_id,
+            "sandbox-single-id-1",
+        )
+        self.assertEqual(
+            message.anymail_status.recipients["to2@example.com"].message_id,
+            "sandbox-single-id-2",
+        )
+        self.assertEqual(
+            # For batch cc and bcc, message_id from the last recipient is used
+            message.anymail_status.recipients["cc@example.com"].message_id,
+            "sandbox-single-id-2",
         )
 
     @override_settings(
