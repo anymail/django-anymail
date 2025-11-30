@@ -12,6 +12,7 @@ from .base import AnymailBaseWebhookView
 
 
 class MailtrapEvent(TypedDict):
+    # https://api-docs.mailtrap.io/docs/mailtrap-api-docs/016fe2a1efd5a-receive-events-json-format
     event: Literal[
         "delivery",
         "open",
