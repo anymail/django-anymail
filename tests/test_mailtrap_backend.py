@@ -835,6 +835,14 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         )
 
     @override_settings(
+        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": ""}
+    )
+    def test_sandbox_id_empty_string(self):
+        """Use transactional API when MAILTRAP_SANDBOX_ID is an empty string."""
+        self.message.send()
+        self.assert_esp_called("https://send.api.mailtrap.io/api/send")
+
+    @override_settings(
         ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
     )
     def test_sandbox_batch_send(self):

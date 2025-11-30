@@ -259,7 +259,7 @@ class EmailBackend(AnymailRequestsBackend):
         self.sandbox_id = get_anymail_setting(
             "sandbox_id", esp_name=self.esp_name, kwargs=kwargs, default=None
         )
-        self.use_sandbox = self.sandbox_id is not None
+        self.use_sandbox = bool(self.sandbox_id)
 
         api_url = get_anymail_setting(
             "api_url",
