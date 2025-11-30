@@ -89,8 +89,8 @@ class MailtrapPayload(RequestsPayload):
     def get_api_endpoint(self):
         endpoint = "batch" if self.is_batch() else "send"
         if self.backend.use_sandbox:
-            test_inbox_id = quote(str(self.backend.test_inbox_id), safe="")
-            return f"{endpoint}/{test_inbox_id}"
+            sandbox_id = quote(str(self.backend.sandbox_id), safe="")
+            return f"{endpoint}/{sandbox_id}"
         else:
             return endpoint
 
@@ -256,10 +256,10 @@ class EmailBackend(AnymailRequestsBackend):
         self.api_token = get_anymail_setting(
             "api_token", esp_name=self.esp_name, kwargs=kwargs, allow_bare=True
         )
-        self.test_inbox_id = get_anymail_setting(
-            "test_inbox_id", esp_name=self.esp_name, kwargs=kwargs, default=None
+        self.sandbox_id = get_anymail_setting(
+            "sandbox_id", esp_name=self.esp_name, kwargs=kwargs, default=None
         )
-        self.use_sandbox = self.test_inbox_id is not None
+        self.use_sandbox = self.sandbox_id is not None
 
         api_url = get_anymail_setting(
             "api_url",

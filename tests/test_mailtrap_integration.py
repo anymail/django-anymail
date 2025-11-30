@@ -15,7 +15,7 @@ ANYMAIL_TEST_MAILTRAP_API_TOKEN = os.getenv("ANYMAIL_TEST_MAILTRAP_API_TOKEN")
 # Validated sending domain for transactional API tests:
 ANYMAIL_TEST_MAILTRAP_DOMAIN = os.getenv("ANYMAIL_TEST_MAILTRAP_DOMAIN")
 # Test inbox id for sandbox API tests:
-ANYMAIL_TEST_MAILTRAP_TEST_INBOX_ID = os.getenv("ANYMAIL_TEST_MAILTRAP_TEST_INBOX_ID")
+ANYMAIL_TEST_MAILTRAP_SANDBOX_ID = os.getenv("ANYMAIL_TEST_MAILTRAP_SANDBOX_ID")
 # Template id for both sets of tests:
 ANYMAIL_TEST_MAILTRAP_TEMPLATE_UUID = os.getenv("ANYMAIL_TEST_MAILTRAP_TEMPLATE_UUID")
 
@@ -157,14 +157,14 @@ class MailtrapBackendTransactionalIntegrationTests(AnymailTestMixin, SimpleTestC
 
 @tag("mailtrap", "live")
 @unittest.skipUnless(
-    ANYMAIL_TEST_MAILTRAP_API_TOKEN and ANYMAIL_TEST_MAILTRAP_TEST_INBOX_ID,
-    "Set ANYMAIL_TEST_MAILTRAP_API_TOKEN and ANYMAIL_TEST_MAILTRAP_TEST_INBOX_ID"
+    ANYMAIL_TEST_MAILTRAP_API_TOKEN and ANYMAIL_TEST_MAILTRAP_SANDBOX_ID,
+    "Set ANYMAIL_TEST_MAILTRAP_API_TOKEN and ANYMAIL_TEST_MAILTRAP_SANDBOX_ID"
     " environment variables to run Mailtrap sandbox integration tests",
 )
 @override_settings(
     ANYMAIL={
         "MAILTRAP_API_TOKEN": ANYMAIL_TEST_MAILTRAP_API_TOKEN,
-        "MAILTRAP_TEST_INBOX_ID": ANYMAIL_TEST_MAILTRAP_TEST_INBOX_ID,
+        "MAILTRAP_SANDBOX_ID": ANYMAIL_TEST_MAILTRAP_SANDBOX_ID,
     },
     EMAIL_BACKEND="anymail.backends.mailtrap.EmailBackend",
 )
@@ -281,7 +281,7 @@ class MailtrapBackendSandboxIntegrationTests(AnymailTestMixin, SimpleTestCase):
     @override_settings(
         ANYMAIL={
             "MAILTRAP_API_TOKEN": "Hey, that's not an API token!",
-            "MAILTRAP_TEST_INBOX_ID": ANYMAIL_TEST_MAILTRAP_TEST_INBOX_ID,
+            "MAILTRAP_SANDBOX_ID": ANYMAIL_TEST_MAILTRAP_SANDBOX_ID,
         }
     )
     def test_invalid_api_token(self):

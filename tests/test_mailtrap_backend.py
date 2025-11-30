@@ -812,7 +812,7 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
 
     # noinspection PyUnresolvedReferences
     @override_settings(
-        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_TEST_INBOX_ID": 12345}
+        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
     )
     def test_sandbox_send(self):
         self.set_mock_response_message_ids(["sandbox-single-id"])
@@ -835,7 +835,7 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         )
 
     @override_settings(
-        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_TEST_INBOX_ID": 12345}
+        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
     )
     def test_sandbox_batch_send(self):
         self.set_mock_response(
@@ -879,7 +879,7 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         )
 
     @override_settings(
-        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_TEST_INBOX_ID": 12345}
+        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
     )
     def test_wrong_message_id_count_sandbox(self):
         self.set_mock_response_message_ids(2)
