@@ -155,6 +155,20 @@ Limitations and quirks
   if you've enabled :setting:`ANYMAIL_IGNORE_UNSUPPORTED_FEATURES`,
   Anymail will use only the first tag.
 
+**Tag not compatible with template**
+  Trying to send with both :attr:`~anymail.message.AnymailMessage.tags` and a
+  :attr:`~anymail.message.AnymailMessage.template_id` will result in a Mailtrap
+  API error that "'category' is not allowed with 'template_uuid'."
+
+**Error when non-ASCII From name includes comma**
+  Trying to send a message with a ``from_email`` display name containing both
+  a non-ASCII Unicode character *and* a comma (e.g., ``'"Ng, Göta" <gng@example.com>'``)
+  will result in a Mailtrap API error that the "'From:' header does not match
+  the sender's domain." This does not affect other address fields (like ``to``
+  or ``reply_to``). It appears to be a limitation of Mailtrap's API, and there
+  is no general workaround Anymail could apply. To avoid the problem, you must
+  rework your *From* address to either remove either the comma or be ASCII-only.
+
 **No delayed sending**
   Mailtrap does not support :attr:`~anymail.message.AnymailMessage.send_at`.
 

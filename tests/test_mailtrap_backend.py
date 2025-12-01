@@ -164,14 +164,21 @@ class MailtrapBackendStandardEmailTests(MailtrapBackendMockAPITestCase):
     def test_reply_to(self):
         # Reply-To is handled as a header, rather than API "reply_to" field,
         # to support multiple addresses.
-        self.message.reply_to = ["reply@example.com", "Other <reply2@example.com>"]
+        self.message.reply_to = [
+            "reply@example.com",
+            '"Other, with comma" <reply2@example.com>',
+            "Інше <reply3@example.com>",
+        ]
         self.message.extra_headers = {"X-Other": "Keep"}
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(
             data["headers"],
             {
-                "Reply-To": "reply@example.com, Other <reply2@example.com>",
+                # Reply-To must be properly formatted as an address header:
+                "Reply-To": "reply@example.com,"
+                ' "Other, with comma" <reply2@example.com>,'
+                " =?utf-8?b?0IbQvdGI0LU=?= <reply3@example.com>",
                 "X-Other": "Keep",
             },
         )
