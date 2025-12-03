@@ -245,13 +245,9 @@ class SendGridPayload(RequestsPayload):
     # Payload construction
     #
 
-    @staticmethod
-    def email_object(email):
+    def email_object(self, email):
         """Converts EmailAddress to SendGrid API {email, name} dict"""
-        obj = {"email": email.addr_spec}
-        if email.display_name:
-            obj["name"] = email.display_name
-        return obj
+        return email.as_dict(idna_encode=self.backend.idna_encode)
 
     def set_from_email(self, email):
         self.data["from"] = self.email_object(email)

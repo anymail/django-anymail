@@ -130,13 +130,11 @@ class MailjetPayload(RequestsPayload):
             to_recipients = self.data["Messages"][0].get("To", [])
             self.data["Messages"] = [{"To": [to]} for to in to_recipients]
 
-    @staticmethod
-    def _mailjet_email(email):
+    def _mailjet_email(self, email):
         """Expand an Anymail EmailAddress into Mailjet's {"Email", "Name"} dict"""
-        result = {"Email": email.addr_spec}
-        if email.display_name:
-            result["Name"] = email.display_name
-        return result
+        return email.as_dict(
+            name="Name", email="Email", idna_encode=self.backend.idna_encode
+        )
 
     def set_from_email(self, email):
         self.data["Globals"]["From"] = self._mailjet_email(email)

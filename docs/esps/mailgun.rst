@@ -288,6 +288,17 @@ Limitations and quirks
 
   .. versionadded:: 8.2
 
+**Non-ASCII mailboxes (EAI)**
+  Mailgun partially supports Unicode mailboxes (the *user* part of
+  *user\@domain*---see :ref:`EAI <eai>`). EAI recipient addresses (to, cc, bcc)
+  are delivered correctly, but Mailgun generates invalid header fields that may
+  display as empty or garbled, depending on the email app.
+
+  For an EAI ``from_email``, the invalid :mailheader:`From` header Mailgun
+  generates can prevent delivery and cause confusing bounce messages. To avoid
+  this, Anymail raises an :exc:`~anymail.exceptions.AnymailUnsupportedFeature`
+  error if you attempt to send *from* an EAI address using Mailgun.
+
 .. _Anymail issue #270:
     https://github.com/anymail/django-anymail/issues/270
 .. _undocumented API requirement:

@@ -307,13 +307,17 @@ class PostmarkPayload(RequestsPayload):
     def set_from_email_list(self, emails):
         # Postmark accepts multiple From email addresses
         # (though truncates to just the first, on their end, as of 4/2017)
-        self.data["From"] = ", ".join([email.address for email in emails])
+        self.data["From"] = ", ".join(
+            [email.format(idna_encode=self.backend.idna_encode) for email in emails]
+        )
 
     def set_recipients(self, recipient_type, emails):
         assert recipient_type in ["to", "cc", "bcc"]
         if emails:
             field = recipient_type.capitalize()
-            self.data[field] = ", ".join([email.address for email in emails])
+            self.data[field] = ", ".join(
+                [email.format(idna_encode=self.backend.idna_encode) for email in emails]
+            )
             if recipient_type == "to":
                 self.to_emails = emails
             else:
@@ -324,7 +328,9 @@ class PostmarkPayload(RequestsPayload):
 
     def set_reply_to(self, emails):
         if emails:
-            reply_to = ", ".join([email.address for email in emails])
+            reply_to = ", ".join(
+                [email.format(idna_encode=self.backend.idna_encode) for email in emails]
+            )
             self.data["ReplyTo"] = reply_to
 
     def set_extra_headers(self, headers):

@@ -102,15 +102,18 @@ class MandrillPayload(RequestsPayload):
         }
 
     def set_from_email(self, email):
-        self.data["message"]["from_email"] = email.addr_spec
-        if email.display_name:
-            self.data["message"]["from_name"] = email.display_name
+        self.data["message"].update(
+            email.as_dict(
+                email="from_email",
+                name="from_name",
+                idna_encode=self.backend.idna_encode,
+            )
+        )
 
     def add_recipient(self, recipient_type, email):
         assert recipient_type in ["to", "cc", "bcc"]
-        recipient_data = {"email": email.addr_spec, "type": recipient_type}
-        if email.display_name:
-            recipient_data["name"] = email.display_name
+        recipient_data = email.as_dict(idna_encode=self.backend.idna_encode)
+        recipient_data["type"] = recipient_type
         to_list = self.data["message"].setdefault("to", [])
         to_list.append(recipient_data)
 
@@ -119,7 +122,9 @@ class MandrillPayload(RequestsPayload):
 
     def set_reply_to(self, emails):
         if emails:
-            reply_to = ", ".join([str(email) for email in emails])
+            reply_to = ", ".join(
+                [email.format(idna_encode=self.backend.idna_encode) for email in emails]
+            )
             self.data["message"].setdefault("headers", {})["Reply-To"] = reply_to
 
     def set_extra_headers(self, headers):

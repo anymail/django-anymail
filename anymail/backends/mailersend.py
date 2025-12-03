@@ -213,10 +213,7 @@ class MailerSendPayload(RequestsPayload):
 
     def make_mailersend_email(self, email):
         """Return MailerSend email/name object for an EmailAddress"""
-        obj = {"email": email.addr_spec}
-        if email.display_name:
-            obj["name"] = email.display_name
-        return obj
+        return email.as_dict(idna_encode=self.backend.idna_encode)
 
     def init_payload(self):
         self.data = {}  # becomes json

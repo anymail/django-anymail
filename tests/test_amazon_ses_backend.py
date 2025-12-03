@@ -5,7 +5,6 @@ from email.mime.application import MIMEApplication
 from unittest.mock import ANY, patch
 
 from django.core import mail
-from django.core.mail import BadHeaderError
 from django.test import SimpleTestCase, override_settings, tag
 
 from anymail import __version__ as ANYMAIL_VERSION
@@ -170,41 +169,48 @@ class AmazonSESBackendStandardEmailTests(AmazonSESBackendMockAPITestCase):
         self.assertEqual(
             params["Destination"],
             {
-                "ToAddresses": [
-                    "to1@example.com",
-                    '"Recipient, second" <to2@example.com>',
-                ],
-                "CcAddresses": ["cc1@example.com", "Also cc <cc2@example.com>"],
-                "BccAddresses": ["bcc1@example.com", "BCC 2 <bcc2@example.com>"],
+                "ToAddresses": ["to1@example.com", "to2@example.com"],
+                "CcAddresses": ["cc1@example.com", "cc2@example.com"],
+                "BccAddresses": ["bcc1@example.com", "bcc2@example.com"],
             },
         )
         # Bcc's shouldn't appear in the message itself:
         self.assertNotIn(b"bcc", params["Content"]["Raw"]["Data"])
 
     def test_non_ascii_headers(self):
-        self.message.subject = "Thử tin nhắn"  # utf-8 in subject header
-        self.message.to = ['"Người nhận" <to@example.com>']  # utf-8 in display name
-        self.message.cc = ["cc@thư.example.com"]  # utf-8 in domain
-        self.message.send()
+        # Amazon SES requires a flattened 7-bit message, including rfc2047
+        # encoded-words and IDNA encoding where appropriate.
+        # (SES does not support EAI non-ASCII local-part.)
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to@příklad.example.cz>'],
+            cc=["cc@މިސާލު.example.mv"],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+
         params = self.get_send_params()
         raw_mime = params["Content"]["Raw"]["Data"]
-        # Non-ASCII headers must use MIME encoded-word syntax:
-        self.assertIn(b"\nSubject: =?utf-8?b?VGjhu60gdGluIG5o4bqvbg==?=\n", raw_mime)
-        # Non-ASCII display names as well:
-        self.assertIn(
-            b"\nTo: =?utf-8?b?TmfGsOG7nWkgbmjhuq1u?= <to@example.com>\n", raw_mime
-        )
-        # Non-ASCII address domains must use Punycode:
-        self.assertIn(b"\nCc: cc@xn--th-e0a.example.com\n", raw_mime)
-        # SES doesn't support non-ASCII in the username@ part
-        # (RFC 6531 "SMTPUTF8" extension)
+        self.assertTrue(raw_mime.isascii(), "8bit Content.Raw.Data not allowed")
+        # Non-ASCII headers must use MIME encoded-word syntax.
+        # Python's email generator should handle this correctly, but spot check a few:
+        self.assertIn(b"\nSubject: =?utf-8?b?UMWZZWRtxJt0IGUtbWFpbHU=?=\n", raw_mime)
+        self.assertIn(b"\nFrom: =?utf-8?q?Odes=C3=ADlatel=2C_z_adresy?=", raw_mime)
+        # Non-ASCII address domains must use IDNA
+        # (and it should be IDNA_ENCODER default idna2008):
+        self.assertIn(b"\nCc: cc@xn--qqbii6gdp.example.mv\n", raw_mime)
+        # Body must use a 7-bit encoding, probably quoted-printable
+        self.assertIn(b"\nProst=C3=BD=20text", raw_mime)
 
-        # Destinations must include all recipients (addr-spec only, must use Punycode):
+        # Destinations must include all recipients (addr-spec only, must use IDNA):
         self.assertEqual(
             params["Destination"],
             {
-                "ToAddresses": ["=?utf-8?b?TmfGsOG7nWkgbmjhuq1u?= <to@example.com>"],
-                "CcAddresses": ["cc@xn--th-e0a.example.com"],
+                "ToAddresses": ["to@xn--pklad-zsa96e.example.cz"],
+                "CcAddresses": ["cc@xn--qqbii6gdp.example.mv"],
             },
         )
 
@@ -446,25 +452,25 @@ class AmazonSESBackendStandardEmailTests(AmazonSESBackendMockAPITestCase):
         # Since we build the raw MIME message, we're responsible for preventing header
         # injection. django.core.mail.EmailMessage.message() implements most of that
         # (for the SMTP backend); spot check some likely cases just to be sure...
-        with self.assertRaises(BadHeaderError):
+        with self.assertRaises(ValueError):
             mail.send_mail(
                 "Subject\r\ninjected", "Body", "from@example.com", ["to@example.com"]
             )
-        with self.assertRaises(BadHeaderError):
+        with self.assertRaises(ValueError):
             mail.send_mail(
                 "Subject",
                 "Body",
                 '"Display-Name\nInjected" <from@example.com>',
                 ["to@example.com"],
             )
-        with self.assertRaises(BadHeaderError):
+        with self.assertRaises(ValueError):
             mail.send_mail(
                 "Subject",
                 "Body",
                 "from@example.com",
                 ['"Display-Name\rInjected" <to@example.com>'],
             )
-        with self.assertRaises(BadHeaderError):
+        with self.assertRaises(ValueError):
             mail.EmailMessage(
                 "Subject",
                 "Body",
@@ -497,7 +503,7 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
         raw_mime = params["Content"]["Raw"]["Data"]
         self.assertEqual(
             params["Destination"],
-            {"ToAddresses": ["Envelope <envelope-to@example.com>"]},
+            {"ToAddresses": ["envelope-to@example.com"]},
         )
         self.assertIn(b"\nTo: Spoofed <spoofed-to@elsewhere.example.org>\n", raw_mime)
         self.assertNotIn(b"envelope-to@example.com", raw_mime)

@@ -147,6 +147,47 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
         # Don't use Mandrill's bcc_address "logging" feature for bcc's:
         self.assertNotIn("bcc_address", data["message"])
 
+    def test_non_ascii_headers(self):
+        # Mandrill incorrectly converts non-ASCII display names to rfc2047
+        # encoded-words _inside a quoted_string_. (Pre-encoding before calling
+        # the API gives the same result, so there is no workaround.)
+        # Mandrill correctly handles other non-ASCII headers
+        # (but requires IDNA encoding for non-ASCII domain names).
+        # Mandrill supports EAI in all address fields (with some bugs--see docs).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from-тест@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to-тест@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply-тест@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["message"]["from_email"],
+            "from-тест@xn--pklad-zsa96e.example.cz",
+        )
+        self.assertEqual(data["message"]["from_name"], "Odesílatel, z adresy")
+        self.assertEqual(
+            data["message"]["to"],
+            [
+                {
+                    "name": "Příjemce, na adresu",
+                    "email": "to-тест@xn--pklad-zsa96e.example.cz",
+                    "type": "to",
+                }
+            ],
+        )
+        self.assertEqual(data["message"]["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["message"]["headers"],
+            {
+                "Reply-To": '"Odpověď, adresa" <reply-тест@xn--pklad-zsa96e.example.cz>',
+                "X-Extra": "Další",
+            },
+        )
+
     def test_html_message(self):
         text_content = "This is an important message."
         html_content = "<p>This is an <strong>important</strong> message.</p>"

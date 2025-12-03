@@ -25,6 +25,66 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes*
+
+This release improves handling of non-ASCII characters everywhere email messages
+allow them, based on extensive testing of Unicode handling for all supported
+ESPs. There are several new workarounds for ESP bugs and a handful of new
+errors to help you avoid bugs that don't have workarounds. See
+`International email <https://anymail.dev/en/latest/tips/international_email/#idna>`_
+in the docs for more information.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+* **International domain names:** When sending email to a non-ASCII domain name,
+  use IDNA 2008 with UTS-46 pre-processing rather than obsolete IDNA 2003
+  encoding. This ensures email can be sent to newer domains enabled by IDNA 2008.
+
+  This change should make no difference for virtually all real-world email
+  addresses that worked with earlier Anymail releases. But trying to send to
+  emoji domains or others no longer allowed by IDNA 2008 will now raise an
+  ``AnymailInvalidAddress`` error.
+
+  To restore the old behavior or select a different encoding, use the new
+  ``IDNA_ENCODER`` setting. See
+  `Domains (IDNA) <https://anymail.dev/en/latest/tips/international_email/#idna>`_
+  in the docs.
+
+  As part of this change, Anymail now has a direct dependency on the ``idna``
+  package. (It was already being installed as a sub-dependency of ``requests``.)
+
+* **Brevo:** Raise an error if metadata or custom header values include non-ASCII
+  characters. This avoids a Brevo API bug that sends unencoded 8-bit headers,
+  which can cause bounces or dropped messages.
+
+* **Mailgun:** Raise an error if the ``from_email`` uses EAI (has a non-ASCII
+  local part). This avoids a Mailgun API bug that generates undeliverable
+  messages.
+
+* **Scaleway TEM:** Raise an error if any address field uses EAI (has a non-ASCII
+  local part). This avoids a Scaleway API bug that generates undeliverable messages.
+
+Fixes
+~~~~~
+
+* **Brevo:** Work around a Brevo API bug which loses non-ASCII display names
+  that also contain a comma or certain other punctuation.
+
+Other
+~~~~~
+
+* **Mandrill:** Document a Mandrill API bug that can cause an address with a
+  non-ASCII display name to display incorrectly in some email clients.
+
+* **Unisender Go:** Document a Unisender Go API bug that can cause an Reply-To
+  address (only) with a non-ASCII display name to display incorrectly in some
+  email clients.
+
+
 v13.1
 -----
 

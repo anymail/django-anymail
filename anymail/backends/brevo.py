@@ -2,7 +2,7 @@ from requests.structures import CaseInsensitiveDict
 
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
-from ..utils import BASIC_NUMERIC_TYPES, get_anymail_setting
+from ..utils import BASIC_NUMERIC_TYPES, get_anymail_setting, has_specials
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 
 
@@ -31,6 +31,30 @@ class EmailBackend(AnymailRequestsBackend):
         if not api_url.endswith("/"):
             api_url += "/"
         super().__init__(api_url, **kwargs)
+
+        # Undocumented setting to control workaround for Brevo display-name bug.
+        # If/when Brevo improves their API, you can disable Anymail's workaround
+        # by adding:
+        #   "BREVO_WORKAROUND_DISPLAY_NAME_BUGS": False
+        # to your `ANYMAIL` settings.
+        self.workaround_display_name_bugs = get_anymail_setting(
+            "workaround_display_name_bugs",
+            esp_name=esp_name,
+            kwargs=kwargs,
+            default=True,
+        )
+
+        # Undocumented setting to control workaround for Brevo header encoding
+        # bug. If/when Brevo fixes the problem, you can disable Anymail's error
+        # on non-ASCII headers/metadata by adding:
+        #    "BREVO_PREVENT_HEADER_ENCODING_BUGS": False
+        # to your `ANYMAIL` settings.
+        self.prevent_header_encoding_bugs = get_anymail_setting(
+            "prevent_header_encoding_bugs",
+            esp_name=esp_name,
+            kwargs=kwargs,
+            default=True,
+        )
 
     def build_message_payload(self, message, defaults):
         return BrevoPayload(message, defaults, self)
@@ -111,8 +135,14 @@ class BrevoPayload(RequestsPayload):
                     # and will apply for recipients without version headers.)
                     recipient_metadata = self.metadata.copy()
                     recipient_metadata.update(self.merge_metadata[to_email])
-                    headers["X-Mailin-custom"] = self.serialize_json(recipient_metadata)
+                    mailin_custom = self.serialize_json(recipient_metadata)
+                    # set_metadata() already validated self.metadata,
+                    # so any problem here originates in merge_metadata:
+                    self.prevent_header_encoding_bug("merge_metadata", mailin_custom)
+                    headers["X-Mailin-custom"] = mailin_custom
                 if to_email in self.merge_headers:
+                    for value in self.merge_headers[to_email].values():
+                        self.prevent_header_encoding_bug("merge_headers", value)
                     headers.update(self.merge_headers[to_email])
                 if headers:
                     version["headers"] = headers
@@ -126,14 +156,39 @@ class BrevoPayload(RequestsPayload):
     # Payload construction
     #
 
-    @staticmethod
-    def email_object(email):
-        """Converts EmailAddress to Brevo API array"""
-        email_object = dict()
-        email_object["email"] = email.addr_spec
-        if email.display_name:
-            email_object["name"] = email.display_name
-        return email_object
+    def email_object(self, email):
+        """Converts EmailAddress to Brevo API object with workarounds"""
+        use_rfc2047 = False
+        # In from/to/cc/bcc, Brevo silently drops the "name" field if it
+        # contains both non-ASCII chars and a comma (or other special).
+        # In replyTo, Brevo sends the name as 8-bit (unencoded) utf-8.
+        # (If the name is all ASCII, or is non-ASCII but doesn't have a special,
+        # Brevo encodes and sends it correctly using RFC 2047.)
+        # Workaround by applying RFC 2047 encoding here. This works fine for
+        # from/to/cc/bcc. In replyTo, the result is an encoded-word inside
+        # a quoted-string, but that's better than sending 8-bit header values.
+        if (
+            self.backend.workaround_display_name_bugs
+            and not email.display_name.isascii()
+            and has_specials(email.display_name)
+        ):
+            use_rfc2047 = "force"
+        return email.as_dict(
+            use_rfc2047=use_rfc2047, idna_encode=self.backend.idna_encode
+        )
+
+    def prevent_header_encoding_bug(self, field, value):
+        # Brevo transmits non-ASCII custom headers as raw 8-bit utf-8.
+        # This can cause messages to be rejected or create other delivery
+        # problems. (Anymail can't work around this, because if we apply
+        # RFC 2047 encoding to the value before calling Brevo's API, Brevo
+        # _decodes_ that value and sends it as 8-bit anyway.)
+        if (
+            self.backend.prevent_header_encoding_bugs
+            and isinstance(value, str)
+            and (not value.isascii() or "\\u" in value)
+        ):
+            self.unsupported_feature(f"non-ASCII characters in {field}")
 
     def set_from_email(self, email):
         self.data["sender"] = self.email_object(email)
@@ -158,14 +213,14 @@ class BrevoPayload(RequestsPayload):
             self.data["replyTo"] = self.email_object(emails[0])
 
     def set_extra_headers(self, headers):
-        # Brevo requires header values to be strings (not integers) as of 11/2022.
-        # Stringify ints and floats; anything else is the caller's responsibility.
-        self.data["headers"].update(
-            {
-                k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
-                for k, v in headers.items()
-            }
-        )
+        for field, value in headers.items():
+            # Brevo requires header values to be strings (not integers) as of 11/2022.
+            # Stringify ints and floats; anything else is the caller's responsibility.
+            if isinstance(value, BASIC_NUMERIC_TYPES):
+                value = str(value)
+
+            self.prevent_header_encoding_bug(f"{field!r} header", value)
+            self.data["headers"][field] = value
 
     def set_tags(self, tags):
         if len(tags) > 0:
@@ -209,7 +264,9 @@ class BrevoPayload(RequestsPayload):
 
     def set_metadata(self, metadata):
         # Brevo expects a single string payload
-        self.data["headers"]["X-Mailin-custom"] = self.serialize_json(metadata)
+        mailin_custom = self.serialize_json(metadata)
+        self.prevent_header_encoding_bug("metadata", mailin_custom)
+        self.data["headers"]["X-Mailin-custom"] = mailin_custom
         self.metadata = metadata  # needed in serialize_data for batch send
 
     def set_merge_metadata(self, merge_metadata):

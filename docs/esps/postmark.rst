@@ -149,6 +149,10 @@ see :ref:`unsupported-features`.
   on individual messages. (You can configure custom return paths for each sending domain in
   the Postmark control panel.)
 
+**No non-ASCII mailboxes (EAI)**
+  Postmark does not support sending from or to Unicode mailboxes (the *user* part of
+  *user\@domain*---see :ref:`EAI <eai>`). Trying to use one will cause an API error.
+
 
 .. _postmark-templates:
 

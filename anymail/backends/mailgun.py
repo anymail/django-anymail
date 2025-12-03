@@ -320,8 +320,15 @@ class MailgunPayload(RequestsPayload):
         self.headers = {}
 
     def set_from_email_list(self, emails):
+        # Mailgun generates invalid headers for EAI, which results
+        # in undeliverable messages in the From header.
+        if any(email.uses_eai for email in emails):
+            self.unsupported_feature("EAI in from_email")
+
         # Mailgun supports multiple From email addresses
-        self.data["from"] = [email.address for email in emails]
+        self.data["from"] = [
+            email.format(idna_encode=self.backend.idna_encode) for email in emails
+        ]
         if self.sender_domain is None and len(emails) > 0:
             # try to intuit sender_domain from first from_email
             self.sender_domain = emails[0].domain or None
@@ -329,7 +336,9 @@ class MailgunPayload(RequestsPayload):
     def set_recipients(self, recipient_type, emails):
         assert recipient_type in ["to", "cc", "bcc"]
         if emails:
-            self.data[recipient_type] = [email.address for email in emails]
+            self.data[recipient_type] = [
+                email.format(idna_encode=self.backend.idna_encode) for email in emails
+            ]
             # used for backend.parse_recipient_status:
             self.all_recipients += emails
         if recipient_type == "to":
@@ -341,7 +350,9 @@ class MailgunPayload(RequestsPayload):
 
     def set_reply_to(self, emails):
         if emails:
-            reply_to = ", ".join([str(email) for email in emails])
+            reply_to = ", ".join(
+                [email.format(idna_encode=self.backend.idna_encode) for email in emails]
+            )
             self.data["h:Reply-To"] = reply_to
 
     def set_extra_headers(self, headers):

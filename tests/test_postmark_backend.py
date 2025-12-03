@@ -202,6 +202,31 @@ class PostmarkBackendStandardEmailTests(PostmarkBackendMockAPITestCase):
         # don't lose other headers:
         self.assertEqual(data["Headers"], [{"Name": "X-Other", "Value": "Keep"}])
 
+    def test_non_ascii_headers(self):
+        # Postmark correctly encodes non-ASCII display-names and other headers
+        # (but requires IDNA encoding for non-ASCII domain names).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["From"], '"Odesílatel, z adresy" <from@xn--pklad-zsa96e.example.cz>'
+        )
+        self.assertEqual(
+            data["To"], '"Příjemce, na adresu" <to@xn--pklad-zsa96e.example.cz>'
+        )
+        self.assertEqual(data["Subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["ReplyTo"], '"Odpověď, adresa" <reply@xn--pklad-zsa96e.example.cz>'
+        )
+        self.assertEqual(data["Headers"], [{"Name": "X-Extra", "Value": "Další"}])
+
     def test_attachments(self):
         text_content = "* Item one\n* Item two\n* Item three"
         self.message.attach(

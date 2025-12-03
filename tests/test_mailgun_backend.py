@@ -173,6 +173,41 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
         )
         self.assertEqual(data["h:X-Other"], "Keep")  # don't lose other headers
 
+    def test_non_ascii_headers(self):
+        # Mailgun correctly encodes non-ASCII display-names and other headers.
+        # It even correctly handles non-ASCII domain names (with UTS46),
+        # but Anymail pre-encodes the domains to allow use of the IDNA_ENCODER setting.
+        # Mailgun delivers EAI addresses correctly but generates invalid headers,
+        # so Anymail prevents EAI from_email that blocks delivery (next test).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to-тест@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply-тест@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_data()
+        self.assertEqual(
+            data["from"], ['"Odesílatel, z adresy" <from@xn--pklad-zsa96e.example.cz>']
+        )
+        self.assertEqual(
+            data["to"], ['"Příjemce, na adresu" <to-тест@xn--pklad-zsa96e.example.cz>']
+        )
+        self.assertEqual(data["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["h:Reply-To"],
+            '"Odpověď, adresa" <reply-тест@xn--pklad-zsa96e.example.cz>',
+        )
+        self.assertEqual(data["h:X-Extra"], "Další")
+
+    def test_eai_from_email_unsupported(self):
+        """Mailgun generates an undeliverable From header with EAI."""
+        self.message.from_email = "тест@example.com"
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "EAI in from_email"):
+            self.message.send()
+
     def test_attachments(self):
         text_content = "* Item one\n* Item two\n* Item three"
         self.message.attach(

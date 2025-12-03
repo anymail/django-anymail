@@ -137,6 +137,10 @@ Limitations and quirks
   Messages sent with templates have some additional limitations, such as not
   supporting attachments. See :ref:`amazon-ses-templates` below.
 
+**No non-ASCII mailboxes (EAI)**
+  Amazon SES does not support sending from or to Unicode mailboxes (the *user*
+  part of *user\@domain*---see :ref:`EAI <eai>`). Trying to use one will cause
+  a boto3 error message, "Local address contains control or whitespace."
 
 .. _throttles sending:
    https://docs.aws.amazon.com/ses/latest/DeveloperGuide/manage-sending-limits.html

@@ -174,6 +174,15 @@ Limitations and quirks
   ESPs, bcc recipients in a batch send *won't* receive a separate copy of the
   message personalized for each :attr:`to` email.)
 
+**Non-ASCII Reply-To name may display incorrectly**
+  Unisender Go's API has a bug in handling non-ASCII characters in a display
+  name for ``reply_to`` addresses (but not other address fields). Anymail
+  applies a workaround to ensure the message can be delivered and won't arrive
+  garbled, but this workaround runs into another Unisender Go limitation that
+  can cause the Reply-To name to display as an RFC 2047 encoded-word
+  (``=?utf8?...``) in some email clients. To prevent the problem, avoid
+  using a reply address with non-ASCII characters in the name.
+
 **AMP for Email**
   Unisender Go supports sending AMPHTML email content. To include it, use
   ``message.attach_alternative("...AMPHTML content...", "text/x-amp-html")``
@@ -223,6 +232,10 @@ Limitations and quirks
   Unisender Go does not support overriding a message's
   :attr:`~anymail.message.AnymailMessage.envelope_sender`.
 
+**No non-ASCII mailboxes (EAI)**
+  Unisender Go does not support sending from or to Unicode mailboxes (the *user*
+  part of *user\@domain*---see :ref:`EAI <eai>`). Trying to use one will cause
+  an API error.
 
 .. _unisender-go-templates:
 

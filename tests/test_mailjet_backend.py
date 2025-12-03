@@ -232,6 +232,46 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         # don't lose other headers:
         self.assertEqual(data["Globals"]["Headers"], {"X-Other": "Keep"})
 
+    def test_non_ascii_headers(self):
+        # Mailjet correctly encodes non-ASCII display-names and other headers
+        # (but requires IDNA encoding for non-ASCII domain names).
+        # Mailjet fully supports EAI in all address fields.
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from-тест@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to-тест@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply-тест@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["Globals"]["From"],
+            {
+                "Name": "Odesílatel, z adresy",
+                "Email": "from-тест@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["Messages"][0]["To"],
+            [
+                {
+                    "Name": "Příjemce, na adresu",
+                    "Email": "to-тест@xn--pklad-zsa96e.example.cz",
+                }
+            ],
+        )
+        self.assertEqual(data["Globals"]["Subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["Globals"]["ReplyTo"],
+            {
+                "Name": "Odpověď, adresa",
+                "Email": "reply-тест@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(data["Globals"]["Headers"], {"X-Extra": "Další"})
+
     def test_attachments(self):
         text_content = "* Item one\n* Item two\n* Item three"
         self.message.attach(

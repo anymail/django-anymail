@@ -178,6 +178,10 @@ anyway---see :ref:`unsupported-features`.
   Resend's status webhooks do not identify which recipient applies
   for an event. See the :ref:`note below <resend-tracking-recipient>`.
 
+**No non-ASCII mailboxes (EAI)**
+  Resend does not support sending from or to Unicode mailboxes (the *user* part of
+  *user\@domain*---see :ref:`EAI <eai>`). Trying to use one will cause an API error.
+
 
 .. _resend-api-rate-limits:
 

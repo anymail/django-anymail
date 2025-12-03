@@ -171,13 +171,13 @@ class AnymailConfigurationError(ImproperlyConfigured):
 class AnymailImproperlyInstalled(AnymailConfigurationError, ImportError):
     """Exception for Anymail missing package dependencies"""
 
-    def __init__(self, missing_package, install_extra="<esp>"):
+    def __init__(self, missing_package, install_extra="<esp>", feature="this ESP"):
         # install_extra must be the package "optional extras name" for the ESP
         # (not the backend's esp_name)
         message = (
-            "The %s package is required to use this ESP, but isn't installed.\n"
-            '(Be sure to use `pip install "django-anymail[%s]"` '
-            "with your desired ESP name(s).)" % (missing_package, install_extra)
+            f"The {missing_package} package isn't installed"
+            f" but is needed for {feature}.\n"
+            f'(Be sure to use `pip install "django-anymail[{install_extra}]"`.)'
         )
         super().__init__(message)
 

@@ -1,17 +1,20 @@
 import base64
 import mimetypes
-import re
 from base64 import b64encode
 from collections.abc import Mapping, MutableMapping
 from copy import copy, deepcopy
+from email.charset import Charset
+from email.errors import HeaderParseError, InvalidHeaderDefect
+from email.header import decode_header
+from email.headerregistry import Address
 from email.mime.base import MIMEBase
 from email.utils import formatdate, getaddresses, parsedate_to_datetime, unquote
 from urllib.parse import urlsplit, urlunsplit
 
 from django.conf import settings
-from django.core.mail.message import DEFAULT_ATTACHMENT_MIME_TYPE, sanitize_address
+from django.core.mail.message import DEFAULT_ATTACHMENT_MIME_TYPE
 from django.utils.encoding import force_str
-from django.utils.functional import Promise
+from django.utils.functional import Promise, cached_property
 from requests.structures import CaseInsensitiveDict
 
 from .exceptions import AnymailConfigurationError, AnymailInvalidAddress
@@ -219,26 +222,21 @@ def parse_address_list(address_list, field=None):
     name_email_pairs = getaddresses(address_list_strings)
     if name_email_pairs == [] and address_list_strings == [""]:
         name_email_pairs = [("", "")]  # getaddresses ignores a single empty string
-    parsed = [
-        EmailAddress(display_name=name, addr_spec=email)
-        for (name, email) in name_email_pairs
-    ]
-
-    # Sanity-check, and raise useful errors
-    for address in parsed:
-        if address.username == "" or address.domain == "":
-            # Django SMTP allows username-only emails,
-            # but they're not meaningful with an ESP
-            errmsg = (
-                "Invalid email address '{problem}'" " parsed from '{source}'{where}."
-            ).format(
-                problem=address.addr_spec,
-                source=", ".join(address_list_strings),
-                where=" in `%s`" % field if field else "",
-            )
-            if len(parsed) > len(address_list):
-                errmsg += " (Maybe missing quotes around a display-name?)"
-            raise AnymailInvalidAddress(errmsg)
+    try:
+        parsed = [
+            EmailAddress(display_name=name, addr_spec=email)
+            for (name, email) in name_email_pairs
+        ]
+    except AnymailInvalidAddress as error:
+        # Add context to message.
+        msg = error.args[0]
+        if field:
+            msg += f" in `{field}`"
+        source = ", ".join(address_list_strings)
+        msg += f" parsed from {source!r}"
+        if any("," in value for value in address_list_strings):
+            msg += " (maybe missing quotes around a display-name?)"
+        raise error.__class__(msg, *error.args[1:]) from error
 
     return parsed
 
@@ -265,11 +263,9 @@ def parse_single_address(address, field=None):
         return parsed[0]
 
 
-class EmailAddress:
+class EmailAddress(Address):
     """A sanitized, complete email address with easy access
     to display-name, addr-spec (email), etc.
-
-    Similar to Python 3.6+ email.headerregistry.Address
 
     Instance properties, all read-only:
     :ivar str display_name:
@@ -291,62 +287,137 @@ class EmailAddress:
         (also available as `str(EmailAddress)`)
     """
 
-    def __init__(self, display_name="", addr_spec=None):
-        self._address = None  # lazy formatted address
-        if addr_spec is None:
+    def __init__(self, display_name="", addr_spec=None, *, username="", domain=None):
+        if display_name is None:
+            display_name = ""
+
+        if addr_spec and not addr_spec.isascii():
+            # Work around python/cpython#81074 bug with Address(addr_spec=non_ascii).
             try:
-                display_name, addr_spec = display_name  # unpack (name,addr) tuple
-            except ValueError:
-                pass
+                username, domain = addr_spec.rsplit("@", 1)
+            except ValueError:  # not enough values to unpack
+                # local-part only address. Django supports that, but no Anymail ESP does.
+                raise AnymailInvalidAddress(
+                    f"Invalid email address {addr_spec!r}: missing @domain part"
+                ) from None
+            username = unquote_string(username)
+            addr_spec = None
 
-        # ESPs should clean or reject addresses containing newlines, but some
-        # extra protection can't hurt (and it seems to be a common oversight)
-        if "\n" in display_name or "\r" in display_name:
-            raise ValueError("EmailAddress display_name cannot contain newlines")
-        if "\n" in addr_spec or "\r" in addr_spec:
-            raise ValueError("EmailAddress addr_spec cannot contain newlines")
-
-        self.display_name = display_name
-        self.addr_spec = addr_spec
         try:
-            self.username, self.domain = addr_spec.split("@", 1)
-            # do we need to unquote username?
-        except ValueError:
-            self.username = addr_spec
-            self.domain = ""
+            super().__init__(display_name, username, domain, addr_spec)
+        except (HeaderParseError, IndexError, InvalidHeaderDefect, ValueError) as error:
+            msg = f"Invalid email address {addr_spec!r}"
+            if display_name:
+                msg += f" display_name={display_name!r}"
+            raise AnymailInvalidAddress(msg) from error
 
     def __repr__(self):
-        return "EmailAddress({display_name!r}, {addr_spec!r})".format(
-            display_name=self.display_name, addr_spec=self.addr_spec
-        )
+        return f"{self.__class__.__name__}({self.display_name!r}, {self.addr_spec!r})"
+
+    @cached_property
+    def address(self):
+        """
+        Fully-formatted string address, properly quoted and escaped.
+        Non-ASCII content is rendered as Unicode characters (not encoded).
+
+        :return str:
+        """
+        return self.format()
+
+    def format_display_name(self, *, use_rfc2047=False, use_quotes=False):
+        """
+        Return display_name formatted as specified.
+
+        :param bool | Literal["force"] use_rfc2047:
+            Whether to convert a non-ASCII display-name to an RFC 2047 encoded-word.
+            If "force", converts unconditionally.
+        :param bool | Literal["force"] use_quotes:
+            Whether to enclose display-name containing RFC 5322 special characters
+            in double quotes. If "force", quotes unconditionally.
+        :return str:
+        """
+        if use_rfc2047 == "force" or (use_rfc2047 and not self.display_name.isascii()):
+            return rfc2047_encode(self.display_name)
+        if use_quotes:
+            return quote_string(self.display_name, force=(use_quotes == "force"))
+        return self.display_name
+
+    def format_addr_spec(self, *, idna_encode=None):
+        """
+        Return addr_spec formatted as specified.
+
+        :param Callable[[str], str] | None idna_encode:
+            IDNA encoding function to apply to a non-ASCII domain.
+            If None, non-ASCII domains are left as-is.
+        :return str:
+        """
+        # (Note there is no 7-bit encoding for the username portion.
+        # If that local part isn't ASCII, probably the ESP will complain.)
+        if idna_encode and not self.domain.isascii():
+            return str(Address(username=self.username, domain=idna_encode(self.domain)))
+        return self.addr_spec
+
+    def format(self, *, use_rfc2047=False, idna_encode=None):
+        """
+        Return a fully-formatted email address.
+
+        Parameters control handling of non-ASCII address parts.
+
+        :param bool | Literal["force"] use_rfc2047:
+            Whether to convert a non-ASCII display-name to an RFC 2047 encoded-word.
+            Passing "force" applies rfc2047 unconditionally, even to ASCII-only names.
+        :param Callable[[str], str] | None idna_encode:
+            IDNA encoding function to apply to a non-ASCII domain.
+            If None, non-ASCII domains are left as-is.
+        :return str:
+        """
+        # This is essentially:
+        #     str(Address(display_name=self.format_display_name(...),
+        #                 addr_spec=self.format_addr_spec(...)))
+        # but working around around python/cpython#81074.
+        display_name = self.format_display_name(use_rfc2047=use_rfc2047)
+        username = self.username
+        if idna_encode and not self.domain.isascii():
+            domain = idna_encode(self.domain)
+        else:
+            domain = self.domain
+        return str(Address(display_name=display_name, username=username, domain=domain))
+
+    def as_dict(
+        self,
+        *,
+        name="name",
+        email="email",
+        use_rfc2047=False,
+        quote_name=False,
+        idna_encode=None,
+    ):
+        """
+        Return a dict representing the address, useful for JSON APIs.
+
+        :param str name: name of the display_name field
+        :param str email: name of the addr_spec field
+        :param bool | Literal["force"] use_rfc2047:
+            whether to encode the name field with rfc2047,
+            as in format_display_name()
+        :param bool | Literal["force"] quote_name:
+            whether to wrap the name field as an RFC 5322 quoted-string,
+            as in format_display_name()
+        :param Callable[[str], str] | None idna_encode:
+            IDNA encoding function to apply to a non-ASCII domain.
+            If None, non-ASCII domains are left as-is.
+        :return dict[str,str]:
+        """
+        obj = {email: self.format_addr_spec(idna_encode=idna_encode)}
+        if self.display_name:
+            obj[name] = self.format_display_name(
+                use_rfc2047=use_rfc2047, use_quotes=quote_name
+            )
+        return obj
 
     @property
-    def address(self):
-        if self._address is None:
-            # (you might be tempted to use `encoding=settings.DEFAULT_CHARSET` here,
-            # but that always forces the display-name to quoted-printable/base64,
-            # even when simple ascii would work fine--and be more readable)
-            self._address = self.formataddr()
-        return self._address
-
-    def formataddr(self, encoding=None):
-        """Return a fully-formatted email address, using encoding.
-
-        This is essentially the same as :func:`email.utils.formataddr`
-        on the EmailAddress's name and email properties, but uses
-        Django's :func:`~django.core.mail.message.sanitize_address`
-        for consistent handling of encoding (a.k.a. charset) and
-        proper handling of IDN domain portions.
-
-        :param str|None encoding:
-            the charset to use for the display-name portion;
-            default None uses ascii if possible, else 'utf-8'
-            (quoted-printable utf-8/base64)
-        """
-        sanitized = sanitize_address((self.display_name, self.addr_spec), encoding)
-        # sanitize_address() can introduce FWS with a long, non-ASCII display name.
-        # Must unfold it:
-        return re.sub(r"(\r|\n|\r\n)[ \t]", "", sanitized)
+    def uses_eai(self):
+        return not self.username.isascii()
 
     def __str__(self):
         return self.address
@@ -541,6 +612,56 @@ def querydict_getfirst(qdict, field, default=UNSET):
         return default
     else:
         return qdict[field]  # raise appropriate KeyError
+
+
+def rfc2047_encode(text):
+    """Convert text to an RFC 2047 encoded-word using the utf-8 charset."""
+    # This uses Python's legacy email API, as the modern API does not expose
+    # a standalone RFC 2047 encoding operation.
+    return Charset("utf-8").header_encode(text)
+
+
+def rfc2047_decode(encoded):
+    """Convert an email header that may include RFC 2047 encoded-words to text."""
+    # This uses Python's legacy email API, as the modern API does not expose
+    # a standalone RFC 2047 decoding operation.
+    return "".join(
+        (
+            segment
+            if charset is None and isinstance(segment, str)
+            else segment.decode(charset or "ascii")
+        )
+        for segment, charset in decode_header(encoded)
+    )
+
+
+#: Set of characters that need special handling in a structured (address) header.
+RFC5322_SPECIALS = set('()<>@,:;."[]\\')
+
+
+def has_specials(text):
+    """Return True if text includes any RFC 5322 special characters."""
+    return not set(text).isdisjoint(RFC5322_SPECIALS)
+
+
+def quote_string(name, force=False):
+    """
+    Wrap name as an RFC 5322 quoted-string if necessary (or unconditionally if force).
+    """
+    # Adapted from email._header_value_parser.quote_string().
+    if force or has_specials(name):
+        escaped = str(name).replace("\\", "\\\\").replace('"', r"\"")
+        return f'"{escaped}"'
+    return name
+
+
+def unquote_string(name):
+    """
+    If name is an RFC 5322 quoted-string, return unquoted (and unescaped) value.
+    """
+    if name.startswith('"') and name.endswith('"'):
+        return name[1:-1].replace("\\\\", "\\").replace('\\"', '"')
+    return name
 
 
 def rfc2822date(dt):

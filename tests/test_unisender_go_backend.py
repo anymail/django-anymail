@@ -279,6 +279,50 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
             data["message"]["reply_to_name"], "=?utf-8?q?Reply_=28parens=29?="
         )
 
+    def test_non_ascii_headers(self):
+        # Unisender Go correctly encodes non-ASCII display-names and other headers,
+        # except non-ASCII:
+        # - recipient domains require IDNA encoding (or obsolete IDNA 2003 is used)
+        # - reply-to display-name requires RFC 2047 encoding (or that header is sent
+        #   using unencoded ISO-8859-1) -- but other address headers are OK
+        # - extra headers require RFC 2047 encoding (or are sent using unencoded
+        #   ISO-8859-1)
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["message"]["from_email"], "from@xn--pklad-zsa96e.example.cz"
+        )
+        self.assertEqual(data["message"]["from_name"], "Odesílatel, z adresy")
+        recipients = data["message"]["recipients"]
+        self.assertEqual(len(recipients), 1)
+        self.assertEqual(recipients[0]["email"], "to@xn--pklad-zsa96e.example.cz")
+        self.assertEqual(
+            recipients[0]["substitutions"]["to_name"], "Příjemce, na adresu"
+        )
+        self.assertEqual(data["message"]["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["message"]["reply_to"], "reply@xn--pklad-zsa96e.example.cz"
+        )
+        self.assertEqual(
+            data["message"]["reply_to_name"], "=?utf-8?b?T2Rwb3bEm8SPLCBhZHJlc2E=?="
+        )
+        self.assertEqual(
+            data["message"]["headers"],
+            {
+                "X-Extra": "=?utf-8?b?RGFsxaHDrQ==?=",
+                "to": "=?utf-8?b?UMWZw61qZW1jZSwgbmEgYWRyZXN1?="
+                " <to@xn--pklad-zsa96e.example.cz>",
+            },
+        )
+
     def test_attachments(self):
         text_content = "* Item one\n* Item two\n* Item three"
         self.message.attach(

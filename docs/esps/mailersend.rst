@@ -258,6 +258,9 @@ see :ref:`unsupported-features`.
 .. _rate limit headers:
    https://developers.mailersend.com/general.html#rate-limits
 
+**No non-ASCII mailboxes (EAI)**
+  Mailersend does not support sending from or to Unicode mailboxes (the *user* part
+  of *user\@domain*---see :ref:`EAI <eai>`). Trying to use one will cause an API error.
 
 
 .. _mailersend-templates:

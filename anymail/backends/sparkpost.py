@@ -104,7 +104,9 @@ class SparkPostPayload(RequestsPayload):
                 for email in self.cc_and_bcc:
                     extra = to_recipient.copy()  # gets "metadata" and "substitutions"
                     extra["address"] = {
-                        "email": email.addr_spec,
+                        "email": email.format_addr_spec(
+                            idna_encode=self.backend.idna_encode
+                        ),
                         "header_to": to_recipient["address"]["header_to"],
                     }
                     extra_recipients.append(extra)
@@ -123,7 +125,9 @@ class SparkPostPayload(RequestsPayload):
             self.data["recipients"].extend(
                 {
                     "address": {
-                        "email": email.addr_spec,
+                        "email": email.format_addr_spec(
+                            idna_encode=self.backend.idna_encode
+                        ),
                         "header_to": full_to_header,
                     }
                 }
@@ -168,7 +172,9 @@ class SparkPostPayload(RequestsPayload):
 
     def set_from_email(self, email):
         if email:
-            self.data["content"]["from"] = email.address
+            self.data["content"]["from"] = email.format(
+                idna_encode=self.backend.idna_encode
+            )
 
     def set_to(self, emails):
         if emails:
@@ -176,11 +182,14 @@ class SparkPostPayload(RequestsPayload):
             # and "header_to" is a fully-composed "To" header to display.
             # (We use "header_to" rather than "name" to simplify some logic
             # in _finalize_recipients; the results end up the same.)
+            # (SparkPost handles adding RFC 2047 in the header_to, but not IDNA.)
             self.data["recipients"].extend(
                 {
                     "address": {
-                        "email": email.addr_spec,
-                        "header_to": email.address,
+                        "email": email.format_addr_spec(
+                            idna_encode=self.backend.idna_encode
+                        ),
+                        "header_to": email.format(idna_encode=self.backend.idna_encode),
                     }
                 }
                 for email in emails
@@ -190,8 +199,11 @@ class SparkPostPayload(RequestsPayload):
     def set_cc(self, emails):
         # https://www.sparkpost.com/docs/faq/cc-bcc-with-rest-api/
         if emails:
-            # Add the Cc header, visible to all recipients:
-            cc_header = ", ".join(email.address for email in emails)
+            # Add the Cc header, visible to all recipients.
+            # (SparkPost handles RFC 2047 encoding, but not IDNA.)
+            cc_header = ", ".join(
+                email.format(idna_encode=self.backend.idna_encode) for email in emails
+            )
             self.data["content"].setdefault("headers", {})["Cc"] = cc_header
             # Actual recipients are added later, in _finalize_recipients
             self.cc_and_bcc += emails
@@ -209,7 +221,7 @@ class SparkPostPayload(RequestsPayload):
     def set_reply_to(self, emails):
         if emails:
             self.data["content"]["reply_to"] = ", ".join(
-                email.address for email in emails
+                email.format(idna_encode=self.backend.idna_encode) for email in emails
             )
 
     def set_extra_headers(self, headers):

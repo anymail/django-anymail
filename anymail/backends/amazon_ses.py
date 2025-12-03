@@ -7,7 +7,7 @@ from requests.structures import CaseInsensitiveDict
 from .. import __version__ as ANYMAIL_VERSION
 from ..exceptions import AnymailAPIError, AnymailImproperlyInstalled
 from ..message import AnymailRecipientStatus
-from ..utils import UNSET, get_anymail_setting
+from ..utils import UNSET, get_anymail_setting, parse_address_list
 from .base import AnymailBaseBackend, BasePayload
 
 try:
@@ -153,7 +153,30 @@ class AmazonSESV2SendEmailPayload(AmazonSESBasePayload):
     def init_payload(self):
         super().init_payload()
         self.all_recipients = []  # for parse_recipient_status
-        self.mime_message = self.message.message()
+
+        # Temporarily replace the address fields on self.message with
+        # pre-IDNA-encoded versions, only while we're converting it
+        # to a MIME message. (We don't own self.message, so should not
+        # permanently modify it.)
+        address_fields = {"from_email", "to", "cc", "bcc", "reply_to"}
+        original_values = {
+            field: getattr(self.message, field) for field in address_fields
+        }
+        try:
+            for field in address_fields:
+                addresses = getattr(self.message, field)
+                idna_encoded_addresses = [
+                    address.format(idna_encode=self.backend.idna_encode)
+                    for address in parse_address_list(addresses, field)
+                ]
+                if field == "from_email":
+                    # from_email is a single string; all others are lists
+                    idna_encoded_addresses = ", ".join(idna_encoded_addresses)
+                setattr(self.message, field, idna_encoded_addresses)
+            self.mime_message = self.message.message()
+        finally:
+            for field, original_value in original_values.items():
+                setattr(self.message, field, original_value)
 
     def finalize_payload(self):
         # (The boto3 SES client handles base64 encoding raw_message.)
@@ -232,7 +255,8 @@ class AmazonSESV2SendEmailPayload(AmazonSESBasePayload):
             assert recipient_type in ("to", "cc", "bcc")
             destination_key = f"{recipient_type.capitalize()}Addresses"
             self.params.setdefault("Destination", {})[destination_key] = [
-                email.address for email in emails
+                email.format_addr_spec(idna_encode=self.backend.idna_encode)
+                for email in emails
             ]
 
     def set_subject(self, subject):
@@ -355,18 +379,28 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
         cc_and_bcc_addresses = {}
         if self.recipients["cc"]:
             cc_and_bcc_addresses["CcAddresses"] = [
-                cc.address for cc in self.recipients["cc"]
+                cc.format(use_rfc2047=True, idna_encode=self.backend.idna_encode)
+                for cc in self.recipients["cc"]
             ]
         if self.recipients["bcc"]:
             cc_and_bcc_addresses["BccAddresses"] = [
-                bcc.address for bcc in self.recipients["bcc"]
+                # (display-name is not relevant for bcc recipients)
+                bcc.format_addr_spec(idna_encode=self.backend.idna_encode)
+                for bcc in self.recipients["bcc"]
             ]
 
         # Construct an entry with merge data for each "to" recipient:
         self.params["BulkEmailEntries"] = []
         for to in self.recipients["to"]:
             entry = {
-                "Destination": dict(ToAddresses=[to.address], **cc_and_bcc_addresses),
+                "Destination": dict(
+                    ToAddresses=[
+                        to.format(
+                            use_rfc2047=True, idna_encode=self.backend.idna_encode
+                        )
+                    ],
+                    **cc_and_bcc_addresses,
+                ),
                 "ReplacementEmailContent": {
                     "ReplacementTemplate": {
                         "ReplacementTemplateData": self.serialize_json(
@@ -447,8 +481,9 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
         return dict(zip(to_addrs, anymail_statuses))
 
     def set_from_email(self, email):
-        # this will RFC2047-encode display_name if needed:
-        self.params["FromEmailAddress"] = email.address
+        self.params["FromEmailAddress"] = email.format(
+            use_rfc2047=True, idna_encode=self.backend.idna_encode
+        )
 
     def set_recipients(self, recipient_type, emails):
         # late-bound in finalize_payload
@@ -462,7 +497,10 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
 
     def set_reply_to(self, emails):
         if emails:
-            self.params["ReplyToAddresses"] = [email.address for email in emails]
+            self.params["ReplyToAddresses"] = [
+                email.format(use_rfc2047=True, idna_encode=self.backend.idna_encode)
+                for email in emails
+            ]
 
     def set_extra_headers(self, headers):
         self.headers = headers

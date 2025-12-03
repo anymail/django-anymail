@@ -65,25 +65,33 @@ class PostalPayload(RequestsPayload):
         return self.serialize_json(self.data)
 
     def set_from_email(self, email):
-        self.data["from"] = str(email)
+        self.data["from"] = email.format(idna_encode=self.backend.idna_encode)
 
     def set_subject(self, subject):
         self.data["subject"] = subject
 
     def set_to(self, emails):
-        self.data["to"] = [str(email) for email in emails]
+        self.data["to"] = [
+            email.format(idna_encode=self.backend.idna_encode) for email in emails
+        ]
 
     def set_cc(self, emails):
-        self.data["cc"] = [str(email) for email in emails]
+        self.data["cc"] = [
+            email.format(idna_encode=self.backend.idna_encode) for email in emails
+        ]
 
     def set_bcc(self, emails):
-        self.data["bcc"] = [str(email) for email in emails]
+        self.data["bcc"] = [
+            email.format(idna_encode=self.backend.idna_encode) for email in emails
+        ]
 
     def set_reply_to(self, emails):
         if len(emails) > 1:
             self.unsupported_feature("multiple reply_to addresses")
         if len(emails) > 0:
-            self.data["reply_to"] = str(emails[0])
+            self.data["reply_to"] = emails[0].format(
+                idna_encode=self.backend.idna_encode
+            )
 
     def set_extra_headers(self, headers):
         self.data["headers"] = headers

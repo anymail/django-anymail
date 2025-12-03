@@ -238,6 +238,54 @@ class SparkPostBackendStandardEmailTests(SparkPostBackendMockAPITestCase):
         # don't lose other headers:
         self.assertEqual(data["content"]["headers"], {"X-Other": "Keep"})
 
+    def test_non_ascii_headers(self):
+        # Sparkpost correctly encodes non-ASCII display-names and other headers,
+        # including applying RFC 2047 encoding within constructed address headers.
+        # It can handle _some_ non-ASCII domain names (though not all),
+        # but Anymail applies its own IDNA_ENCODER for consistency.
+        # Sparkpost supports EAI in all address fields (but does not verify smtputf8).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from-тест@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to-тест@příklad.example.cz>'],
+            cc=['"Příjemce, adresa kopie" <cc-тест@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply-тест@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["content"]["from"],
+            '"Odesílatel, z adresy" <from-тест@xn--pklad-zsa96e.example.cz>',
+        )
+        self.assertEqual(
+            data["recipients"][0]["address"],
+            {
+                "email": "to-тест@xn--pklad-zsa96e.example.cz",
+                "header_to": '"Příjemce, na adresu" <to-тест@xn--pklad-zsa96e.example.cz>',
+            },
+        )
+        self.assertEqual(
+            data["recipients"][1]["address"],
+            {
+                "email": "cc-тест@xn--pklad-zsa96e.example.cz",
+                "header_to": '"Příjemce, na adresu" <to-тест@xn--pklad-zsa96e.example.cz>',
+            },
+        )
+        self.assertEqual(data["content"]["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["content"]["reply_to"],
+            '"Odpověď, adresa" <reply-тест@xn--pklad-zsa96e.example.cz>',
+        )
+        self.assertEqual(
+            data["content"]["headers"],
+            {
+                "Cc": '"Příjemce, adresa kopie" <cc-тест@xn--pklad-zsa96e.example.cz>',
+                "X-Extra": "Další",
+            },
+        )
+
     def test_attachments(self):
         text_content = "* Item one\n* Item two\n* Item three"
         self.message.attach(

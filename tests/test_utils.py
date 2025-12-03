@@ -11,6 +11,7 @@ from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy
 
+from anymail._idna import idna2008
 from anymail.exceptions import AnymailInvalidAddress, _LazyError
 from anymail.utils import (
     UNSET,
@@ -23,6 +24,7 @@ from anymail.utils import (
     force_non_lazy_list,
     get_request_basic_auth,
     get_request_uri,
+    has_specials,
     is_lazy,
     last,
     merge_dicts_deep,
@@ -32,6 +34,10 @@ from anymail.utils import (
     parse_rfc2822date,
     parse_single_address,
     querydict_getfirst,
+    quote_string,
+    rfc2047_decode,
+    rfc2047_encode,
+    unquote_string,
     update_deep,
 )
 
@@ -81,7 +87,7 @@ class ParseAddressListTests(SimpleTestCase):
         # formatted display-name automatically shifts
         # to quoted-printable/base64 for non-ascii chars:
         self.assertEqual(
-            parsed.address, "=?utf-8?b?VW5pY29kZSDinaQ=?= <test@example.com>"
+            parsed.address, "Unicode \N{HEAVY BLACK HEART} <test@example.com>"
         )
 
     def test_invalid_display_name(self):
@@ -91,7 +97,7 @@ class ParseAddressListTests(SimpleTestCase):
             parse_address_list(["webmaster"])
 
         with self.assertRaisesMessage(
-            AnymailInvalidAddress, "Maybe missing quotes around a display-name?"
+            AnymailInvalidAddress, "maybe missing quotes around a display-name?"
         ):
             # this parses as multiple email addresses, because of the comma:
             parse_address_list(["Display Name, Inc. <test@example.com>"])
@@ -101,8 +107,8 @@ class ParseAddressListTests(SimpleTestCase):
         self.assertEqual(len(parsed_list), 1)
         parsed = parsed_list[0]
         self.assertEqual(parsed.addr_spec, "idn@\N{ENVELOPE}.example.com")
-        # punycode-encoded domain:
-        self.assertEqual(parsed.address, "idn@xn--4bi.example.com")
+        # No attempt to apply IDNA to domain (leave that to the backend):
+        self.assertEqual(parsed.address, "idn@\N{ENVELOPE}.example.com")
         self.assertEqual(parsed.username, "idn")
         self.assertEqual(parsed.domain, "\N{ENVELOPE}.example.com")
 
@@ -120,16 +126,17 @@ class ParseAddressListTests(SimpleTestCase):
             parse_address_list([" "])
 
     def test_invalid_address(self):
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["localonly"])
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["localonly@"])
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["@domainonly"])
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["<localonly@>"])
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["<@domainonly>"])
+        invalid_addresses = [
+            "localonly",
+            "localonly@",
+            "@domainonly",
+            "<localonly@>",
+            "<@domainonly>",
+        ]
+        for address in invalid_addresses:
+            with self.subTest(address=address):
+                with self.assertRaises(AnymailInvalidAddress):
+                    parse_address_list([address])
 
     def test_email_list(self):
         parsed_list = parse_address_list(["first@example.com", "second@example.com"])
@@ -190,9 +197,11 @@ class ParseAddressListTests(SimpleTestCase):
         with self.assertRaisesMessage(AnymailInvalidAddress, "Invalid email address"):
             parse_single_address(" ")
 
+
+class EmailAddressTests(SimpleTestCase):
+    """Test utils.EmailAddress"""
+
     def test_no_newlines(self):
-        # (Parsing shouldn't even be able to even generate these cases,
-        # but in case anyone constructs an EmailAddress directly...)
         for name, addr in [
             ("Potential\nInjection", "addr@example.com"),
             ("Potential\rInjection", "addr@example.com"),
@@ -200,14 +209,367 @@ class ParseAddressListTests(SimpleTestCase):
             ("Name", "potential\rinjection@example.com"),
         ]:
             with self.subTest(name=name, addr=addr):
-                with self.assertRaisesMessage(ValueError, "cannot contain newlines"):
+                with self.assertRaisesMessage(
+                    AnymailInvalidAddress, "cannot contain CR or LF"
+                ):
                     _ = EmailAddress(name, addr)
 
-    def test_email_address_repr(self):
+    def test_repr(self):
         self.assertEqual(
             "EmailAddress('Name', 'addr@example.com')",
             repr(EmailAddress("Name", "addr@example.com")),
         )
+
+    def test_address_property(self):
+        cases = [
+            # display_name, addr_spec, expected
+            ("John Smith", "john@example.com", "John Smith <john@example.com>"),
+            ("Smith, John", "john@example.com", '"Smith, John" <john@example.com>'),
+            ("Juan Lopéz", "juan@example.com", "Juan Lopéz <juan@example.com>"),
+            (None, "juan@éxample.com", "juan@éxample.com"),
+            ("Juan Lopéz", "juan@éxample.com", "Juan Lopéz <juan@éxample.com>"),
+            (None, "maría@example.com", "maría@example.com"),
+            ("María Lopéz", "maría@éxample.com", "María Lopéz <maría@éxample.com>"),
+        ]
+        for display_name, addr_spec, expected in cases:
+            with self.subTest(display_name=display_name, addr_spec=addr_spec):
+                email = EmailAddress(display_name, addr_spec)
+                self.assertEqual(email.address, expected)
+
+    def test_format_display_name(self):
+        cases = [
+            # display_name, format_display_name() kwargs, expected
+            ("John Smith", {}, "John Smith"),
+            ("Smith, John", {}, "Smith, John"),
+            # use_quotes
+            ("Smith, John", {"use_quotes": True}, '"Smith, John"'),
+            ("John Smith", {"use_quotes": True}, "John Smith"),
+            ("John Smith", {"use_quotes": "force"}, '"John Smith"'),
+            # use_rfc2047
+            ("Juan Lopéz", {}, "Juan Lopéz"),
+            ("Juan Lopéz", {"use_rfc2047": True}, "=?utf-8?q?Juan_Lop=C3=A9z?="),
+            ("John Smith", {"use_rfc2047": True}, "John Smith"),
+            ("John Smith", {"use_rfc2047": "force"}, "=?utf-8?q?John_Smith?="),
+            # rfc2047 is never quoted
+            (
+                "Juan Lopéz",
+                {"use_rfc2047": True, "use_quotes": True},
+                "=?utf-8?q?Juan_Lop=C3=A9z?=",
+            ),
+            (
+                "Lopéz, Juan Carlo",
+                {"use_rfc2047": True, "use_quotes": True},
+                "=?utf-8?q?Lop=C3=A9z=2C_Juan_Carlo?=",
+            ),
+            (
+                "Juan Lopéz",
+                {"use_rfc2047": True, "use_quotes": "force"},
+                "=?utf-8?q?Juan_Lop=C3=A9z?=",
+            ),
+            (
+                "John Smith",
+                {"use_rfc2047": "force", "use_quotes": "force"},
+                "=?utf-8?q?John_Smith?=",
+            ),
+            # Corner cases
+            ("", {}, ""),
+            ("", {"use_quotes": "force"}, '""'),
+        ]
+        for display_name, args, expected in cases:
+            with self.subTest(display_name=display_name, args=args):
+                email = EmailAddress(display_name, "user@example.com")
+                result = email.format_display_name(**args)
+                self.assertEqual(result, expected)
+
+    def test_format_addr_spec(self):
+        cases = [
+            # addr_spec, format_addr_spec() kwargs, expected
+            ("user@example.com", {}, "user@example.com"),
+            ("user@exämple.com", {}, "user@exämple.com"),
+            ("user@example.com", {"idna_encode": idna2008}, "user@example.com"),
+            (
+                "user@exämple.com",
+                {"idna_encode": idna2008},
+                "user@xn--exmple-cua.com",
+            ),
+            ("user+tag@example.com", {}, "user+tag@example.com"),
+            ('"user@example.net"@example.com', {}, '"user@example.net"@example.com'),
+            ("üser@exämple.com", {}, "üser@exämple.com"),
+            (
+                "üser@exämple.com",
+                {"idna_encode": idna2008},
+                "üser@xn--exmple-cua.com",
+            ),
+        ]
+        for addr_spec, args, expected in cases:
+            with self.subTest(addr_spec=addr_spec, args=args):
+                email = EmailAddress(addr_spec=addr_spec)
+                result = email.format_addr_spec(**args)
+                self.assertEqual(result, expected)
+
+    def test_format(self):
+        cases = [
+            # email, format() kwargs, expected
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {},
+                "John Smith <john@example.com>",
+            ),
+            (
+                EmailAddress("Smith, John", "john@example.com"),
+                {},
+                '"Smith, John" <john@example.com>',
+            ),
+            (
+                EmailAddress("", "john@example.com"),
+                {},
+                "john@example.com",
+            ),
+            (
+                EmailAddress("Juan Lopéz", "juan@example.com"),
+                {},
+                "Juan Lopéz <juan@example.com>",
+            ),
+            (
+                EmailAddress("Lopéz, Juan", "juan@example.com"),
+                {},
+                '"Lopéz, Juan" <juan@example.com>',
+            ),
+            (
+                EmailAddress("", "user@exämple.com"),
+                {},
+                "user@exämple.com",
+            ),
+            # RFC 2047
+            (
+                EmailAddress("Juan Lopéz", "juan@example.com"),
+                {"use_rfc2047": True},
+                "=?utf-8?q?Juan_Lop=C3=A9z?= <juan@example.com>",
+            ),
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {"use_rfc2047": True},
+                "John Smith <john@example.com>",
+            ),
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {"use_rfc2047": "force"},
+                "=?utf-8?q?John_Smith?= <john@example.com>",
+            ),
+            # IDNA
+            (
+                EmailAddress("", "user@exämple.com"),
+                {"idna_encode": idna2008},
+                "user@xn--exmple-cua.com",
+            ),
+            (
+                EmailAddress("", "user@example.com"),
+                {"idna_encode": idna2008},
+                "user@example.com",
+            ),
+            (
+                EmailAddress("John Smith", "user@exämple.com"),
+                {"idna_encode": idna2008},
+                "John Smith <user@xn--exmple-cua.com>",
+            ),
+            # Combinations
+            (
+                EmailAddress("Juan Lopéz", "user@exämple.com"),
+                {"use_rfc2047": True, "idna_encode": idna2008},
+                "=?utf-8?q?Juan_Lop=C3=A9z?= <user@xn--exmple-cua.com>",
+            ),
+        ]
+
+        for email, args, expected in cases:
+            with self.subTest(email=email, args=args):
+                self.assertEqual(email.format(**args), expected)
+
+    def test_as_dict(self):
+        cases = [
+            # email, kwargs, expected
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {},
+                {"name": "John Smith", "email": "john@example.com"},
+            ),
+            (
+                EmailAddress(None, "john@example.com"),
+                {},
+                {"email": "john@example.com"},
+            ),
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {"name": "Name", "email": "Address"},
+                {"Name": "John Smith", "Address": "john@example.com"},
+            ),
+            (
+                EmailAddress("Smith, John", "john@example.com"),
+                {"quote_name": True},
+                {"name": '"Smith, John"', "email": "john@example.com"},
+            ),
+            (
+                EmailAddress("Juan Lopéz", "juan@éxample.com"),
+                {"idna_encode": idna2008},
+                {"name": "Juan Lopéz", "email": "juan@xn--xample-9ua.com"},
+            ),
+            (
+                EmailAddress("Juan Lopéz", "juan@example.com"),
+                {"use_rfc2047": True},
+                {"name": "=?utf-8?q?Juan_Lop=C3=A9z?=", "email": "juan@example.com"},
+            ),
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {"use_rfc2047": "force"},
+                {"name": "=?utf-8?q?John_Smith?=", "email": "john@example.com"},
+            ),
+            (
+                EmailAddress("John Smith", "john@exämple.com"),
+                {"quote_name": "force", "idna_encode": idna2008},
+                {"name": '"John Smith"', "email": "john@xn--exmple-cua.com"},
+            ),
+        ]
+        for email, kwargs, expected in cases:
+            with self.subTest(email=email, args=kwargs):
+                result = email.as_dict(**kwargs)
+                self.assertEqual(result, expected)
+
+    def test_long_unicode(self):
+        # (Earlier implementations using Django's sanitize_address could incorrectly
+        # introduce folding in the formatted address.)
+        display_name = (
+            "* * * 💲 Snag Your Free Gift! Click Here:"
+            " https://spam.example.com/uploads/spammy.php?spammy 💲 * * * 8v1e8k"
+        )
+        address = EmailAddress(display_name, "addr@example.com")
+        self.assertNotIn("\n", str(address))
+
+    def test_uses_eai(self):
+        cases = [
+            (EmailAddress(addr_spec="j.lópez@example.com"), True),
+            (EmailAddress(addr_spec="j.lopez@example.com"), False),
+            (EmailAddress(addr_spec="john@exämple.com"), False),
+            (EmailAddress(display_name="Jörg", addr_spec="jorg@example.com"), False),
+            (EmailAddress(display_name="Jörg", addr_spec="jörg@example.com"), True),
+        ]
+        for email, expected in cases:
+            with self.subTest(email=email):
+                self.assertIs(email.uses_eai, expected)
+
+
+class RFC2047Tests(SimpleTestCase):
+    cases = [
+        # text, encoded
+        ("ascii text", "=?utf-8?q?ascii_text?="),
+        ("Café", "=?utf-8?b?Q2Fmw6k=?="),
+        ("Café Florence", "=?utf-8?q?Caf=C3=A9_Florence?="),
+        ("こんにちは", "=?utf-8?b?44GT44KT44Gr44Gh44Gv?="),
+        ("Hello, World!", "=?utf-8?q?Hello=2C_World!?="),
+        ("", ""),
+    ]
+
+    decode_only_cases = [
+        # Cases where `encoded` is a valid representation of `text`,
+        # but not the one used by rfc2047_encode().
+        # text, encoded
+        ("Café Florence", "=?utf-8?q?Caf=C3=A9?= Florence"),
+        ("Café Florence", "=?utf-8?q?Caf=C3=A9?= =?utf-8?q?_Florence?="),
+        ("Café Florence", "Café Florence"),
+        (
+            "Café Café Café",
+            "=?utf-8?q?Caf=C3=A9_?= =?iso-8859-1?q?Caf=E9_?= =?utf-8?b?Q2Fmw6k=?=",
+        ),
+    ]
+
+    def test_rfc2047_encode(self):
+        for text, expected in self.cases:
+            with self.subTest(text=text):
+                result = rfc2047_encode(text)
+                self.assertEqual(result, expected)
+
+    def test_rfc2047_decode(self):
+        for text, encoded in self.cases + self.decode_only_cases:
+            with self.subTest(encoded=encoded):
+                result = rfc2047_decode(encoded)
+                self.assertEqual(result, text)
+
+
+class TestQuoting(SimpleTestCase):
+    def test_has_specials(self):
+        cases = [
+            # (value, expected)
+            ("", False),
+            ("Abc's åßç & $%=*+_^#! \t", False),
+            ("1, 2", True),
+            ("<3", True),
+            (">", True),
+            ("foo@bar@baz", True),
+            ("(Remark", True),
+            (")", True),
+            ('"dquote"', True),
+            ("back\\slash", True),
+            (";", True),
+            (".", True),
+            (":", True),
+            ("[bracket", True),
+            ("]", True),
+        ]
+        for value, expected in cases:
+            with self.subTest(value=value):
+                result = has_specials(value)
+                self.assertIs(result, expected)
+
+    def test_quote_display_name(self):
+        cases = [
+            # name, expected
+            ("John Doe", "John Doe"),
+            ("John, Doe", '"John, Doe"'),
+            ("Juan Lopéz", "Juan Lopéz"),
+            ("Lopéz, Juan", '"Lopéz, Juan"'),
+            ('Name "Namey"', r'"Name \"Namey\""'),
+            (r"John\Doe", r'"John\\Doe"'),
+            (r'"John\"Doe', r'"\"John\\\"Doe"'),
+            ("Name <Namey>", '"Name <Namey>"'),
+            ("Name@Email", '"Name@Email"'),
+            ("Name: Details;", '"Name: Details;"'),
+            ("(Remark)", '"(Remark)"'),
+        ]
+        for name, expected in cases:
+            with self.subTest(name=name):
+                result = quote_string(name)
+                self.assertEqual(result, expected)
+
+    def test_quote_display_name_force(self):
+        cases = [
+            # name, expected (with force=True)
+            ("John Doe", '"John Doe"'),
+            ("Juan Lopéz", '"Juan Lopéz"'),
+            ('John "Doe"', r'"John \"Doe\""'),
+        ]
+        for name, expected in cases:
+            with self.subTest(name=name):
+                result = quote_string(name, force=True)
+                self.assertEqual(result, expected)
+
+    def test_unquote_string(self):
+        cases = [
+            # quoted, expected
+            ('"John Doe"', "John Doe"),
+            ("John Doe", "John Doe"),
+            (
+                r'"inline \"quotes\" and \\backslashes"',
+                r'inline "quotes" and \backslashes',
+            ),
+            # Doesn't touch angle brackets (unlike email.utils.unquote)
+            ('"<foo@bar>"', "<foo@bar>"),
+            ("<foo@bar>", "<foo@bar>"),
+            # Corner cases
+            ('"', ""),
+            ("", ""),
+        ]
+        for quoted, expected in cases:
+            with self.subTest(quoted=quoted):
+                result = unquote_string(quoted)
+                self.assertEqual(result, expected)
 
 
 class NormalizedAttachmentTests(SimpleTestCase):

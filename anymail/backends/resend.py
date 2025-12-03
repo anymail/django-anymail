@@ -130,13 +130,15 @@ class ResendPayload(RequestsPayload):
         self.data = {}  # becomes json
 
     def set_from_email(self, email):
-        self.data["from"] = email.address
+        self.data["from"] = email.format(idna_encode=self.backend.idna_encode)
 
     def set_recipients(self, recipient_type, emails):
         assert recipient_type in ["to", "cc", "bcc"]
         if emails:
             field = recipient_type
-            self.data[field] = [email.address for email in emails]
+            self.data[field] = [
+                email.format(idna_encode=self.backend.idna_encode) for email in emails
+            ]
             self.recipients += emails
             if recipient_type == "to":
                 self.to_recipients = emails
@@ -146,7 +148,9 @@ class ResendPayload(RequestsPayload):
 
     def set_reply_to(self, emails):
         if emails:
-            self.data["reply_to"] = [email.address for email in emails]
+            self.data["reply_to"] = [
+                email.format(idna_encode=self.backend.idna_encode) for email in emails
+            ]
 
     def set_extra_headers(self, headers):
         # Resend requires header values to be strings (not integers) as of 2023-10-20.

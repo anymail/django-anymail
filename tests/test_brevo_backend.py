@@ -192,6 +192,13 @@ class BrevoBackendStandardEmailTests(BrevoBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailSerializationError, "Decimal"):
             self.message.send()
 
+    def test_extra_headers_non_ascii(self):
+        self.message.extra_headers = {"X-Extra": "Další"}
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "non-ASCII characters in 'X-Extra' header"
+        ):
+            self.message.send()
+
     def test_reply_to(self):
         self.message.reply_to = ['"Reply recipient" <reply@example.com']
         self.message.send()
@@ -220,6 +227,85 @@ class BrevoBackendStandardEmailTests(BrevoBackendMockAPITestCase):
         data = self.get_api_call_json()
         self.assertEqual(
             data["replyTo"], {"name": "Reply recipient", "email": "reply@example.com"}
+        )
+
+    def test_non_ascii_headers(self):
+        # Brevo correctly encodes non-ASCII display-names -- unless they contain commas
+        # (see next test). It requires IDNA encoding for non-ASCII domain names.
+        # It correctly encodes non-ASCII subjects, but sends raw utf-8 for other headers.
+        # Brevo supports EAI in all address fields (with some bugs--see docs).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel z adresy" <from-тест@příklad.example.cz>',
+            to=['"Příjemce na adresu" <to-тест@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď adresa" <reply-тест@příklad.example.cz>'],  # no comma
+            # headers={"X-Extra": "Další"},  # not supported
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["sender"],
+            {
+                "name": "Odesílatel z adresy",
+                "email": "from-тест@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["to"],
+            [
+                {
+                    "name": "Příjemce na adresu",
+                    "email": "to-тест@xn--pklad-zsa96e.example.cz",
+                }
+            ],
+        )
+        self.assertEqual(data["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["replyTo"],
+            {
+                "name": "Odpověď adresa",
+                "email": "reply-тест@xn--pklad-zsa96e.example.cz",
+            },
+        )
+
+    def test_non_ascii_display_names_with_commas(self):
+        # Workaround Brevo bug that drops non-ASCII display-names with special chars
+        # by using rfc2047 encoded-words. (But don't use this in Reply-To, where Brevo
+        # incorrectly puts the encoded-word inside a quoted-string.)
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to@příklad.example.cz>'],
+            reply_to=['"Odpověď, adresa" <reply@příklad.example.cz>'],
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["sender"],
+            {
+                "name": "=?utf-8?q?Odes=C3=ADlatel=2C_z_adresy?=",
+                "email": "from@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["to"],
+            [
+                {
+                    "name": "=?utf-8?b?UMWZw61qZW1jZSwgbmEgYWRyZXN1?=",
+                    "email": "to@xn--pklad-zsa96e.example.cz",
+                }
+            ],
+        )
+        # Brevo transmits this as a raw utf8 header, which can cause problems.
+        # Using an rfc2047 encoded-word here prevents that, but gets wrapped
+        # in a quoted-string (unlike other address headers). That's the lesser
+        # of two bugs.
+        self.assertEqual(
+            data["replyTo"],
+            {
+                "name": "=?utf-8?b?T2Rwb3bEm8SPLCBhZHJlc2E=?=",
+                "email": "reply@xn--pklad-zsa96e.example.cz",
+            },
         )
 
     def test_attachments(self):
@@ -390,6 +476,13 @@ class BrevoBackendAnymailFeatureTests(BrevoBackendMockAPITestCase):
         self.assertEqual(metadata["user_id"], "12345")
         self.assertEqual(metadata["items"], 6)
         self.assertEqual(metadata["float"], 98.6)
+
+    def test_metadata_non_ascii(self):
+        self.message.metadata = {"user_id": "Další"}
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "non-ASCII characters in metadata"
+        ):
+            self.message.send()
 
     def test_send_at(self):
         utc_plus_6 = get_fixed_timezone(6 * 60)
@@ -568,6 +661,18 @@ class BrevoBackendAnymailFeatureTests(BrevoBackendMockAPITestCase):
             {"notification_batch": "zx912"},
         )
 
+    def test_merge_metadata_non_ascii(self):
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.metadata = {"base": "ascii"}
+        self.message.merge_metadata = {
+            "alice@example.com": {"merge": "ascii"},
+            "bob@example.com": {"merge": "nøn-åscii"},
+        }
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "non-ASCII characters in merge_metadata"
+        ):
+            self.message.send()
+
     def test_merge_headers(self):
         self.set_mock_response(json_data=self._mock_batch_response)
         self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
@@ -604,6 +709,18 @@ class BrevoBackendAnymailFeatureTests(BrevoBackendMockAPITestCase):
                 "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
             },
         )
+
+    def test_merge_headers_non_ascii(self):
+        self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
+        self.message.extra_headers = {"X-Base": "ASCII"}
+        self.message.merge_headers = {
+            "alice@example.com": {"X-Merge": "ASCII"},
+            "bob@example.com": {"X-Merge": "nøn-åscii"},
+        }
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "non-ASCII characters in merge_headers"
+        ):
+            self.message.send()
 
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
