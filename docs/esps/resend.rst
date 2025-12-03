@@ -117,32 +117,6 @@ error when you try to send a message using features that Resend doesn't support.
 You can tell Anymail to suppress these errors and send the messages
 anyway---see :ref:`unsupported-features`.
 
-**Restricted characters in ``from_email`` display names**
-  Resend's API does not accept many email address display names
-  (a.k.a. "friendly names" or "real names") formatted according
-  to the relevant standard (:rfc:`5322`). Anymail implements a
-  workaround for the ``to``, ``cc``, ``bcc`` and ``reply_to``
-  fields, but Resend rejects attempts to use this workaround
-  for ``from_email`` display names.
-
-  These characters will cause problems in a *From* address display name:
-
-      * Double quotes (``"``) and some other punctuation characters
-        can cause a "Resend API response 422" error complaining of an
-        "Invalid \`from\` field", or can result in a garbled *From* name
-        (missing segments, additional punctuation inserted) in the
-        resulting message.
-      * A question mark immediately followed by any alphabetic character
-        (e.g., ``?u``) will cause a "Resend API response 451" security error
-        complaining that "The email payload contain invalid characters".
-        (This behavior prevents use of standard :rfc:`2047` encoded words
-        in *From* display names---which is the workaround Anymail implements
-        for other address fields.)
-
-  There may be other character combinations that also cause problems.
-  If you need to include punctuation in a *From* display name, be sure
-  to verify the results. (The issues were reported to Resend in October, 2023.)
-
 **Attachment filename determines content type**
   Resend determines the content type of an attachment from its filename extension.
 
