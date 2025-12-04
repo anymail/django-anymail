@@ -203,7 +203,6 @@ class MailtrapBackendSandboxIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(anymail_status.status, {sent_status})
         self.assertEqual(anymail_status.message_id, message_id)
 
-    @unittest.skip("Batch with two recipients exceeds rate limit on free plan")
     def test_all_options(self):
         message = AnymailMessage(
             subject="Anymail Mailtrap all-options integration test",
@@ -259,7 +258,6 @@ class MailtrapBackendSandboxIntegrationTests(AnymailTestMixin, SimpleTestCase):
             message.anymail_status.recipients["test+to2@anymail.dev"].message_id,
         )
 
-    @unittest.skip("Batch with two recipients exceeds rate limit on free plan")
     @unittest.skipUnless(
         ANYMAIL_TEST_MAILTRAP_TEMPLATE_UUID,
         "Set ANYMAIL_TEST_MAILTRAP_TEMPLATE_UUID to test Mailtrap stored templates",
