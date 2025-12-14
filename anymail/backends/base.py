@@ -1,7 +1,6 @@
 import json
 from datetime import date, datetime, timezone
 
-from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
 from django.utils.module_loading import import_string
 from django.utils.timezone import get_current_timezone, is_naive, make_aware
@@ -477,11 +476,8 @@ class BasePayload:
         ]
 
     def prepped_attachments(self, attachments):
-        str_encoding = self.message.encoding or settings.DEFAULT_CHARSET
-        return [
-            Attachment(attachment, str_encoding)  # (handles lazy content, filename)
-            for attachment in attachments
-        ]
+        # (handles lazy content, filename, charset)
+        return [Attachment(attachment) for attachment in attachments]
 
     def aware_datetime(self, value):
         """Converts a date or datetime or timestamp to an aware datetime.

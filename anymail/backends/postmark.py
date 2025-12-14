@@ -353,7 +353,7 @@ class PostmarkPayload(RequestsPayload):
         att = {
             "Name": attachment.name or "",
             "Content": attachment.b64content,
-            "ContentType": attachment.mimetype,
+            "ContentType": attachment.content_type,
         }
         if attachment.inline:
             att["ContentID"] = "cid:%s" % attachment.cid

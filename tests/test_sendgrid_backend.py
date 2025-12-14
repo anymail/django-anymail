@@ -1,9 +1,6 @@
-from base64 import b64decode, b64encode
 from calendar import timegm
 from datetime import date, datetime
 from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 from unittest.mock import patch
 
 from django.core import mail
@@ -21,17 +18,17 @@ from anymail.exceptions import (
     AnymailUnsupportedFeature,
     AnymailWarning,
 )
-from anymail.message import attach_inline_image_file
+from anymail.message import attach_inline_image
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
 from .utils import (
-    SAMPLE_IMAGE_FILENAME,
     AnymailTestMixin,
+    create_text_attachment,
+    decode_att,
     sample_image_content,
-    sample_image_path,
 )
 
 
@@ -313,119 +310,44 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         self.assertEqual(data["headers"], {"X-Extra": "Další"})
 
     def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
+        # SendGrid does not have a way to specify charset for text attachments
+        # (it strips any charset included in the `type` API field). It either
+        # doesn't include charset in the Content-Type or incorrectly adds
+        # `charset=iso-8859-1` under unknown conditions (issue #150).
+        # Just force utf-8 and hope for the best.
+        # SendGrid accepts non-ASCII filenames and incorrectly sends them as
+        # 8-bit utf-8. The filename param is required but can be empty.
+        text_content = "pièce jointe\n"
         self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
         )
-
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
-
-        # Should work with a MIMEBase object (also tests no filename)...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf data"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        self.message.attach(mimeattachment)
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
 
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(len(data["attachments"]), 3)
-
         attachments = data["attachments"]
+        self.assertEqual(len(attachments), 3)
+
+        # Use utf-8 encoding for text, regardless of original charset.
+        self.assertEqual(attachments[0]["type"], 'text/plain; charset="utf-8"')
+        self.assertEqual(attachments[0]["filename"], "")  # no filename
         self.assertEqual(
-            attachments[0],
-            {
-                "filename": "test.txt",
-                "content": b64encode(text_content.encode("utf-8")).decode("ascii"),
-                "type": "text/plain",
-            },
+            decode_att(attachments[0]["content"]).decode("utf-8"), text_content
         )
-        self.assertEqual(
-            attachments[1],
-            {
-                "filename": "test.png",
-                "content": b64encode(png_content).decode("ascii"),
-                "type": "image/png",  # (type inferred from filename)
-            },
-        )
-        self.assertEqual(
-            attachments[2],
-            {
-                "filename": "",  # no filename -- but param is required
-                "content": b64encode(pdf_content).decode("ascii"),
-                "type": "application/pdf",
-            },
-        )
+        self.assertNotIn("disposition", attachments[0])
 
-    def test_unicode_attachment_correctly_decoded(self):
-        self.message.attach(
-            "Une pièce jointe.html", "<p>\u2019</p>", mimetype="text/html"
-        )
-        self.message.send()
-        attachment = self.get_api_call_json()["attachments"][0]
-        self.assertEqual(attachment["filename"], "Une pièce jointe.html")
-        self.assertEqual(
-            b64decode(attachment["content"]).decode("utf-8"), "<p>\u2019</p>"
-        )
+        self.assertEqual(attachments[1]["type"], "image/x-emoticon")
+        self.assertEqual(attachments[1]["filename"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["content"]), b";-)")
+        self.assertNotIn("disposition", attachments[1])
 
-    def test_embedded_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        self.message.send()
-        data = self.get_api_call_json()
-
-        self.assertEqual(
-            data["attachments"][0],
-            {
-                "filename": image_filename,
-                "content": b64encode(image_data).decode("ascii"),
-                "type": "image/png",  # (type inferred from filename)
-                "disposition": "inline",
-                "content_id": cid,
-            },
-        )
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly
-        image = MIMEImage(image_data)
-        self.message.attach(image)
-
-        self.message.send()
-
-        image_data_b64 = b64encode(image_data).decode("ascii")
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["attachments"][0],
-            {
-                "filename": image_filename,  # the named one
-                "content": image_data_b64,
-                "type": "image/png",
-            },
-        )
-        self.assertEqual(
-            data["attachments"][1],
-            {
-                "filename": "",  # the unnamed one
-                "content": image_data_b64,
-                "type": "image/png",
-            },
-        )
+        self.assertEqual(attachments[2]["type"], "image/png")  # from filename
+        self.assertEqual(attachments[2]["filename"], "test.png")
+        self.assertEqual(attachments[2]["disposition"], "inline")
+        self.assertEqual(attachments[2]["content_id"], cid)
+        self.assertEqual(decode_att(attachments[2]["content"]), image_data)
 
     def test_multiple_html_alternatives(self):
         # SendGrid's v3 API allows all kinds of content alternatives.

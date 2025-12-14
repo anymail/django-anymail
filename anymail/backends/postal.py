@@ -109,7 +109,7 @@ class PostalPayload(RequestsPayload):
         att = {
             "name": attachment.name or "",
             "data": attachment.b64content,
-            "content_type": attachment.mimetype,
+            "content_type": attachment.content_type,
         }
         if attachment.inline:
             # see https://github.com/postalhq/postal/issues/731

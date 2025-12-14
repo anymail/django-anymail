@@ -155,6 +155,12 @@ Brevo can handle.
   Anymail has no way to communicate an attachment's desired content-type
   to the Brevo API if the name is not set correctly.
 
+**Non-ASCII attachment filenames will be garbled**
+  Brevo's API does not properly encode Unicode characters in attachment
+  filenames. Some email clients will display those characters incorrectly.
+  The only workaround is to limit attachment filenames to ASCII when sending
+  through Brevo.
+
 **Single Reply-To**
   Brevo's v3 API only supports a single Reply-To address.
 

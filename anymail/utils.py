@@ -1,4 +1,6 @@
 import base64
+import email.message
+import email.policy
 import mimetypes
 from base64 import b64encode
 from collections.abc import Mapping, MutableMapping
@@ -11,11 +13,18 @@ from email.mime.base import MIMEBase
 from email.utils import formatdate, getaddresses, parsedate_to_datetime, unquote
 from urllib.parse import urlsplit, urlunsplit
 
+import django.core.mail
 from django.conf import settings
 from django.core.mail.message import DEFAULT_ATTACHMENT_MIME_TYPE
 from django.utils.encoding import force_str
 from django.utils.functional import Promise, cached_property
 from requests.structures import CaseInsensitiveDict
+
+try:
+    from django.core.mail.message import MIMEMixin
+except ImportError:
+    # Django >= 7.0
+    MIMEMixin = None
 
 from .exceptions import AnymailConfigurationError, AnymailInvalidAddress
 
@@ -23,6 +32,9 @@ BASIC_NUMERIC_TYPES = (int, float)
 
 
 UNSET = type("UNSET", (object,), {})  # Used as non-None default value
+
+
+SMTP7BIT = email.policy.SMTP.clone(cte_type="7bit")
 
 
 def concat_lists(*args):
@@ -428,54 +440,116 @@ class Attachment:
 
     Normalized to have these properties:
     name: attachment filename; may be None
-    content: bytestream
-    mimetype: the content type; guessed if not explicit
-    inline: bool, True if attachment has a Content-ID header
+    content: bytes or str
+
+    mimetype: maintype/subtype (no params); guessed if not provided
+    maintype: content-type maintype
+    subtype: content-type subtype
+    charset: for text character encoding used (for text/* types)
+             default from settings.DEFAULT_CHARSET (which is utf-8 by default)
+    content_type: the full content-type, with charset param if text
+
+    inline: bool, True if Content-Disposition: inline
     content_id: for inline, the Content-ID (*with* <>); may be None
     cid: for inline, the Content-ID *without* <>; may be empty string
     """
 
-    def __init__(self, attachment, encoding):
+    def __init__(self, attachment):
         # Note that an attachment can be either a tuple of (filename, content, mimetype)
         # or a MIMEBase object. (Also, both filename and mimetype may be missing.)
         self._attachment = attachment
-        self.encoding = encoding  # or check attachment["Content-Encoding"] ???
-        self.inline = False
+
+        if isinstance(attachment, (MIMEBase, email.message.MIMEPart)):
+            # MIMEBase support is deprecated in Django 6.0, removed in 7.0.
+            # MIMEPart support is added in Django 6.0.
+            filename = attachment.get_filename()
+            content_type = attachment["Content-Type"]
+            mimetype = attachment.get_content_type()
+            charset = attachment.get_content_charset()
+            content = (
+                attachment.get_payload(decode=True)
+                if isinstance(attachment, MIMEBase)
+                else attachment.get_content()
+            )
+            if content is None:
+                content = attachment.as_bytes()
+            content_disposition = attachment.get_content_disposition()
+            inline = content_disposition == "inline" or (
+                content_disposition is None and "Content-ID" in attachment
+            )
+            content_id = attachment["Content-ID"]
+        else:
+            (_filename, _content, mimetype) = attachment
+            filename = force_non_lazy(_filename)
+            content = force_non_lazy(_content)
+            charset = None
+            inline = False
+            content_id = None
+
+            # Django supports both Django and Python EmailMessage as attachment content
+            if isinstance(content, django.core.mail.EmailMessage):
+                content = content.message()
+                if MIMEMixin is not None and isinstance(content, MIMEMixin):
+                    # Django < 6.0: can't use policy-based serialization below
+                    content = content.as_bytes(linesep="\r\n")
+                    if mimetype is None:
+                        mimetype = "message/rfc822"
+            if isinstance(content, (email.message.EmailMessage, email.message.Message)):
+                # Serialize attached message using conservative options
+                content = content.as_bytes(policy=SMTP7BIT)
+                if mimetype is None:
+                    mimetype = "message/rfc822"
+
+            content_type = mimetype
+
+        # Ensure mimetype
+        if mimetype is None and filename is not None:
+            # Guess missing mimetype from filename, borrowed from
+            # django.core.mail.EmailMessage._create_attachment()
+            try:
+                mimetype, _ = mimetypes.guess_type(filename)
+                content_type = None  # recreate from mimetype below
+            except TypeError:
+                pass
+        if mimetype is None:
+            mimetype = DEFAULT_ATTACHMENT_MIME_TYPE
+            content_type = None  # recreate from mimetype below
+
+        maintype, subtype = mimetype.split("/", 1)
+
+        # Ensure a charset for text/* types or any str content
+        if maintype == "text" or isinstance(content, str):
+            if charset is None:
+                charset = settings.DEFAULT_CHARSET
+            if content_type is None or charset not in content_type:
+                # Use MIMEPart to format a Content-Type header with charset
+                temp = email.message.MIMEPart()
+                temp.add_header("Content-Type", mimetype, charset=charset)
+                content_type = temp["Content-Type"]
+
+        # Ensure str for text/* types
+        if maintype == "text" and not isinstance(content, str):
+            content = content.decode(charset)
+
+        # Ensure content_type
+        if content_type is None:
+            content_type = mimetype
+
+        self.name = filename
+        self.content = content
+        self.mimetype = mimetype
+        self.maintype = maintype
+        self.subtype = subtype
+        self.charset = charset
+        self.content_type = content_type
+
+        self.inline = inline
         self.content_id = None
         self.cid = ""
-
-        if isinstance(attachment, MIMEBase):
-            self.name = attachment.get_filename()
-            self.content = attachment.get_payload(decode=True)
-            if self.content is None:
-                self.content = attachment.as_bytes()
-            self.mimetype = attachment.get_content_type()
-            # Content-Type includes charset if provided
-            self.content_type = attachment["Content-Type"]
-
-            content_disposition = attachment.get_content_disposition()
-            if content_disposition == "inline" or (
-                not content_disposition and "Content-ID" in attachment
-            ):
-                self.inline = True
-                self.content_id = attachment["Content-ID"]  # probably including <...>
-                if self.content_id is not None:
-                    self.cid = unquote(self.content_id)  # without the <, >
-        else:
-            (self.name, self.content, self.mimetype) = attachment
-            self.content_type = self.mimetype
-
-        self.name = force_non_lazy(self.name)
-        self.content = force_non_lazy(self.content)
-
-        # Guess missing mimetype from filename, borrowed from
-        # django.core.mail.EmailMessage._create_attachment()
-        if self.mimetype is None and self.name is not None:
-            self.mimetype, _ = mimetypes.guess_type(self.name)
-        if self.mimetype is None:
-            self.mimetype = DEFAULT_ATTACHMENT_MIME_TYPE
-        if self.content_type is None:
-            self.content_type = self.mimetype
+        if inline:
+            self.content_id = content_id
+            if content_id:
+                self.cid = unquote(content_id)  # without the <>
 
     def __repr__(self):
         details = [
@@ -492,12 +566,32 @@ class Attachment:
         return "Attachment<{details}>".format(details=", ".join(details))
 
     @property
-    def b64content(self):
-        """Content encoded as a base64 ascii string"""
+    def content_bytes(self):
+        """Content as bytes, using original charset"""
         content = self.content
         if isinstance(content, str):
-            content = content.encode(self.encoding)
-        return b64encode(content).decode("ascii")
+            content = content.encode(self.charset)
+        return content
+
+    @property
+    def content_utf8_bytes(self):
+        """Content as bytes, forcing utf-8 charset"""
+        if self.charset is None or self.charset == "utf-8":
+            return self.content_bytes
+        content = self.content
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        return content
+
+    @property
+    def b64content(self):
+        """Content encoded as a base64 7-bit string, using original charset"""
+        return b64encode(self.content_bytes).decode("ascii")
+
+    @property
+    def b64content_utf8(self):
+        """Content encoded as a base64 7-bit string, forcing utf-8 charset"""
+        return b64encode(self.content_utf8_bytes).decode("ascii")
 
 
 def get_anymail_setting(

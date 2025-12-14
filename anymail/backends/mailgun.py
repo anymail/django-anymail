@@ -378,7 +378,7 @@ class MailgunPayload(RequestsPayload):
             super().add_alternative(content, mimetype)
 
     def add_attachment(self, attachment):
-        # http://docs.python-requests.org/en/v2.4.3/user/advanced/#post-multiple-multipart-encoded-files
+        # https://requests.readthedocs.io/en/stable/user/advanced/#post-multiple-multipart-encoded-files
         if attachment.inline:
             field = "inline"
             name = attachment.cid
@@ -386,10 +386,10 @@ class MailgunPayload(RequestsPayload):
                 self.unsupported_feature("inline attachments without Content-ID")
         else:
             field = "attachment"
-            name = attachment.name
-            if not name:
-                self.unsupported_feature("attachments without filenames")
-        self.files.append((field, (name, attachment.content, attachment.mimetype)))
+            name = attachment.name or "attachment"
+        self.files.append(
+            (field, (name, attachment.content_bytes, attachment.content_type))
+        )
 
     def set_envelope_sender(self, email):
         # Only the domain is used

@@ -1,9 +1,6 @@
 import json
-from base64 import b64decode, b64encode
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 
 from django.core import mail
 from django.test import SimpleTestCase, override_settings, tag
@@ -18,17 +15,17 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import AnymailMessage, attach_inline_image_file
+from anymail.message import AnymailMessage, attach_inline_image
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
 from .utils import (
-    SAMPLE_IMAGE_FILENAME,
     AnymailTestMixin,
+    create_text_attachment,
+    decode_att,
     sample_image_content,
-    sample_image_path,
 )
 
 
@@ -309,99 +306,37 @@ class BrevoBackendStandardEmailTests(BrevoBackendMockAPITestCase):
         )
 
     def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
+        # Brevo guesses content type from the filename extension. It adds
+        # `charset=utf-8` to text content types, unconditionally.
+        # Brevo accepts non-ASCII filenames but incorrectly sends them
+        # as 8-bit utf-8 (without using RFC 2231 encoding).
+        # Brevo doesn't support inline images.
+        text_content = "pièce jointe\n"
         self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
         )
-
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
-
-        # Should work with a MIMEBase object (also tests no filename)...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf data"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        self.message.attach(mimeattachment)
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
 
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(len(data["attachment"]), 3)
 
         attachments = data["attachment"]
+        self.assertEqual(len(attachments), 2)
+        # Anymail sends an empty filename if none specified, rather than
+        # trying to guess an extension. This will cause a Brevo API error.
+        self.assertEqual(attachments[0]["name"], "")  # no filename
+        # Text content *must* be utf-8 encoded.
         self.assertEqual(
-            attachments[0],
-            {
-                "name": "test.txt",
-                "content": b64encode(text_content.encode("utf-8")).decode("ascii"),
-            },
+            decode_att(attachments[0]["content"]).decode("utf-8"), text_content
         )
-        self.assertEqual(
-            attachments[1],
-            {"name": "test.png", "content": b64encode(png_content).decode("ascii")},
-        )
-        self.assertEqual(
-            attachments[2],
-            {"name": "", "content": b64encode(pdf_content).decode("ascii")},
-        )
-
-    def test_unicode_attachment_correctly_decoded(self):
-        self.message.attach(
-            "Une pièce jointe.html", "<p>\u2019</p>", mimetype="text/html"
-        )
-        self.message.send()
-        attachment = self.get_api_call_json()["attachment"][0]
-        self.assertEqual(attachment["name"], "Une pièce jointe.html")
-        self.assertEqual(
-            b64decode(attachment["content"]).decode("utf-8"), "<p>\u2019</p>"
-        )
+        self.assertEqual(attachments[1]["name"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["content"]), b";-)")
 
     def test_embedded_images(self):
-        # Brevo doesn't support inline image
-        # inline image are just added as a content attachment
-
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        with self.assertRaises(AnymailUnsupportedFeature):
+        # Brevo doesn't support inline images
+        attach_inline_image(self.message, sample_image_content(), "test.png")
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "inline attachments"):
             self.message.send()
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly
-        image = MIMEImage(image_data)
-        self.message.attach(image)
-
-        self.message.send()
-
-        image_data_b64 = b64encode(image_data).decode("ascii")
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["attachment"][0],
-            {
-                "name": image_filename,  # the named one
-                "content": image_data_b64,
-            },
-        )
-        self.assertEqual(
-            data["attachment"][1],
-            {
-                "name": "",  # the unnamed one
-                "content": image_data_b64,
-            },
-        )
 
     def test_multiple_html_alternatives(self):
         self.message.body = "Text body"

@@ -194,11 +194,13 @@ class MailjetPayload(RequestsPayload):
             self.data["Globals"]["HTMLPart"] = body
 
     def add_attachment(self, attachment):
+        # Mailjet adds `charset=utf-8` to text/* ContentType (even if charset
+        # already there), so omit charset and always use utf-8 for text content.
+        # Mailjet requires a non-empty Filename.
         att = {
-            "ContentType": attachment.mimetype,
-            # Mailjet requires a non-empty Filename.
+            "ContentType": attachment.mimetype,  # (not content_type with charset)
             "Filename": attachment.name or "attachment",
-            "Base64Content": attachment.b64content,
+            "Base64Content": attachment.b64content_utf8,
         }
         if attachment.inline:
             field = "InlinedAttachments"

@@ -188,12 +188,19 @@ see :ref:`unsupported-features`.
   And it determines the content type of the attachment from the filename extension.
 
   If you try to send an attachment without a filename, Anymail will substitute
-  "attachment*.ext*" using an appropriate *.ext* for the content type.
+  "attachment.ext" using an appropriate *.ext* for the content type.
 
   If you try to send an attachment whose content type doesn't match its filename
   extension, MailerSend will change the content type to match the extension.
   (E.g., the filename "data.txt" will always be sent as "text/plain",
   even if you specified a "text/csv" content type.)
+
+**Non-ASCII text attachments may be garbled**
+  MailerSend's API does not provide a way to identify the character set used
+  for text attachment content, and it does not include a ``charset`` parameter
+  in the sent message. Anymail uses utf-8 encoding for MailerSend text attachments.
+  This will display incorrectly or cause errors in email clients that assume
+  some other encoding when the message doesn't identify the charset.
 
 **Single Reply-To**
   MailerSend only supports a single Reply-To address.

@@ -209,28 +209,15 @@ Limitations and quirks
 **Attachments require filenames**
   Mailgun has an `undocumented API requirement`_ that every attachment must have a
   filename. Attachments with missing filenames are silently dropped from the sent
-  message. Similarly, every inline attachment must have a :mailheader:`Content-ID`.
+  message.
 
-  To avoid unexpected behavior, Anymail will raise an
-  :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error if you attempt to send
-  a message through Mailgun with any attachments that don't have filenames (or inline
-  attachments that don't have :mailheader:`Content-ID`\s).
+  To avoid unexpected behavior, Anymail will use ``"attachment"`` as the filename
+  if you don't supply a filename.
 
-  Ensure your attachments have filenames by using
-  :class:`message.attach_file(filename) <django.core.mail.EmailMessage>`,
-  :class:`message.attach(content, filename="...") <django.core.mail.EmailMessage>`,
-  or if you are constructing your own MIME objects to attach,
-  :meth:`mimeobj.add_header("Content-Disposition", "attachment", filename="...") <email.message.Message.add_header>`.
+  .. versionchanged:: vNext
 
-  Ensure your inline attachments have Content-IDs by using Anymail's
-  :ref:`inline image helpers <inline-images>`, or if you are constructing your own MIME objects,
-  :meth:`mimeobj.add_header("Content-ID", "...") <email.message.Message.add_header>` and
-  :meth:`mimeobj.add_header("Content-Disposition", "inline") <email.message.Message.add_header>`.
-
-  .. versionchanged:: 4.3
-
-      Earlier Anymail releases did not check for these cases, and attachments
-      without filenames/Content-IDs would be ignored by Mailgun without notice.
+     Earlier Anymail versions raised :exc:`~anymail.exceptions.AnymailUnsupportedFeature`
+     if you attempted to send an attachment through Mailgun without a filename.
 
 **Display name problems with punctuation and non-ASCII characters**
   Mailgun does not correctly handle certain display names in :mailheader:`From`,

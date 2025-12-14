@@ -268,10 +268,13 @@ class MailerSendPayload(RequestsPayload):
         self.data["html"] = body
 
     def add_attachment(self, attachment):
-        # Add a MailerSend attachments[] object for attachment:
+        # Add a MailerSend attachments[] object for attachment.
+        # MailerSend guesses content type from filename. It doesn't have
+        # a way to specify charset for text attachments and does not include
+        # charset in the Content-Type header. Use utf-8 and hope for the best.
         attachment_object = {
             "filename": attachment.name,
-            "content": attachment.b64content,
+            "content": attachment.b64content_utf8,
             "disposition": "attachment",
         }
         if not attachment_object["filename"]:

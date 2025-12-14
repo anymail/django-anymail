@@ -304,7 +304,7 @@ class UnisenderGoPayload(RequestsPayload):
         name = attachment.cid if attachment.inline else attachment.name
         att = {
             "content": attachment.b64content,
-            "type": attachment.mimetype,
+            "type": attachment.content_type,
             "name": name or "",  # required - submit empty string if unknown
         }
         if attachment.inline:

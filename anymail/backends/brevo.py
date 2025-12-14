@@ -242,9 +242,12 @@ class BrevoPayload(RequestsPayload):
 
     def add_attachment(self, attachment):
         """Converts attachments to Brevo API {name, base64} array"""
+        # Brevo guesses content type from the name
+        # and returns a useful API error for an empty name.
+        # Text content must be utf-8 (Brevo adds `charset=utf-8`).
         att = {
             "name": attachment.name or "",
-            "content": attachment.b64content,
+            "content": attachment.b64content_utf8,
         }
 
         if attachment.inline:

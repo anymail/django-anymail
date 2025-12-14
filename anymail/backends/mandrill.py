@@ -149,7 +149,7 @@ class MandrillPayload(RequestsPayload):
             name = attachment.name or ""
         self.data["message"].setdefault(field, []).append(
             {
-                "type": attachment.mimetype,
+                "type": attachment.content_type,
                 "name": name,
                 "content": attachment.b64content,
             }

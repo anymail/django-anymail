@@ -1,9 +1,6 @@
 import json
-from base64 import b64encode
 from datetime import date, datetime
 from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 from unittest.mock import patch
 
 from django.core import mail
@@ -20,17 +17,17 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import AnymailMessage, attach_inline_image_file
+from anymail.message import AnymailMessage, attach_inline_image
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
 from .utils import (
-    SAMPLE_IMAGE_FILENAME,
     AnymailTestMixin,
+    create_text_attachment,
+    decode_att,
     sample_image_content,
-    sample_image_path,
 )
 
 
@@ -324,108 +321,37 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
         )
 
     def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
+        # Unisender Go supports non-utf-8 content with charset in the `type` field.
+        # Unisender Go requires the `name` field, which may be an empty string.
+        # It allows non-ASCII filenames (though incorrectly applies rfc2047 when
+        # sending).
+        text_content = "pièce jointe\n"
         self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
         )
-
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
-
-        # Should work with a MIMEBase object (also tests no filename)...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf data"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        self.message.attach(mimeattachment)
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
 
         self.message.send()
         data = self.get_api_call_json()
+
         attachments = data["message"]["attachments"]
-        self.assertEqual(len(attachments), 3)
-
+        self.assertEqual(len(attachments), 2)
+        self.assertEqual(attachments[0]["type"], 'text/plain; charset="iso-8859-1"')
+        self.assertEqual(attachments[0]["name"], "")  # no filename
         self.assertEqual(
-            attachments[0],
-            {
-                "name": "test.txt",
-                "content": b64encode(text_content.encode("utf-8")).decode("ascii"),
-                "type": "text/plain",
-            },
+            decode_att(attachments[0]["content"]).decode("iso-8859-1"), text_content
         )
-        self.assertEqual(
-            attachments[1],
-            {
-                "name": "test.png",
-                "content": b64encode(png_content).decode("ascii"),
-                "type": "image/png",  # (type inferred from filename)
-            },
-        )
-        self.assertEqual(
-            attachments[2],
-            {
-                "name": "",  # no filename -- but param is required
-                "content": b64encode(pdf_content).decode("ascii"),
-                "type": "application/pdf",
-            },
-        )
+        self.assertEqual(attachments[1]["type"], "image/x-emoticon")
+        self.assertEqual(attachments[1]["name"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["content"]), b";-)")
 
-    def test_embedded_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        self.message.send()
-        data = self.get_api_call_json()
-
-        self.assertEqual(
-            data["message"]["inline_attachments"],
-            [
-                {
-                    "name": cid,
-                    "content": b64encode(image_data).decode("ascii"),
-                    "type": "image/png",  # (type inferred from filename)
-                }
-            ],
-        )
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly
-        image = MIMEImage(image_data)
-        self.message.attach(image)
-
-        self.message.send()
-
-        image_data_b64 = b64encode(image_data).decode("ascii")
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["message"]["attachments"][0],
-            {
-                "name": image_filename,  # the named one
-                "content": image_data_b64,
-                "type": "image/png",
-            },
-        )
-        self.assertEqual(
-            data["message"]["attachments"][1],
-            {
-                "name": "",  # the unnamed one
-                "content": image_data_b64,
-                "type": "image/png",
-            },
-        )
+        inlines = data["message"]["inline_attachments"]
+        self.assertEqual(len(inlines), 1)
+        self.assertEqual(inlines[0]["type"], "image/png")  # from filename
+        self.assertEqual(inlines[0]["name"], cid)
+        self.assertEqual(decode_att(inlines[0]["content"]), image_data)
 
     def test_multiple_html_alternatives(self):
         # Multiple alternatives not allowed

@@ -135,7 +135,7 @@ class ScalewayPayload(RequestsPayload):
         self.data.setdefault("attachments", []).append(
             {
                 "name": attachment.name,
-                "type": attachment.mimetype,
+                "type": attachment.content_type,
                 "content": attachment.b64content,
             }
         )

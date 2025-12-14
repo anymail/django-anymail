@@ -76,19 +76,38 @@ Features
 ~~~~~~~~
 
 * **Resend:** Add support for inline images. Identify attachment content type
-  using new API parameter. (See related Resend breaking change above.)
+  using new API parameter, including accurately specifying charset for
+  non-ASCII text attachments. (See related Resend breaking change above.)
 
 Fixes
 ~~~~~
 
+* Handle sending attached messages (e.g., forwarded emails) consistently with
+  Django's SMTP EmailBackend.
+
+* **Brevo, Mailgun, Mandrill, Postal, Postmark, Scaleway TEM, Unisender Go:**
+  Fix Anymail bugs that could cause text attachments with non-ASCII content
+  to display incorrectly in some email clients.
+
 * **Brevo:** Work around a Brevo API bug which loses non-ASCII display names
   that also contain a comma or certain other punctuation.
+
+* **Mailgun:** Use ``"attachment"`` as the default attachment filename (rather
+  than raising an error) for consistency with Anymail's handling of missing
+  attachment filenames in other ESPs.
 
 Other
 ~~~~~
 
+* **Brevo:** Document a Brevo API bug that causes non-ASCII attachment
+  filenames to display incorrectly in some email clients.
+
 * **Mandrill:** Document a Mandrill API bug that can cause an address with a
   non-ASCII display name to display incorrectly in some email clients.
+
+* **SendGrid:** Document a SendGrid API bug that causes non-ASCII attachment
+  filenames to display incorrectly in some email clients. Clarify handling and
+  documentation of SendGrid API bugs around text attachment content encoding.
 
 * **Unisender Go:** Document a Unisender Go API bug that can cause an Reply-To
   address (only) with a non-ASCII display name to display incorrectly in some
