@@ -65,8 +65,18 @@ Breaking changes
   local part). This avoids a Mailgun API bug that generates undeliverable
   messages.
 
+* **Resend:** Raise an error if an attachment's filename has an extension that
+  doesn't match its content type. This tries to help you avoid a Resend API bug
+  that can silently drop sent messages.
+
 * **Scaleway TEM:** Raise an error if any address field uses EAI (has a non-ASCII
   local part). This avoids a Scaleway API bug that generates undeliverable messages.
+
+Features
+~~~~~~~~
+
+* **Resend:** Add support for inline images. Identify attachment content type
+  using new API parameter. (See related Resend breaking change above.)
 
 Fixes
 ~~~~~

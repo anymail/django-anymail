@@ -225,16 +225,22 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         attachments = data["attachments"]
         self.assertEqual(len(attachments), 3)
         self.assertEqual(attachments[0]["filename"], "test.txt")
+        self.assertEqual(attachments[0]["content_type"], "text/plain")
         self.assertEqual(
             decode_att(attachments[0]["content"]).decode("ascii"), text_content
         )
+        self.assertNotIn("content_id", attachments[0])
 
         self.assertEqual(attachments[1]["filename"], "test.png")
+        self.assertEqual(attachments[1]["content_type"], "image/png")
         self.assertEqual(decode_att(attachments[1]["content"]), png_content)
+        self.assertNotIn("content_id", attachments[1])
 
         # unnamed attachment given default name with correct extension for content type
         self.assertEqual(attachments[2]["filename"], "attachment.pdf")
+        self.assertEqual(attachments[2]["content_type"], "application/pdf")
         self.assertEqual(decode_att(attachments[2]["content"]), pdf_content)
+        self.assertNotIn("content_id", attachments[2])
 
     def test_unicode_attachment_correctly_decoded(self):
         self.message.attach(
@@ -247,6 +253,7 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
             [
                 {
                     "filename": "Une pièce jointe.html",
+                    "content_type": "text/html",
                     "content": b64encode("<p>\u2019</p>".encode("utf-8")).decode(
                         "ascii"
                     ),
@@ -255,9 +262,9 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         )
 
     def test_embedded_images(self):
-        # Resend's API doesn't have a way to specify content-id
         image_filename = SAMPLE_IMAGE_FILENAME
         image_path = sample_image_path(image_filename)
+        image_data = sample_image_content(image_filename)
 
         cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
         html_content = (
@@ -265,8 +272,15 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
         )
         self.message.attach_alternative(html_content, "text/html")
 
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "inline content-id"):
-            self.message.send()
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data["html"], html_content)
+
+        self.assertEqual(len(data["attachments"]), 1)
+        self.assertEqual(data["attachments"][0]["content_type"], "image/png")
+        self.assertEqual(data["attachments"][0]["filename"], image_filename)
+        self.assertEqual(data["attachments"][0]["content_id"], cid)
+        self.assertEqual(decode_att(data["attachments"][0]["content"]), image_data)
 
     def test_attached_images(self):
         image_filename = SAMPLE_IMAGE_FILENAME
@@ -289,16 +303,47 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
             [
                 {
                     "filename": image_filename,  # the named one
+                    "content_type": "image/png",
                     "content": image_data_b64,
                 },
                 {
                     # For unnamed attachments, Anymail constructs a default name
                     # based on the content_type:
                     "filename": "attachment.png",
+                    "content_type": "image/png",
                     "content": image_data_b64,
                 },
             ],
         )
+
+    def test_mismatched_attachment_extension(self):
+        # See note above about silently dropping messages.
+        self.message.attach("data.txt", "data", "text/csv")
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature,
+            "attachments of type text/csv with name 'data.txt'",
+        ):
+            self.message.send()
+
+    @override_settings(ANYMAIL_RESEND_VERIFY_ATTACHMENT_EXTENSIONS=False)
+    def test_mismatched_attachment_setting(self):
+        # Undocumented setting to disable mismatched extension check
+        self.message.attach("data.txt", "data", "text/csv")
+        self.message.send()
+        data = self.get_api_call_json()
+        attachments = data["attachments"]
+        self.assertEqual(len(attachments), 1)
+        self.assertEqual(attachments[0]["content_type"], "text/csv")
+        self.assertEqual(attachments[0]["filename"], "data.txt")
+
+    def test_missing_attachment_filename_unknown_type(self):
+        # Earlier tests cover generating a missing filename (attachment.txt).
+        # Verify an error when the extension can't be determined.
+        self.message.attach(None, "data", "text/x-unknown-type")
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "unnamed attachments of type text/x-unknown-type"
+        ):
+            self.message.send()
 
     def test_multiple_html_alternatives(self):
         # Multiple alternatives not allowed

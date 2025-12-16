@@ -117,20 +117,27 @@ error when you try to send a message using features that Resend doesn't support.
 You can tell Anymail to suppress these errors and send the messages
 anyway---see :ref:`unsupported-features`.
 
-**Attachment filename determines content type**
-  Resend determines the content type of an attachment from its filename extension.
+**Attachment filename extension must match content type**
+  Resend silently drops messages with attachments whose filename extensions
+  are inconsistent with their content types (mimetype). E.g., sending
+  a *text/csv* attachment with the filename "data.txt" rather than "data.csv"
+  will not generate an API error or bounce, but the message will never be
+  delivered.
 
-  If you try to send an attachment without a filename, Anymail will substitute
-  "attachment\ *.ext*" using an appropriate *.ext* for the content type.
+  To avoid this, Anymail attempts to verify attachment filenames before sending,
+  and raises an :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error for
+  likely mismatches. (This is a best guess using Python's :mod:`mimetypes`
+  package. There's no way for Anymail to know exactly which extensions and
+  content types will cause Resend to drop a message.)
 
-  If you try to send an attachment whose content type doesn't match its filename
-  extension, Resend will change the content type to match the extension.
-  (E.g., the filename "data.txt" will always be sent as "text/plain",
-  even if you specified a "text/csv" content type.)
+  If you try to send an attachment without a filename, Anymail will generate
+  a filename for you using "attachment\ *.ext*" with an appropriate extension
+  for the content type.
 
-**No inline images**
-  Resend's API does not provide a mechanism to send inline content
-  or to specify :mailheader:`Content-ID` for an attachment.
+  .. versionchanged:: vNext
+
+      Resend's API did not previously support specifying the content type,
+      and instead based attachment content type on the filename.
 
 **Anymail tags and metadata are exposed to recipient**
   Anymail implements its normalized :attr:`~anymail.message.AnymailMessage.tags`
@@ -181,6 +188,13 @@ anyway---see :ref:`unsupported-features`.
 **No non-ASCII mailboxes (EAI)**
   Resend does not support sending from or to Unicode mailboxes (the *user* part of
   *user\@domain*---see :ref:`EAI <eai>`). Trying to use one will cause an API error.
+
+**Earlier limitations**
+
+    .. versionchanged:: vNext
+
+    Resend's API did not previously support inline images. Earlier Anymail
+    releases raised an error on attempts to send them through Resend.
 
 
 .. _resend-api-rate-limits:
