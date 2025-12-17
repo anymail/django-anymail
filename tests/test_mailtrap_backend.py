@@ -1,0 +1,981 @@
+from __future__ import annotations
+
+from datetime import datetime
+from decimal import Decimal
+
+from django.core import mail
+from django.core.exceptions import ImproperlyConfigured
+from django.test import SimpleTestCase, override_settings, tag
+from django.utils.timezone import timezone
+
+from anymail.exceptions import (
+    AnymailAPIError,
+    AnymailSerializationError,
+    AnymailUnsupportedFeature,
+)
+from anymail.message import AnymailMessage, attach_inline_image
+
+from .mock_requests_backend import (
+    RequestsBackendMockAPITestCase,
+    SessionSharingTestCases,
+)
+from .utils import (
+    AnymailTestMixin,
+    create_text_attachment,
+    decode_att,
+    sample_image_content,
+)
+
+
+@tag("mailtrap")
+@override_settings(
+    EMAIL_BACKEND="anymail.backends.mailtrap.EmailBackend",
+    ANYMAIL={"MAILTRAP_API_TOKEN": "test_api_token"},
+)
+class MailtrapBackendMockAPITestCase(RequestsBackendMockAPITestCase):
+    DEFAULT_RAW_RESPONSE = b"""{
+        "success": true,
+        "message_ids": ["1df37d17-0286-4d8b-8edf-bc4ec5be86e6"]
+    }"""
+
+    def setUp(self):
+        super().setUp()
+        self.message = mail.EmailMultiAlternatives(
+            "Subject", "Body", "from@example.com", ["to@example.com"]
+        )
+
+    def set_mock_response_message_ids(self, message_ids: list[str] | int):
+        """
+        Set a "success" mock response payload with multiple message_ids.
+        Call with either the count of ids to generate or the list of desired ids.
+        """
+        if isinstance(message_ids, int):
+            message_ids = [f"message-id-{i}" for i in range(message_ids)]
+        self.set_mock_response(
+            json_data={
+                "success": True,
+                "message_ids": message_ids,
+            },
+        )
+
+
+@tag("mailtrap")
+class MailtrapBackendStandardEmailTests(MailtrapBackendMockAPITestCase):
+    def test_send_mail(self):
+        """Test basic API for simple send"""
+        mail.send_mail(
+            "Subject here",
+            "Here is the message.",
+            "from@sender.example.com",
+            ["to@example.com"],
+            fail_silently=False,
+        )
+        # Uses transactional API
+        self.assert_esp_called("https://send.api.mailtrap.io/api/send")
+        headers = self.get_api_call_headers()
+        self.assertEqual(headers["Api-Token"], "test_api_token")
+        data = self.get_api_call_json()
+        self.assertEqual(data["subject"], "Subject here")
+        self.assertEqual(data["text"], "Here is the message.")
+        self.assertEqual(data["from"], {"email": "from@sender.example.com"})
+        self.assertEqual(data["to"], [{"email": "to@example.com"}])
+
+    def test_name_addr(self):
+        """Make sure RFC2822 name-addr format (with display-name) is allowed
+
+        (Test both sender and recipient addresses)
+        """
+        msg = mail.EmailMessage(
+            "Subject",
+            "Message",
+            "From Name <from@example.com>",
+            ["Recipient #1 <to1@example.com>", "to2@example.com"],
+            cc=["Carbon Copy <cc1@example.com>", "cc2@example.com"],
+            bcc=["Blind Copy <bcc1@example.com>", "bcc2@example.com"],
+        )
+        self.set_mock_response_message_ids(6)
+        msg.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["from"], {"name": "From Name", "email": "from@example.com"}
+        )
+        self.assertEqual(
+            data["to"],
+            [
+                {"name": "Recipient #1", "email": "to1@example.com"},
+                {"email": "to2@example.com"},
+            ],
+        )
+        self.assertEqual(
+            data["cc"],
+            [
+                {"name": "Carbon Copy", "email": "cc1@example.com"},
+                {"email": "cc2@example.com"},
+            ],
+        )
+        self.assertEqual(
+            data["bcc"],
+            [
+                {"name": "Blind Copy", "email": "bcc1@example.com"},
+                {"email": "bcc2@example.com"},
+            ],
+        )
+
+    def test_html_message(self):
+        text_content = "This is an important message."
+        html_content = "<p>This is an <strong>important</strong> message.</p>"
+        email = mail.EmailMultiAlternatives(
+            "Subject", text_content, "from@example.com", ["to@example.com"]
+        )
+        email.attach_alternative(html_content, "text/html")
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data["text"], text_content)
+        self.assertEqual(data["html"], html_content)
+        # Don't accidentally send the html part as an attachment:
+        self.assertNotIn("attachments", data)
+
+    def test_html_only_message(self):
+        html_content = "<p>This is an <strong>important</strong> message.</p>"
+        email = mail.EmailMessage(
+            "Subject", html_content, "from@example.com", ["to@example.com"]
+        )
+        email.content_subtype = "html"  # Main content is now text/html
+        email.send()
+        data = self.get_api_call_json()
+        self.assertNotIn("text", data)
+        self.assertEqual(data["html"], html_content)
+
+    def test_extra_headers(self):
+        self.message.extra_headers = {"X-Custom": "string", "X-Num": 123}
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertCountEqual(data["headers"], {"X-Custom": "string", "X-Num": 123})
+
+    def test_extra_headers_serialization_error(self):
+        self.message.extra_headers = {"X-Custom": Decimal(12.5)}
+        with self.assertRaisesMessage(AnymailSerializationError, "Decimal"):
+            self.message.send()
+
+    def test_reply_to(self):
+        self.message.reply_to = ['"Reply, with comma" <reply@example.com>']
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["reply_to"],
+            {"name": "Reply, with comma", "email": "reply@example.com"},
+        )
+
+    def test_multiple_reply_to(self):
+        # Mailtrap allows a fully-formatted Reply-To header
+        # instead of the `reply_to` parameter.
+        self.message.reply_to = [
+            "reply@example.com",
+            '"Other, with comma" <reply2@example.com>',
+            "Інше <reply3@příklad.example.cz>",
+        ]
+        self.message.extra_headers = {"X-Other": "Keep"}
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["headers"],
+            {
+                # Reply-To must be properly formatted as an address header
+                # using an RFC 2047 encoded-word for Unicode display-names
+                "Reply-To": "reply@example.com,"
+                ' "Other, with comma" <reply2@example.com>,'
+                " =?utf-8?b?0IbQvdGI0LU=?= <reply3@xn--pklad-zsa96e.example.cz>",
+                "X-Other": "Keep",
+            },
+        )
+
+    def test_eai_with_multiple_reply_to(self):
+        # When Anymail formats the Reply-To header, there's no way to handle EAI.
+        # (EAI single reply_to is included in test_non_ascii_headers() below.)
+        self.message.reply_to = ["відповідь@example.com", "other@example.com"]
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "EAI with multiple reply_to addresses"
+        ):
+            self.message.send()
+
+    def test_non_ascii_headers(self):
+        # Mailtrap correctly encodes non-ASCII display-names and other headers
+        # (but requires IDNA encoding for non-ASCII domain names).
+        # Mailtrap (currently) incorrectly applies rfc2047 to EAI addresses,
+        # resulting in invalid address headers and an API error for EAI `from`.
+        # (For these mock backend tests, assume those bugs are fixed.)
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <відправник@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <одержувач@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <відповідь@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["from"],
+            {
+                "name": "Odesílatel, z adresy",
+                "email": "відправник@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["to"],
+            [
+                {
+                    "name": "Příjemce, na adresu",
+                    "email": "одержувач@xn--pklad-zsa96e.example.cz",
+                }
+            ],
+        )
+        self.assertEqual(data["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["reply_to"],
+            {
+                "name": "Odpověď, adresa",
+                "email": "відповідь@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["headers"],
+            {"X-Extra": "Další"},
+        )
+
+    def test_attachments(self):
+        # Mailtrap supports non-utf-8 content with charset in the `type` field.
+        # Mailtrap accepts non-ASCII filenames but incorrectly sends them
+        # as 8-bit utf-8 (without using RFC 2231 encoding).
+        # The filename param is required.
+        text_content = "pièce jointe\n"
+        self.message.attach(
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
+        )
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
+
+        self.message.send()
+        data = self.get_api_call_json()
+        attachments = data["attachments"]
+        self.assertEqual(len(attachments), 3)
+
+        self.assertEqual(attachments[0]["type"], 'text/plain; charset="iso-8859-1"')
+        self.assertEqual(attachments[0]["filename"], "attachment")
+        self.assertEqual(
+            decode_att(attachments[0]["content"]).decode("iso-8859-1"), text_content
+        )
+        self.assertNotIn("disposition", attachments[0])
+        self.assertNotIn("content_id", attachments[0])
+
+        self.assertEqual(attachments[1]["type"], "image/x-emoticon")
+        self.assertEqual(attachments[1]["filename"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["content"]), b";-)")
+        self.assertNotIn("disposition", attachments[1])
+        self.assertNotIn("content_id", attachments[1])
+
+        self.assertEqual(attachments[2]["type"], "image/png")  # from filename
+        self.assertEqual(attachments[2]["filename"], "test.png")
+        self.assertEqual(attachments[2]["disposition"], "inline")
+        self.assertEqual(attachments[2]["content_id"], cid)
+        self.assertEqual(decode_att(attachments[2]["content"]), image_data)
+
+    def test_multiple_html_alternatives(self):
+        # Multiple alternatives not allowed
+        self.message.attach_alternative("<p>First html is OK</p>", "text/html")
+        self.message.attach_alternative("<p>But not second html</p>", "text/html")
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "multiple html parts"):
+            self.message.send()
+
+    def test_html_alternative(self):
+        # Only html alternatives allowed
+        self.message.attach_alternative("{'not': 'allowed'}", "application/json")
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "alternative part with type 'application/json'"
+        ):
+            self.message.send()
+
+    def test_alternatives_fail_silently(self):
+        # Make sure fail_silently is respected
+        self.message.attach_alternative("{'not': 'allowed'}", "application/json")
+        sent = self.message.send(fail_silently=True)
+        self.assert_esp_not_called("API should not be called when send fails silently")
+        self.assertEqual(sent, 0)
+
+    def test_multiple_from_emails(self):
+        self.message.from_email = 'first@example.com, "From, also" <second@example.com>'
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "multiple from emails"
+        ):
+            self.message.send()
+
+    def test_api_failure(self):
+        self.set_mock_response(
+            status_code=400,
+            json_data={"success": False, "errors": ["helpful error message"]},
+        )
+        with self.assertRaisesMessage(
+            AnymailAPIError, r"Mailtrap API response 400"
+        ) as cm:
+            self.message.send()
+        # Error message includes response details:
+        self.assertIn("helpful error message", str(cm.exception))
+
+    def test_api_failure_fail_silently(self):
+        # Make sure fail_silently is respected
+        self.set_mock_response(status_code=500)
+        sent = self.message.send(fail_silently=True)
+        self.assertEqual(sent, 0)
+
+
+@tag("mailtrap")
+class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
+    """Test backend support for Anymail added features"""
+
+    def test_envelope_sender(self):
+        self.message.envelope_sender = "anything@bounces.example.com"
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "envelope_sender"):
+            self.message.send()
+
+    def test_metadata(self):
+        self.message.metadata = {"user_id": "12345", "items": 6}
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data["custom_variables"], {"user_id": "12345", "items": "6"})
+
+    def test_send_at(self):
+        self.message.send_at = datetime(2023, 10, 1, 12, 0, 0, tzinfo=timezone.utc)
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "send_at"):
+            self.message.send()
+
+    def test_tags(self):
+        self.message.tags = ["receipt"]
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data["category"], "receipt")
+
+    def test_multiple_tags(self):
+        self.message.tags = ["receipt", "repeat-user"]
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "multiple tags"):
+            self.message.send()
+
+    @override_settings(ANYMAIL_IGNORE_UNSUPPORTED_FEATURES=True)
+    def test_multiple_tags_ignore_unsupported_features(self):
+        # First tag only when ignoring unsupported features
+        self.message.tags = ["receipt", "repeat-user"]
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data["category"], "receipt")
+
+    def test_track_opens(self):
+        self.message.track_opens = True
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "track_opens"):
+            self.message.send()
+
+    def test_track_clicks(self):
+        self.message.track_clicks = True
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "track_clicks"):
+            self.message.send()
+
+    def test_non_batch_template(self):
+        # Mailtrap's usual /send endpoint works for template sends
+        # without per-recipient customization
+        message = AnymailMessage(
+            # Omit subject and body (Mailtrap prohibits them with templates)
+            from_email="from@example.com",
+            to=["to@example.com"],
+            template_id="template-uuid",
+            merge_global_data={"name": "Alice", "group": "Developers"},
+        )
+        message.send()
+        self.assert_esp_called("/api/send")
+        data = self.get_api_call_json()
+        self.assertEqual(data["template_uuid"], "template-uuid")
+        self.assertEqual(
+            data["template_variables"], {"name": "Alice", "group": "Developers"}
+        )
+        # Make sure Django default subject and body didn't end up in the payload:
+        self.assertNotIn("subject", data)
+        self.assertNotIn("text", data)
+        self.assertNotIn("html", data)
+
+    _mock_batch_response = {
+        "success": True,
+        "responses": [
+            {"success": True, "message_ids": ["message-id-alice-to"]},
+            {"success": True, "message_ids": ["message-id-bob-to"]},
+            {"success": True, "message_ids": ["message-id-cam-to"]},
+        ],
+    }
+
+    def test_merge_data(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        message = AnymailMessage(
+            from_email="from@example.com",
+            to=["alice@example.com", "Bob <bob@example.com>", "cam@example.com"],
+            template_id="template-uuid",
+            merge_data={
+                "alice@example.com": {"name": "Alice", "group": "Developers"},
+                "bob@example.com": {"name": "Bob"},  # and leave group undefined
+                "nobody@example.com": {"name": "Not a recipient for this message"},
+            },
+            merge_global_data={"group": "Users", "site": "ExampleCo"},
+        )
+        message.send()
+
+        # Use batch send endpoint
+        self.assert_esp_called("/api/batch")
+        data = self.get_api_call_json()
+
+        # Common parameters in "base":
+        self.assertEqual(data["base"]["from"], {"email": "from@example.com"})
+        self.assertEqual(data["base"]["template_uuid"], "template-uuid")
+        self.assertEqual(
+            data["base"]["template_variables"], {"group": "Users", "site": "ExampleCo"}
+        )
+        self.assertNotIn("subject", data["base"])  # invalid with template_uuid
+        self.assertNotIn("text", data["base"])
+        self.assertNotIn("html", data["base"])
+
+        # Per-recipient parameters in "requests" array:
+        self.assertEqual(len(data["requests"]), 3)
+        self.assertEqual(
+            data["requests"][0],
+            {
+                "to": [{"email": "alice@example.com"}],
+                # Completely overrides base template_variables
+                "template_variables": {
+                    "name": "Alice",
+                    "group": "Developers",
+                    "site": "ExampleCo",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][1],
+            {
+                "to": [{"email": "bob@example.com", "name": "Bob"}],
+                "template_variables": {
+                    "name": "Bob",
+                    "group": "Users",
+                    "site": "ExampleCo",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][2],
+            {
+                "to": [{"email": "cam@example.com"}],
+                # No template_variables (no merge_data for cam, so global base applies)
+            },
+        )
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["alice@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["alice@example.com"].message_id,
+            "message-id-alice-to",
+        )
+        self.assertEqual(recipients["bob@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["bob@example.com"].message_id,
+            "message-id-bob-to",
+        )
+        self.assertEqual(recipients["cam@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["cam@example.com"].message_id,
+            "message-id-cam-to",
+        )
+
+    def test_merge_metadata(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        self.message.to = [
+            "alice@example.com",
+            "Bob <bob@example.com>",
+            "cam@example.com",
+        ]
+        self.message.merge_metadata = {
+            "alice@example.com": {"order_id": 123, "tier": "premium"},
+            "bob@example.com": {"order_id": 678},
+        }
+        self.message.metadata = {"notification_batch": "zx912", "tier": "basic"}
+        self.message.send()
+
+        self.assert_esp_called("/api/batch")
+        data = self.get_api_call_json()
+        self.assertEqual(data["base"]["from"], {"email": "from@example.com"})
+        self.assertEqual(data["base"]["subject"], "Subject")
+        self.assertEqual(data["base"]["text"], "Body")
+        self.assertEqual(
+            data["base"]["custom_variables"],
+            {"notification_batch": "zx912", "tier": "basic"},
+        )
+
+        self.assertEqual(len(data["requests"]), 3)
+        self.assertEqual(
+            data["requests"][0],
+            {
+                "to": [{"email": "alice@example.com"}],
+                "custom_variables": {
+                    "order_id": 123,
+                    "tier": "premium",
+                    "notification_batch": "zx912",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][1],
+            {
+                "to": [{"email": "bob@example.com", "name": "Bob"}],
+                "custom_variables": {
+                    "order_id": 678,
+                    "notification_batch": "zx912",
+                    "tier": "basic",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][2],
+            {
+                "to": [{"email": "cam@example.com"}],
+                # No custom_variables (no merge_data for cam, so global base applies)
+            },
+        )
+
+    def test_merge_headers(self):
+        self.set_mock_response(json_data=self._mock_batch_response)
+        self.message.to = [
+            "alice@example.com",
+            "Bob <bob@example.com>",
+            "cam@example.com",
+        ]
+        self.message.extra_headers = {
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+        }
+        self.message.merge_headers = {
+            "alice@example.com": {
+                "List-Unsubscribe": "<https://example.com/a/>",
+            },
+            "bob@example.com": {
+                "List-Unsubscribe": "<https://example.com/b/>",
+            },
+        }
+        self.message.send()
+
+        self.assert_esp_called("/api/batch")
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["base"]["headers"],
+            {
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": "<mailto:unsubscribe@example.com>",
+            },
+        )
+
+        self.assertEqual(len(data["requests"]), 3)
+        self.assertEqual(
+            data["requests"][0],
+            {
+                "to": [{"email": "alice@example.com"}],
+                "headers": {
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][1],
+            {
+                "to": [{"email": "bob@example.com", "name": "Bob"}],
+                "headers": {
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
+        )
+        self.assertEqual(
+            data["requests"][2],
+            {
+                "to": [{"email": "cam@example.com"}],
+                # No headers (no merge_data for cam, so global base applies)
+            },
+        )
+
+    def test_batch_send_with_cc_and_bcc(self):
+        self.set_mock_response(
+            json_data={
+                "success": True,
+                "responses": [
+                    {
+                        "success": True,
+                        "message_ids": [
+                            "message-id-alice-to",
+                            "message-id-alice-cc0",
+                            "message-id-alice-cc1",
+                            "message-id-alice-bcc0",
+                        ],
+                    },
+                    {
+                        "success": True,
+                        "message_ids": [
+                            "message-id-bob-to",
+                            "message-id-bob-cc0",
+                            "message-id-bob-cc1",
+                            "message-id-bob-bcc0",
+                        ],
+                    },
+                ],
+            }
+        )
+        message = AnymailMessage(
+            to=["alice@example.com", "Bob <bob@example.com>"],
+            cc=["cc0@example.com", "Also CC <cc1@example.com>"],
+            bcc=["bcc0@example.com"],
+            merge_metadata={},  # force batch send
+        )
+        message.send()
+
+        self.assert_esp_called("/api/batch")
+
+        # cc and bcc must be copied to each subrequest (cannot be in base)
+        data = self.get_api_call_json()
+        self.assertEqual(len(data["requests"]), 2)
+        self.assertEqual(
+            data["requests"][0],
+            {
+                "to": [{"email": "alice@example.com"}],
+                "cc": [
+                    {"email": "cc0@example.com"},
+                    {"email": "cc1@example.com", "name": "Also CC"},
+                ],
+                "bcc": [{"email": "bcc0@example.com"}],
+            },
+        )
+        self.assertEqual(
+            data["requests"][1],
+            {
+                "to": [{"email": "bob@example.com", "name": "Bob"}],
+                "cc": [
+                    {"email": "cc0@example.com"},
+                    {"email": "cc1@example.com", "name": "Also CC"},
+                ],
+                "bcc": [{"email": "bcc0@example.com"}],
+            },
+        )
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["alice@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["alice@example.com"].message_id,
+            "message-id-alice-to",
+        )
+        self.assertEqual(recipients["bob@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["bob@example.com"].message_id,
+            "message-id-bob-to",
+        )
+        # anymail_status.recipients can't represent separate statuses for batch
+        # cc and bcc recipients. For Mailtrap, the status will reflect the cc/bcc
+        # for the last 'to' recipient:
+        self.assertEqual(recipients["cc0@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["cc0@example.com"].message_id,
+            "message-id-bob-cc0",
+        )
+        self.assertEqual(recipients["cc1@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["cc1@example.com"].message_id,
+            "message-id-bob-cc1",
+        )
+        self.assertEqual(recipients["bcc0@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["bcc0@example.com"].message_id,
+            "message-id-bob-bcc0",
+        )
+
+    def test_batch_send_with_mixed_responses(self):
+        self.set_mock_response(
+            json_data={
+                "success": True,
+                "responses": [
+                    {
+                        "success": True,
+                        "message_ids": ["message-id-alice-to"],
+                    },
+                    {"success": False, "errors": ["address is invalid in 'to' 0"]},
+                ],
+            }
+        )
+        message = AnymailMessage(
+            to=["alice@example.com", "invalid@address"],
+            merge_metadata={},  # force batch send
+        )
+        message.send()
+
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["alice@example.com"].status, "queued")
+        self.assertEqual(
+            recipients["alice@example.com"].message_id,
+            "message-id-alice-to",
+        )
+        self.assertEqual(recipients["invalid@address"].status, "failed")
+        self.assertIsNone(recipients["invalid@address"].message_id)
+
+    def test_default_omits_options(self):
+        """Make sure by default we don't send any ESP-specific options.
+
+        Options not specified by the caller should be omitted entirely from
+        the API call (*not* sent as False or empty). This ensures
+        that your ESP account settings apply by default.
+        """
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertNotIn("cc", data)
+        self.assertNotIn("bcc", data)
+        self.assertNotIn("reply_to", data)
+        self.assertNotIn("attachments", data)
+        self.assertNotIn("headers", data)
+        self.assertNotIn("custom_variables", data)
+        self.assertNotIn("category", data)
+
+    def test_esp_extra(self):
+        self.message.esp_extra = {
+            "future_mailtrap_option": "some-value",
+        }
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data["future_mailtrap_option"], "some-value")
+
+    # noinspection PyUnresolvedReferences
+    def test_send_attaches_anymail_status(self):
+        """The anymail_status should be attached to the message when it is sent"""
+        response_content = {
+            "success": True,
+            # Transactional API response lists message ids in to, cc, bcc order
+            "message_ids": [
+                "id-to1",
+                "id-to2",
+                "id-cc1",
+                "id-cc2",
+                "id-bcc1",
+                "id-bcc2",
+            ],
+        }
+        self.set_mock_response(json_data=response_content)
+        msg = mail.EmailMessage(
+            "Subject",
+            "Message",
+            "from@example.com",
+            ["Recipient <to1@example.com>", "to2@example.com"],
+            cc=["CC <cc1@example.com>", "cc2@example.com"],
+            bcc=["BCC <bcc1@example.com>", "bcc2@example.com"],
+        )
+        sent = msg.send()
+        self.assertEqual(sent, 1)
+        self.assertEqual(msg.anymail_status.status, {"queued"})
+        self.assertEqual(
+            msg.anymail_status.message_id,
+            {"id-to1", "id-to2", "id-cc1", "id-cc2", "id-bcc1", "id-bcc2"},
+        )
+        recipients = msg.anymail_status.recipients
+        self.assertEqual(recipients["to1@example.com"].status, "queued")
+        self.assertEqual(recipients["to1@example.com"].message_id, "id-to1")
+        self.assertEqual(recipients["to2@example.com"].status, "queued")
+        self.assertEqual(recipients["to2@example.com"].message_id, "id-to2")
+        self.assertEqual(recipients["cc1@example.com"].status, "queued")
+        self.assertEqual(recipients["cc1@example.com"].message_id, "id-cc1")
+        self.assertEqual(recipients["cc2@example.com"].status, "queued")
+        self.assertEqual(recipients["cc2@example.com"].message_id, "id-cc2")
+        self.assertEqual(recipients["bcc1@example.com"].status, "queued")
+        self.assertEqual(recipients["bcc1@example.com"].message_id, "id-bcc1")
+        self.assertEqual(recipients["bcc2@example.com"].status, "queued")
+        self.assertEqual(recipients["bcc2@example.com"].message_id, "id-bcc2")
+        self.assertEqual(msg.anymail_status.esp_response.json(), response_content)
+
+    def test_wrong_message_id_count(self):
+        self.set_mock_response_message_ids(2)
+        with self.assertRaisesMessage(AnymailAPIError, "Expected 1 message_ids, got 2"):
+            self.message.send()
+
+    # noinspection PyUnresolvedReferences
+    @override_settings(
+        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
+    )
+    def test_sandbox_send(self):
+        self.set_mock_response_message_ids(["sandbox-single-id"])
+        self.message.to = ["Recipient #1 <to1@example.com>", "to2@example.com"]
+        self.message.send()
+
+        self.assert_esp_called("https://sandbox.api.mailtrap.io/api/send/12345")
+        self.assertEqual(self.message.anymail_status.status, {"queued"})
+        self.assertEqual(
+            self.message.anymail_status.message_id,
+            "sandbox-single-id",
+        )
+        self.assertEqual(
+            self.message.anymail_status.recipients["to1@example.com"].message_id,
+            "sandbox-single-id",
+        )
+        self.assertEqual(
+            self.message.anymail_status.recipients["to2@example.com"].message_id,
+            "sandbox-single-id",
+        )
+
+    @override_settings(
+        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": ""}
+    )
+    def test_sandbox_id_empty_string(self):
+        """Use transactional API when MAILTRAP_SANDBOX_ID is an empty string."""
+        self.message.send()
+        self.assert_esp_called("https://send.api.mailtrap.io/api/send")
+
+    @override_settings(
+        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
+    )
+    def test_sandbox_batch_send(self):
+        self.set_mock_response(
+            json_data={
+                "success": True,
+                "responses": [
+                    # Sandbox returns single message_id per request,
+                    # even with multiple recipients via cc/bcc.
+                    {"success": True, "message_ids": ["sandbox-single-id-1"]},
+                    {"success": True, "message_ids": ["sandbox-single-id-2"]},
+                ],
+            }
+        )
+        message = AnymailMessage(
+            "Subject",
+            "Body",
+            "from@example.com",
+            ["Recipient #1 <to1@example.com>", "to2@example.com"],
+            cc=["cc@example.com"],
+            merge_data={},  # force batch send
+        )
+        message.send()
+
+        self.assert_esp_called("https://sandbox.api.mailtrap.io/api/batch/12345")
+        self.assertEqual(
+            message.anymail_status.message_id,
+            {"sandbox-single-id-1", "sandbox-single-id-2"},
+        )
+        self.assertEqual(
+            message.anymail_status.recipients["to1@example.com"].message_id,
+            "sandbox-single-id-1",
+        )
+        self.assertEqual(
+            message.anymail_status.recipients["to2@example.com"].message_id,
+            "sandbox-single-id-2",
+        )
+        self.assertEqual(
+            # For batch cc and bcc, message_id from the last recipient is used
+            message.anymail_status.recipients["cc@example.com"].message_id,
+            "sandbox-single-id-2",
+        )
+
+    @override_settings(
+        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
+    )
+    def test_wrong_message_id_count_sandbox(self):
+        self.set_mock_response_message_ids(2)
+        self.message.to = ["Recipient #1 <to1@example.com>", "to2@example.com"]
+        with self.assertRaisesMessage(AnymailAPIError, "Expected 1 message_ids, got 2"):
+            self.message.send()
+
+    # noinspection PyUnresolvedReferences
+    def test_send_failed_anymail_status(self):
+        """If the send fails, anymail_status should contain initial values"""
+        self.set_mock_response(status_code=500)
+        sent = self.message.send(fail_silently=True)
+        self.assertEqual(sent, 0)
+        self.assertIsNone(self.message.anymail_status.status)
+        self.assertIsNone(self.message.anymail_status.message_id)
+        self.assertEqual(self.message.anymail_status.recipients, {})
+        self.assertIsNone(self.message.anymail_status.esp_response)
+
+    # noinspection PyUnresolvedReferences
+    def test_send_unparsable_response(self):
+        mock_response = self.set_mock_response(
+            status_code=200, raw=b"yikes, this isn't a real response"
+        )
+        with self.assertRaises(AnymailAPIError):
+            self.message.send()
+        self.assertIsNone(self.message.anymail_status.status)
+        self.assertIsNone(self.message.anymail_status.message_id)
+        self.assertEqual(self.message.anymail_status.recipients, {})
+        self.assertEqual(self.message.anymail_status.esp_response, mock_response)
+
+    def test_send_with_serialization_error(self):
+        self.message.extra_headers = {
+            "foo": Decimal("1.23")
+        }  # Decimal can't be serialized
+        with self.assertRaises(AnymailSerializationError) as cm:
+            self.message.send()
+        err = cm.exception
+        self.assertIsInstance(err, TypeError)
+        self.assertRegex(str(err), r"Decimal.*is not JSON serializable")
+
+    def test_error_response(self):
+        self.set_mock_response(
+            status_code=401, json_data={"success": False, "error": "Invalid API token"}
+        )
+        with self.assertRaisesMessage(AnymailAPIError, "Invalid API token"):
+            self.message.send()
+
+    def test_unexpected_success_false(self):
+        self.set_mock_response(
+            status_code=200,
+            json_data={"success": False, "message_ids": ["message-id-1"]},
+        )
+        with self.assertRaisesMessage(
+            AnymailAPIError, "Unexpected API failure fields with response status 200"
+        ):
+            self.message.send()
+
+    def test_unexpected_errors(self):
+        self.set_mock_response(
+            status_code=200,
+            json_data={
+                "success": True,
+                "errors": ["oops"],
+                "message_ids": ["message-id-1"],
+            },
+        )
+        with self.assertRaisesMessage(
+            AnymailAPIError, "Unexpected API failure fields with response status 200"
+        ):
+            self.message.send()
+
+    @override_settings(
+        ANYMAIL={
+            "MAILTRAP_API_TOKEN": "test-token",
+            "MAILTRAP_API_URL": "https://bulk.api.mailtrap.io/api",
+        }
+    )
+    def test_override_api_url(self):
+        self.message.send()
+        self.assert_esp_called("https://bulk.api.mailtrap.io/api/send")
+
+
+@tag("mailtrap")
+class MailtrapBackendSessionSharingTestCase(
+    SessionSharingTestCases, MailtrapBackendMockAPITestCase
+):
+    """Requests session sharing tests"""
+
+    pass  # tests are defined in SessionSharingTestCases
+
+
+@tag("mailtrap")
+@override_settings(EMAIL_BACKEND="anymail.backends.mailtrap.EmailBackend")
+class MailtrapBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
+    """Test ESP backend without required settings in place"""
+
+    def test_missing_api_token(self):
+        with self.assertRaises(ImproperlyConfigured) as cm:
+            mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
+        errmsg = str(cm.exception)
+        self.assertRegex(errmsg, r"\bMAILTRAP_API_TOKEN\b")
+        self.assertRegex(errmsg, r"\bANYMAIL_MAILTRAP_API_TOKEN\b")

@@ -44,6 +44,7 @@ jobs:
           - { tox: django60-py314-mailersend, python: "3.14" }
           - { tox: django60-py314-mailgun, python: "3.14" }
           - { tox: django60-py314-mailjet, python: "3.14" }
+          - { tox: django60-py314-mailtrap, python: "3.14" }
           - { tox: django60-py314-mandrill, python: "3.14" }
           - { tox: django60-py314-postal, python: "3.14" }
           - { tox: django60-py314-postmark, python: "3.14" }
@@ -89,6 +90,10 @@ jobs:
           ANYMAIL_TEST_MAILJET_DOMAIN: ${{ vars.ANYMAIL_TEST_MAILJET_DOMAIN }}
           ANYMAIL_TEST_MAILJET_SECRET_KEY: ${{ secrets.ANYMAIL_TEST_MAILJET_SECRET_KEY }}
           ANYMAIL_TEST_MAILJET_TEMPLATE_ID: ${{ vars.ANYMAIL_TEST_MAILJET_TEMPLATE_ID }}
+          ANYMAIL_TEST_MAILTRAP_API_TOKEN: ${{ secrets.ANYMAIL_TEST_MAILTRAP_API_TOKEN }}
+          ANYMAIL_TEST_MAILTRAP_DOMAIN: ${{ vars.ANYMAIL_TEST_MAILTRAP_DOMAIN }}
+          ANYMAIL_TEST_MAILTRAP_SANDBOX_ID: ${{ vars.ANYMAIL_TEST_MAILTRAP_SANDBOX_ID }}
+          ANYMAIL_TEST_MAILTRAP_TEMPLATE_UUID: ${{ vars.ANYMAIL_TEST_MAILTRAP_TEMPLATE_UUID }}
           ANYMAIL_TEST_MANDRILL_API_KEY: ${{ secrets.ANYMAIL_TEST_MANDRILL_API_KEY }}
           ANYMAIL_TEST_MANDRILL_DOMAIN: ${{ secrets.ANYMAIL_TEST_MANDRILL_DOMAIN }}
           ANYMAIL_TEST_POSTMARK_DOMAIN: ${{ secrets.ANYMAIL_TEST_POSTMARK_DOMAIN }}

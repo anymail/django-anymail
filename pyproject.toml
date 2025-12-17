@@ -13,7 +13,7 @@ authors = [
 ]
 description = """\
 Django email backends and webhooks for Amazon SES, Brevo,
- MailerSend, Mailgun, Mailjet, Mandrill, Postal, Postmark, Resend,
+ MailerSend, Mailgun, Mailjet, Mailtrap, Mandrill, Postal, Postmark, Resend,
  Scaleway TEM, SendGrid, SparkPost, and Unisender Go
  (EmailBackend, transactional email tracking and inbound email signals)\
 """
@@ -26,6 +26,7 @@ keywords = [
     "Brevo", "SendinBlue",
     "MailerSend",
     "Mailgun", "Mailjet", "Sinch",
+    "Mailtrap",
     "Mandrill", "MailChimp",
     "Postal",
     "Postmark", "ActiveCampaign",
@@ -68,6 +69,7 @@ dependencies = [
     "idna",
     "requests>=2.4.3",
     "urllib3>=1.25.0",  # requests dependency: fixes RFC 7578 header encoding
+    "typing_extensions>=4.12;python_version<'3.11'",  # for older Python compatibility
 ]
 
 [project.optional-dependencies]
@@ -79,6 +81,7 @@ brevo = []
 mailersend = []
 mailgun = []
 mailjet = []
+mailtrap = []
 mandrill = []
 postal = [
     # Postal requires cryptography for verifying webhooks.
