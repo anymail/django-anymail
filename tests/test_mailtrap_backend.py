@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from base64 import b64encode
 from datetime import datetime
 from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
@@ -16,18 +13,17 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import AnymailMessage, attach_inline_image_file
+from anymail.message import AnymailMessage, attach_inline_image
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
 from .utils import (
-    SAMPLE_IMAGE_FILENAME,
     AnymailTestMixin,
+    create_text_attachment,
     decode_att,
     sample_image_content,
-    sample_image_path,
 )
 
 
@@ -162,12 +158,21 @@ class MailtrapBackendStandardEmailTests(MailtrapBackendMockAPITestCase):
             self.message.send()
 
     def test_reply_to(self):
-        # Reply-To is handled as a header, rather than API "reply_to" field,
-        # to support multiple addresses.
+        self.message.reply_to = ['"Reply, with comma" <reply@example.com>']
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["reply_to"],
+            {"name": "Reply, with comma", "email": "reply@example.com"},
+        )
+
+    def test_multiple_reply_to(self):
+        # Mailtrap allows a fully-formatted Reply-To header
+        # instead of the `reply_to` parameter.
         self.message.reply_to = [
             "reply@example.com",
             '"Other, with comma" <reply2@example.com>',
-            "Інше <reply3@example.com>",
+            "Інше <reply3@příklad.example.cz>",
         ]
         self.message.extra_headers = {"X-Other": "Keep"}
         self.message.send()
@@ -175,129 +180,106 @@ class MailtrapBackendStandardEmailTests(MailtrapBackendMockAPITestCase):
         self.assertEqual(
             data["headers"],
             {
-                # Reply-To must be properly formatted as an address header:
+                # Reply-To must be properly formatted as an address header
+                # using an RFC 2047 encoded-word for Unicode display-names
                 "Reply-To": "reply@example.com,"
                 ' "Other, with comma" <reply2@example.com>,'
-                " =?utf-8?b?0IbQvdGI0LU=?= <reply3@example.com>",
+                " =?utf-8?b?0IbQvdGI0LU=?= <reply3@xn--pklad-zsa96e.example.cz>",
                 "X-Other": "Keep",
             },
         )
 
-    def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
-        self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+    def test_eai_with_multiple_reply_to(self):
+        # When Anymail formats the Reply-To header, there's no way to handle EAI.
+        # (EAI single reply_to is included in test_non_ascii_headers() below.)
+        self.message.reply_to = ["відповідь@example.com", "other@example.com"]
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "EAI with multiple reply_to addresses"
+        ):
+            self.message.send()
+
+    def test_non_ascii_headers(self):
+        # Mailtrap correctly encodes non-ASCII display-names and other headers
+        # (but requires IDNA encoding for non-ASCII domain names).
+        # Mailtrap (currently) incorrectly applies rfc2047 to EAI addresses,
+        # resulting in invalid address headers and an API error for EAI `from`.
+        # (For these mock backend tests, assume those bugs are fixed.)
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <відправник@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <одержувач@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <відповідь@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["from"],
+            {
+                "name": "Odesílatel, z adresy",
+                "email": "відправник@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["to"],
+            [
+                {
+                    "name": "Příjemce, na adresu",
+                    "email": "одержувач@xn--pklad-zsa96e.example.cz",
+                }
+            ],
+        )
+        self.assertEqual(data["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["reply_to"],
+            {
+                "name": "Odpověď, adresa",
+                "email": "відповідь@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["headers"],
+            {"X-Extra": "Další"},
         )
 
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
-
-        # Should work with a MIMEBase object (also tests no filename)...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf data"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        self.message.attach(mimeattachment)
+    def test_attachments(self):
+        # Mailtrap supports non-utf-8 content with charset in the `type` field.
+        # Mailtrap accepts non-ASCII filenames but incorrectly sends them
+        # as 8-bit utf-8 (without using RFC 2231 encoding).
+        # The filename param is required.
+        text_content = "pièce jointe\n"
+        self.message.attach(
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
+        )
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
 
         self.message.send()
         data = self.get_api_call_json()
         attachments = data["attachments"]
         self.assertEqual(len(attachments), 3)
-        self.assertEqual(attachments[0]["filename"], "test.txt")
-        self.assertEqual(attachments[0]["type"], "text/plain")
+
+        self.assertEqual(attachments[0]["type"], 'text/plain; charset="iso-8859-1"')
+        self.assertEqual(attachments[0]["filename"], "attachment")
         self.assertEqual(
-            decode_att(attachments[0]["content"]).decode("ascii"), text_content
+            decode_att(attachments[0]["content"]).decode("iso-8859-1"), text_content
         )
-        self.assertEqual(attachments[0].get("disposition", "attachment"), "attachment")
+        self.assertNotIn("disposition", attachments[0])
         self.assertNotIn("content_id", attachments[0])
 
-        # ContentType inferred from filename:
-        self.assertEqual(attachments[1]["type"], "image/png")
-        self.assertEqual(attachments[1]["filename"], "test.png")
-        self.assertEqual(decode_att(attachments[1]["content"]), png_content)
-        # make sure image not treated as inline:
-        self.assertEqual(attachments[1].get("disposition", "attachment"), "attachment")
+        self.assertEqual(attachments[1]["type"], "image/x-emoticon")
+        self.assertEqual(attachments[1]["filename"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["content"]), b";-)")
+        self.assertNotIn("disposition", attachments[1])
         self.assertNotIn("content_id", attachments[1])
 
-        self.assertEqual(attachments[2]["type"], "application/pdf")
-        self.assertEqual(attachments[2]["filename"], "attachment")  # default
-        self.assertEqual(decode_att(attachments[2]["content"]), pdf_content)
-        self.assertEqual(attachments[2].get("disposition", "attachment"), "attachment")
-        self.assertNotIn("content_id", attachments[2])
-
-    def test_unicode_attachment_correctly_decoded(self):
-        self.message.attach(
-            "Une pièce jointe.html", "<p>\u2019</p>", mimetype="text/html"
-        )
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["attachments"],
-            [
-                {
-                    "filename": "Une pièce jointe.html",
-                    "type": "text/html",
-                    "content": b64encode("<p>\u2019</p>".encode("utf-8")).decode(
-                        "ascii"
-                    ),
-                }
-            ],
-        )
-
-    def test_embedded_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(data["html"], html_content)
-
-        attachments = data["attachments"]
-        self.assertEqual(len(attachments), 1)
-        self.assertEqual(attachments[0]["filename"], image_filename)
-        self.assertEqual(attachments[0]["type"], "image/png")
-        self.assertEqual(decode_att(attachments[0]["content"]), image_data)
-        self.assertEqual(attachments[0]["disposition"], "inline")
-        self.assertEqual(attachments[0]["content_id"], cid)
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly
-        image = MIMEImage(image_data)
-        self.message.attach(image)
-
-        image_data_b64 = b64encode(image_data).decode("ascii")
-
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["attachments"],
-            [
-                {
-                    "filename": image_filename,  # the named one
-                    "type": "image/png",
-                    "content": image_data_b64,
-                },
-                {
-                    "filename": "attachment",  # the unnamed one
-                    "type": "image/png",
-                    "content": image_data_b64,
-                },
-            ],
-        )
+        self.assertEqual(attachments[2]["type"], "image/png")  # from filename
+        self.assertEqual(attachments[2]["filename"], "test.png")
+        self.assertEqual(attachments[2]["disposition"], "inline")
+        self.assertEqual(attachments[2]["content_id"], cid)
+        self.assertEqual(decode_att(attachments[2]["content"]), image_data)
 
     def test_multiple_html_alternatives(self):
         # Multiple alternatives not allowed

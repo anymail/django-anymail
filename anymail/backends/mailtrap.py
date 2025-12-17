@@ -34,6 +34,7 @@ MailtrapData = TypedDict(
         "to": NotRequired[List[MailtrapAddress]],
         "cc": NotRequired[List[MailtrapAddress]],
         "bcc": NotRequired[List[MailtrapAddress]],
+        "reply_to": NotRequired[MailtrapAddress],
         "attachments": NotRequired[List[MailtrapAttachment]],
         "headers": NotRequired[Dict[str, str]],
         "custom_variables": NotRequired[Dict[str, str]],
@@ -136,16 +137,8 @@ class MailtrapPayload(RequestsPayload):
     def init_payload(self):
         self.data: MailtrapData = {}
 
-    @staticmethod
-    def _mailtrap_email(email: EmailAddress) -> MailtrapAddress:
-        """Expand an Anymail EmailAddress into Mailtrap's {"email", "name"} dict"""
-        result: MailtrapAddress = {"email": email.addr_spec}
-        if email.display_name:
-            result["name"] = email.display_name
-        return result
-
     def set_from_email(self, email: EmailAddress):
-        self.data["from"] = self._mailtrap_email(email)
+        self.data["from"] = email.as_dict(idna_encode=self.backend.idna_encode)
 
     def set_recipients(
         self, recipient_type: Literal["to", "cc", "bcc"], emails: List[EmailAddress]
@@ -153,7 +146,7 @@ class MailtrapPayload(RequestsPayload):
         assert recipient_type in ["to", "cc", "bcc"]
         if emails:
             self.data[recipient_type] = [
-                self._mailtrap_email(email) for email in emails
+                email.as_dict(idna_encode=self.backend.idna_encode) for email in emails
             ]
 
             if recipient_type == "to":
@@ -169,11 +162,21 @@ class MailtrapPayload(RequestsPayload):
             self.data["subject"] = subject
 
     def set_reply_to(self, emails: List[EmailAddress]):
-        if emails:
-            # Use header rather than "reply_to" param
-            # to allow multiple reply-to addresses
+        if len(emails) == 1:
+            # Let Mailtrap handle the header generation (and EAI if needed)
+            self.data["reply_to"] = emails[0].as_dict(
+                idna_encode=self.backend.idna_encode
+            )
+        elif len(emails) >= 2:
+            # Use header rather than "reply_to" param for multiple reply-to
+            # addresses. We must format (and encode) the header ourselves.
+            if any(email.uses_eai for email in emails):
+                # There's no way for us to encode an EAI address properly.
+                # (Mailtrap will apply rfc2047 if any 8-bit header content.)
+                self.unsupported_feature("EAI with multiple reply_to addresses")
             self.data.setdefault("headers", {})["Reply-To"] = ", ".join(
-                email.address for email in emails
+                email.format(use_rfc2047=True, idna_encode=self.backend.idna_encode)
+                for email in emails
             )
 
     def set_extra_headers(self, headers):
@@ -198,11 +201,10 @@ class MailtrapPayload(RequestsPayload):
             # Mailtrap requires filename even for inline attachments.
             # Provide a fallback filename like the Mailjet backend does.
             "filename": attachment.name or "attachment",
+            "type": attachment.content_type,
             "content": attachment.b64content,
             # default disposition is "attachment"
         }
-        if attachment.mimetype:
-            att["type"] = attachment.mimetype
         if attachment.inline:
             att["disposition"] = "inline"
             att["content_id"] = attachment.cid

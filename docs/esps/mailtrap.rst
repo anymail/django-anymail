@@ -160,21 +160,16 @@ Limitations and quirks
   :attr:`~anymail.message.AnymailMessage.template_id` will result in a Mailtrap
   API error that "'category' is not allowed with 'template_uuid'."
 
-**Error when non-ASCII From name includes comma**
-  Trying to send a message with a ``from_email`` display name containing both
-  a non-ASCII Unicode character *and* a comma (e.g., ``'"Ng, Göta" <gng@example.com>'``)
-  will result in a Mailtrap API error that the "'From:' header does not match
-  the sender's domain." This does not affect other address fields (like ``to``
-  or ``reply_to``). It appears to be a limitation of Mailtrap's API, and there
-  is no general workaround Anymail could apply. To avoid the problem, you must
-  rework your *From* address to either remove either the comma or be ASCII-only.
-
 **No delayed sending**
   Mailtrap does not support :attr:`~anymail.message.AnymailMessage.send_at`.
 
 **Attachments require filenames**
   Mailtrap requires that all attachments and inline images have filenames. If you
   don't supply a filename, Anymail will use ``"attachment"`` as the filename.
+
+**Non-ASCII attachment filenames will be garbled**
+  Mailtrap's API does not properly encode Unicode characters in attachment
+  filenames. Some email clients will display those characters incorrectly.
 
 **No click-tracking or open-tracking options**
   Mailtrap does not provide a way to control open or click tracking for individual
@@ -186,6 +181,19 @@ Limitations and quirks
 **No envelope sender overrides**
   Mailtrap does not support overriding :attr:`~anymail.message.AnymailMessage.envelope_sender`.
 
+**Non-ASCII mailboxes (EAI)**
+  Mailtrap partially supports Unicode mailboxes (the *user* part of
+  *user\@domain*---see :ref:`EAI <eai>`). EAI recipient addresses (to, cc, bcc)
+  are delivered correctly, but Mailtrap generates invalid header fields that may
+  display as empty or garbled, depending on the email app.
+
+  Trying to use an EAI ``from_email`` results in a Mailtrap API error that the
+  "'From' header does not match the sender's domain."
+
+  EAI in ``reply_to`` is supported (though may generate an invalid header
+  field) for a single address. Using EAI with multiple reply addresses will
+  cause an :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error because
+  Anymail cannot accurately communicate that to Mailtrap's API.
 
 .. _exclude specific links from tracking:
    https://help.mailtrap.io/article/184-excluding-specific-links-from-tracking
