@@ -75,6 +75,12 @@ Breaking changes
 Features
 ~~~~~~~~
 
+* Support Django 6.0.
+
+* Allow Python's modern MIMEPart object as attachments (new in Django 6.0).
+  Use MIMEPart for Anymail's ``attach_inline_image`` helpers under Django 6.0
+  and later.
+
 * **Resend:** Add support for inline images. Identify attachment content type
   using new API parameter, including accurately specifying charset for
   non-ASCII text attachments. (See related Resend breaking change above.)
@@ -112,6 +118,16 @@ Other
 * **Unisender Go:** Document a Unisender Go API bug that can cause an Reply-To
   address (only) with a non-ASCII display name to display incorrectly in some
   email clients.
+
+Deprecations
+~~~~~~~~~~~~
+
+* This will be the last Anymail release to support Django 4.0 and 4.1
+  (which reached end of extended support on 2023-04-01 and 2023-12-01,
+  respectively).
+
+* This will be the last Anymail release to support Python 3.8 and 3.9
+  (which reached end of life on 2024-10-07 and 2025-10-31, respectively).
 
 
 v13.1

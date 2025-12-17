@@ -1,6 +1,8 @@
 from datetime import date, datetime
+from email.message import MIMEPart
 from email.mime.image import MIMEImage
 
+import django
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, override_settings, tag
@@ -243,8 +245,19 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
 
     def test_inline_missing_content_id(self):
         # Mailgun silently drops inline images without Content-Id
-        mimeattachment = MIMEImage(b"imagedata", "x-fakeimage")
-        mimeattachment["Content-Disposition"] = 'inline; filename="fakeimage.txt"'
+        if django.VERSION >= (6, 0):
+            mimeattachment = MIMEPart()
+            mimeattachment.set_content(
+                b"imagedata",
+                maintype="image",
+                subtype="x-fakeimage",
+                disposition="inline",
+                filename="fakeimage.txt",
+            )
+        else:
+            # MIMEBase attachments deprecated in Django 6.0, removed in Django 7.0
+            mimeattachment = MIMEImage(b"imagedata", "x-fakeimage")
+            mimeattachment["Content-Disposition"] = 'inline; filename="fakeimage.txt"'
         self.message.attach(mimeattachment)
         with self.assertRaisesMessage(
             AnymailUnsupportedFeature, "inline attachments without Content-ID"

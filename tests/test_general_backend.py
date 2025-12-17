@@ -1,6 +1,5 @@
 import unittest
 from datetime import datetime, timezone
-from email.mime.text import MIMEText
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
@@ -355,12 +354,10 @@ class LazyStringsTest(TestBackendTestCase):
         self.message.attach(
             gettext_lazy("test.csv"), gettext_lazy("test,csv,data"), "text/csv"
         )
-        self.message.attach(MIMEText(gettext_lazy("contact info")))
         self.message.send()
         params = self.get_send_params()
         self.assertNotLazy(params["attachments"][0].name)
         self.assertNotLazy(params["attachments"][0].content)
-        self.assertNotLazy(params["attachments"][1].content)
 
     def test_lazy_tags(self):
         self.message.tags = [gettext_lazy("Shipping"), gettext_lazy("Sales")]

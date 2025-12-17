@@ -39,19 +39,19 @@ jobs:
         # Live API integration tests are run on only one representative Python/Django version
         # combination, to avoid rapidly consuming the testing accounts' entire send allotments.
         config:
-          - { tox: django52-py313-amazon_ses, python: "3.13" }
-          - { tox: django52-py313-brevo, python: "3.13" }
-          - { tox: django52-py313-mailersend, python: "3.13" }
-          - { tox: django52-py313-mailgun, python: "3.13" }
-          - { tox: django52-py313-mailjet, python: "3.13" }
-          - { tox: django52-py313-mandrill, python: "3.13" }
-          - { tox: django52-py313-postal, python: "3.13" }
-          - { tox: django52-py313-postmark, python: "3.13" }
-          - { tox: django52-py313-resend, python: "3.13" }
-          - { tox: django52-py313-scaleway, python: "3.13" }
-          # - { tox: django52-py313-sendgrid, python: "3.13" }
-          - { tox: django52-py313-sparkpost, python: "3.13" }
-          - { tox: django52-py313-unisender_go, python: "3.13" }
+          - { tox: django60-py314-amazon_ses, python: "3.14" }
+          - { tox: django60-py314-brevo, python: "3.14" }
+          - { tox: django60-py314-mailersend, python: "3.14" }
+          - { tox: django60-py314-mailgun, python: "3.14" }
+          - { tox: django60-py314-mailjet, python: "3.14" }
+          - { tox: django60-py314-mandrill, python: "3.14" }
+          - { tox: django60-py314-postal, python: "3.14" }
+          - { tox: django60-py314-postmark, python: "3.14" }
+          - { tox: django60-py314-resend, python: "3.14" }
+          - { tox: django60-py314-scaleway, python: "3.14" }
+          # - { tox: django60-py314-sendgrid, python: "3.14" }
+          - { tox: django60-py314-sparkpost, python: "3.14" }
+          - { tox: django60-py314-unisender_go, python: "3.14" }
 
     steps:
       - name: Get code
