@@ -247,6 +247,11 @@ Examples (for a non-template send):
                 'ContactListName': 'RegisteredUsers',
                 'TopicName': 'DailyUpdates',
             },
+            # Specify a tenant (when using isolated tenant management):
+            'TenantName': 'MyTenant',
+            # Send through a Global endpoint MREP (multi-region endpoint).
+            # This must be the actual endpoint id, not its friendly name:
+            'EndpointId': 'abcdef12.g3h',
         }
 
 
@@ -761,7 +766,7 @@ Following the principle of `least privilege`_, you should omit permissions
 for any features you aren't using, and you may want to add additional restrictions:
 
 * For Amazon SES sending, you can add conditions to restrict senders, recipients, times,
-  or other properties. See Amazon's `Controlling access to Amazon SES`_ guide.
+  tenants, or other properties. See Amazon's `Controlling access to Amazon SES`_ guide.
   But be aware that:
 
   * The v2 ``ses:SendBulkEmail`` action does not support condition keys that
