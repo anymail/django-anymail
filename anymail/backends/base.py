@@ -1,14 +1,16 @@
 import json
 from datetime import date, datetime, timezone
 
-from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
+from django.utils.module_loading import import_string
 from django.utils.timezone import get_current_timezone, is_naive, make_aware
 from requests.structures import CaseInsensitiveDict
 
 from ..exceptions import (
     AnymailCancelSend,
+    AnymailConfigurationError,
     AnymailError,
+    AnymailInvalidAddress,
     AnymailRecipientsRefused,
     AnymailSerializationError,
     AnymailUnsupportedFeature,
@@ -31,6 +33,8 @@ from ..utils import (
     parse_address_list,
     parse_single_address,
 )
+
+DEFAULT_IDNA_ENCODER = "idna2008"
 
 
 class AnymailBaseBackend(BaseEmailBackend):
@@ -62,6 +66,26 @@ class AnymailBaseBackend(BaseEmailBackend):
             send_defaults = send_defaults.copy()
             send_defaults.update(esp_send_defaults)
         self.send_defaults = send_defaults
+
+        # Initialize self._idna_encoder from IDNA_ENCODER setting
+        # (optionally ESP-specific)
+        self.idna_encoder = get_anymail_setting(
+            "idna_encoder", esp_name=self.esp_name, kwargs=kwargs, default=None
+        ) or get_anymail_setting("idna_encoder", default=DEFAULT_IDNA_ENCODER)
+        if callable(self.idna_encoder):
+            self._idna_encoder = self.idna_encoder
+        else:
+            try:
+                dotted_path = (
+                    self.idna_encoder
+                    if "." in self.idna_encoder
+                    else f"anymail._idna.{self.idna_encoder}"  # built-ins
+                )
+                self._idna_encoder = import_string(dotted_path)
+            except (ImportError, TypeError) as error:
+                raise AnymailConfigurationError(
+                    f"cannot resolve IDNA_ENCODER={self.idna_encoder!r}"
+                ) from error
 
     def open(self):
         """
@@ -156,6 +180,15 @@ class AnymailBaseBackend(BaseEmailBackend):
         )
 
         return True
+
+    def idna_encode(self, domain):
+        try:
+            return self._idna_encoder(domain)
+        except ValueError as error:
+            # ValueError includes UnicodeError, idna.IDNAError, uts46.UTS46Error, etc.
+            raise AnymailInvalidAddress(
+                f"Cannot encode {domain!r} using IDNA_ENCODER={self.idna_encoder!r}"
+            ) from error
 
     def run_pre_send(self, message):
         """Send pre_send signal, and return True if message should still be sent"""
@@ -443,11 +476,8 @@ class BasePayload:
         ]
 
     def prepped_attachments(self, attachments):
-        str_encoding = self.message.encoding or settings.DEFAULT_CHARSET
-        return [
-            Attachment(attachment, str_encoding)  # (handles lazy content, filename)
-            for attachment in attachments
-        ]
+        # (handles lazy content, filename, charset)
+        return [Attachment(attachment) for attachment in attachments]
 
     def aware_datetime(self, value):
         """Converts a date or datetime or timestamp to an aware datetime.

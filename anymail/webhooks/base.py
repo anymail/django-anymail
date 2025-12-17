@@ -9,6 +9,13 @@ from django.views.generic import View
 from ..exceptions import AnymailInsecureWebhookWarning, AnymailWebhookValidationFailure
 from ..utils import collect_all_methods, get_anymail_setting, get_request_basic_auth
 
+try:
+    from django.contrib.auth.decorators import login_not_required
+except ImportError:
+    # LoginRequiredMiddleware added in Django 5.1
+    def login_not_required(view_func):
+        return view_func
+
 
 # Mixin note: Django's View.__init__ doesn't cooperate with chaining,
 # so all mixins that need __init__ must appear before View in MRO.
@@ -63,6 +70,7 @@ class AnymailCoreWebhookView(View):
     http_method_names = ["post", "head", "options"]
 
     @method_decorator(csrf_exempt)
+    @method_decorator(login_not_required)
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
 

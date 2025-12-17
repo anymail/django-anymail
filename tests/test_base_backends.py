@@ -13,7 +13,7 @@ class MinimalRequestsBackend(AnymailRequestsBackend):
     """(useful only for these tests)"""
 
     esp_name = "Example"
-    api_url = "https://httpbin.org/post"  # helpful echoback endpoint for live testing
+    api_url = "https://httpbingo.org/post"  # helpful echoback endpoint for live testing
 
     def __init__(self, **kwargs):
         super().__init__(self.api_url, **kwargs)
@@ -56,7 +56,7 @@ class RequestsBackendBaseTestCase(RequestsBackendMockAPITestCase):
     def test_minimal_requests_backend(self):
         """Make sure the testing backend defined above actually works"""
         self.message.send()
-        self.assert_esp_called("https://httpbin.org/post")
+        self.assert_esp_called("https://httpbingo.org/post")
 
     def test_timeout_default(self):
         """All requests have a 30 second default timeout"""
@@ -102,14 +102,14 @@ class RequestsBackendLiveTestCase(AnymailTestMixin, SimpleTestCase):
         # but make sure that the output contains some expected pieces of the request
         # and the response
         output = outbuf.getvalue()
-        self.assertIn("\nPOST https://httpbin.org/post\n", output)
+        self.assertIn("\nPOST https://httpbingo.org/post\n", output)
         self.assertIn("\nUser-Agent: django-anymail/", output)
         self.assertIn("\nAccept: application/json\n", output)
         self.assertIn("\nContent-Type: text/plain\n", output)  # request
         self.assertIn("\n\nRequest body\n", output)
         self.assertIn("\n----- Response\n", output)
         self.assertIn("\nHTTP 200 OK\n", output)
-        self.assertIn("\nContent-Type: application/json\n", output)  # response
+        self.assertIn("\ncontent-type: application/json", output.lower())  # response
 
     def test_no_debug_logging(self):
         # Make sure it doesn't output anything when DEBUG_API_REQUESTS is not set

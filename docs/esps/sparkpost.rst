@@ -257,6 +257,12 @@ Limitations and quirks
 
   .. versionchanged:: 8.2
 
+**Non-ASCII mailboxes (EAI)**
+  SparkPost supports sending from or to Unicode mailboxes (the *user* part of
+  *user\@domain*---see :ref:`EAI <eai>`), but does not properly verify the
+  receiving SMTP server supports them (smtputf8). For valid EAI recipient
+  addresses, this generally shouldn't cause problems. For an EAI ``from_email``
+  or ``reply_to`` this could result in lost or undeliverable messages.
 
 .. _sparkpost-templates:
 

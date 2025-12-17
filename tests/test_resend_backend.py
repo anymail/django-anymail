@@ -1,9 +1,6 @@
 import json
-from base64 import b64encode
 from datetime import date, datetime
 from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
@@ -18,18 +15,17 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import AnymailMessage, attach_inline_image_file
+from anymail.message import AnymailMessage, attach_inline_image
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
 from .utils import (
-    SAMPLE_IMAGE_FILENAME,
     AnymailTestMixin,
+    create_text_attachment,
     decode_att,
     sample_image_content,
-    sample_image_path,
 )
 
 
@@ -179,101 +175,99 @@ class ResendBackendStandardEmailTests(ResendBackendMockAPITestCase):
             data["reply_to"], ["reply@example.com", "Other <reply2@example.com>"]
         )
 
-    def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
-        self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+    def test_non_ascii_headers(self):
+        # Resend correctly encodes non-ASCII display-names and other headers
+        # (but requires IDNA encoding for non-ASCII domain names).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
         )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["from"], '"Odesílatel, z adresy" <from@xn--pklad-zsa96e.example.cz>'
+        )
+        self.assertEqual(
+            data["to"], ['"Příjemce, na adresu" <to@xn--pklad-zsa96e.example.cz>']
+        )
+        self.assertEqual(data["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["reply_to"], ['"Odpověď, adresa" <reply@xn--pklad-zsa96e.example.cz>']
+        )
+        self.assertEqual(data["headers"], {"X-Extra": "Další"})
 
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
+    def test_attachments(self):
+        # Resend supports non-utf-8 content with charset in the `content_type` field.
+        # Resend requires attachment filenames whose extensions are consistent with
+        # the content_type (and silently drops messages where they aren't).
+        # It allows non-ASCII filenames and sends them correctly using rfc2231
+        # in the Content-Disposition filename param (but incorrectly applies
+        # rfc2047 in the obsolete Content-Type name param).
+        text_content = "pièce jointe\n"
+        self.message.attach(
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
+        )
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
 
-        # Should work with a MIMEBase object (also tests no filename)...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf data"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        self.message.attach(mimeattachment)
+        self.message.send()
+        data = self.get_api_call_json()
 
+        attachments = data["attachments"]
+        self.assertEqual(len(attachments), 3)
+
+        self.assertEqual(
+            attachments[0]["content_type"], 'text/plain; charset="iso-8859-1"'
+        )
+        self.assertEqual(attachments[0]["filename"], "attachment.txt")  # generated
+        self.assertEqual(
+            decode_att(attachments[0]["content"]).decode("iso-8859-1"), text_content
+        )
+        self.assertNotIn("content_id", attachments[0])
+
+        self.assertEqual(attachments[1]["content_type"], "image/x-emoticon")
+        self.assertEqual(attachments[1]["filename"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["content"]), b";-)")
+        self.assertNotIn("content_id", attachments[1])
+
+        self.assertEqual(attachments[2]["content_type"], "image/png")
+        self.assertEqual(attachments[2]["filename"], "test.png")
+        self.assertEqual(decode_att(attachments[2]["content"]), image_data)
+        self.assertEqual(attachments[2]["content_id"], cid)
+
+    def test_mismatched_attachment_extension(self):
+        # See note above about silently dropping messages.
+        self.message.attach("data.txt", "data", "text/csv")
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature,
+            "attachments of type text/csv with name 'data.txt'",
+        ):
+            self.message.send()
+
+    @override_settings(ANYMAIL_RESEND_VERIFY_ATTACHMENT_EXTENSIONS=False)
+    def test_mismatched_attachment_setting(self):
+        # Undocumented setting to disable mismatched extension check
+        self.message.attach("data.txt", "data", "text/csv")
         self.message.send()
         data = self.get_api_call_json()
         attachments = data["attachments"]
-        self.assertEqual(len(attachments), 3)
-        self.assertEqual(attachments[0]["filename"], "test.txt")
-        self.assertEqual(
-            decode_att(attachments[0]["content"]).decode("ascii"), text_content
-        )
+        self.assertEqual(len(attachments), 1)
+        self.assertEqual(attachments[0]["content_type"], 'text/csv; charset="utf-8"')
+        self.assertEqual(attachments[0]["filename"], "data.txt")
 
-        self.assertEqual(attachments[1]["filename"], "test.png")
-        self.assertEqual(decode_att(attachments[1]["content"]), png_content)
-
-        # unnamed attachment given default name with correct extension for content type
-        self.assertEqual(attachments[2]["filename"], "attachment.pdf")
-        self.assertEqual(decode_att(attachments[2]["content"]), pdf_content)
-
-    def test_unicode_attachment_correctly_decoded(self):
-        self.message.attach(
-            "Une pièce jointe.html", "<p>\u2019</p>", mimetype="text/html"
-        )
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["attachments"],
-            [
-                {
-                    "filename": "Une pièce jointe.html",
-                    "content": b64encode("<p>\u2019</p>".encode("utf-8")).decode(
-                        "ascii"
-                    ),
-                }
-            ],
-        )
-
-    def test_embedded_images(self):
-        # Resend's API doesn't have a way to specify content-id
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "inline content-id"):
+    def test_missing_attachment_filename_unknown_type(self):
+        # test_attachments() covers generating a missing filename (attachment.txt).
+        # Verify an error when the extension can't be determined.
+        self.message.attach(None, "data", "text/x-unknown-type")
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "unnamed attachments of type text/x-unknown-type"
+        ):
             self.message.send()
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly
-        image = MIMEImage(image_data)
-        self.message.attach(image)
-
-        image_data_b64 = b64encode(image_data).decode("ascii")
-
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["attachments"],
-            [
-                {
-                    "filename": image_filename,  # the named one
-                    "content": image_data_b64,
-                },
-                {
-                    # For unnamed attachments, Anymail constructs a default name
-                    # based on the content_type:
-                    "filename": "attachment.png",
-                    "content": image_data_b64,
-                },
-            ],
-        )
 
     def test_multiple_html_alternatives(self):
         # Multiple alternatives not allowed

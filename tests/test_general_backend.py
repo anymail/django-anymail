@@ -1,5 +1,5 @@
+import unittest
 from datetime import datetime, timezone
-from email.mime.text import MIMEText
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
@@ -17,9 +17,18 @@ from anymail.exceptions import (
     AnymailUnsupportedFeature,
 )
 from anymail.message import AnymailMessage
-from anymail.utils import get_anymail_setting
+from anymail.utils import EmailAddress, get_anymail_setting
 
 from .utils import AnymailTestMixin
+
+
+def uts46_installed():
+    try:
+        import uts46  # NOQA: F401
+    except ImportError:
+        return False
+    else:
+        return True
 
 
 class SettingsTestBackend(TestBackend):
@@ -345,12 +354,10 @@ class LazyStringsTest(TestBackendTestCase):
         self.message.attach(
             gettext_lazy("test.csv"), gettext_lazy("test,csv,data"), "text/csv"
         )
-        self.message.attach(MIMEText(gettext_lazy("contact info")))
         self.message.send()
         params = self.get_send_params()
         self.assertNotLazy(params["attachments"][0].name)
         self.assertNotLazy(params["attachments"][0].content)
-        self.assertNotLazy(params["attachments"][1].content)
 
     def test_lazy_tags(self):
         self.message.tags = [gettext_lazy("Shipping"), gettext_lazy("Sales")]
@@ -409,7 +416,7 @@ class CatchCommonErrorsTests(TestBackendTestCase):
         self.message.from_email = ""
         with self.assertRaisesMessage(
             AnymailInvalidAddress,
-            "Invalid email address '' parsed from '' in `from_email`.",
+            "Invalid email address '' in `from_email` parsed from ''",
         ):
             self.message.send()
         self.message.from_email = "from@example.com"
@@ -418,7 +425,8 @@ class CatchCommonErrorsTests(TestBackendTestCase):
         self.message.to = ["ok@example.com", "oops"]
         with self.assertRaisesMessage(
             AnymailInvalidAddress,
-            "Invalid email address 'oops' parsed from 'ok@example.com, oops' in `to`.",
+            "Invalid email address 'oops' in `to`"
+            " parsed from 'ok@example.com, oops'",
         ):
             self.message.send()
         self.message.to = ["test@example.com"]
@@ -437,9 +445,9 @@ class CatchCommonErrorsTests(TestBackendTestCase):
         self.message.extra_headers["From"] = "Mail, Inc. <mail@example.com>"
         with self.assertRaisesMessage(
             AnymailInvalidAddress,
-            "Invalid email address 'Mail' parsed from"
-            " 'Mail, Inc. <mail@example.com>' in `extra_headers['From']`."
-            " (Maybe missing quotes around a display-name?)",
+            "Invalid email address 'Mail' in `extra_headers['From']`"
+            " parsed from 'Mail, Inc. <mail@example.com>' (maybe missing quotes"
+            " around a display-name?)",
         ):
             self.message.send()
 
@@ -545,6 +553,20 @@ class SpecialHeaderTests(TestBackendTestCase):
             AnymailUnsupportedFeature, "spoofing `To` header"
         ):
             self.message.send()
+
+    def test_eai_address(self):
+        """Unicode local-parts should survive Anymail's address normalization."""
+        self.message.from_email = "відправник@example.com"
+        self.message.to = ["Recipient <одержувач@example.com>"]
+        self.message.send()
+        params = self.get_send_params()
+        self.assertEqual(
+            params["from"], EmailAddress(addr_spec="відправник@example.com")
+        )
+        self.assertEqual(
+            params["to"],
+            [EmailAddress(display_name="Recipient", addr_spec="одержувач@example.com")],
+        )
 
 
 class AlternativePartsTests(TestBackendTestCase):
@@ -657,3 +679,92 @@ class BatchSendDetectionTestCase(TestBackendTestCase):
             AssertionError, "Cannot call is_batch before all attributes processed"
         ):
             connection.send_messages([self.message])
+
+
+def custom_encoder(domain):
+    """For test_custom_idna_dotted_path"""
+    return f"CUSTOM:{domain}"
+
+
+class IDNAEncoderTests(TestBackendTestCase):
+    """
+    Check IDNA_ENCODER setting and built-in options.
+    (This is not attempting to comprehensively test IDNA encoding,
+    but just verify that swappable encoders work as expected.)
+    """
+
+    def test_default_encode(self):
+        """Default encoder is idna2008."""
+        connection = mail.get_connection()
+        self.assertEqual(connection.idna_encode("faß.example"), "xn--fa-hia.example")
+        self.assertEqual(
+            connection.idna_encode("idna2008.މިސާލު.example"),
+            "idna2008.xn--qqbii6gdp.example",
+        )
+        with self.assertRaisesMessage(
+            AnymailInvalidAddress,
+            "Cannot encode '✉.example' using IDNA_ENCODER='idna2008'",
+        ):
+            connection.idna_encode("✉.example")
+
+    @override_settings(ANYMAIL={"IDNA_ENCODER": "idna2003"})
+    def test_idna2003_encode(self):
+        """idna2003 provides strict compatibility with Django and earlier releases."""
+        connection = mail.get_connection()
+        self.assertEqual(connection.idna_encode("faß.example"), "fass.example")
+        self.assertEqual(connection.idna_encode("✉.example"), "xn--4bi.example")
+        self.assertEqual(connection.idna_encode("✉ß.example"), "xn--ss-ufy.example")
+        with self.assertRaisesMessage(
+            AnymailInvalidAddress,
+            "Cannot encode 'idna2008.މިސާލު.example' using IDNA_ENCODER='idna2003'",
+        ):
+            connection.idna_encode("idna2008.މިސާލު.example")
+
+    @unittest.skipUnless(uts46_installed(), "uts46 package not installed")
+    @override_settings(ANYMAIL={"IDNA_ENCODER": "uts46"})
+    def test_uts46_encode(self):
+        """uts46 handles some domains rejected by idna2008."""
+        connection = mail.get_connection()
+        self.assertEqual(connection.idna_encode("faß.example"), "xn--fa-hia.example")
+        self.assertEqual(
+            connection.idna_encode("idna2008.މިސާލު.example"),
+            "idna2008.xn--qqbii6gdp.example",
+        )
+        self.assertEqual(connection.idna_encode("✉.example"), "xn--4bi.example")
+        self.assertEqual(connection.idna_encode("✉ß.example"), "xn--zca356q.example")
+
+    @override_settings(ANYMAIL={"IDNA_ENCODER": "none"})
+    def test_none_encode(self):
+        """No encoding, for ESPs that can handle IDNA themselves."""
+        connection = mail.get_connection()
+        self.assertEqual(
+            connection.idna_encode("idna2008.މިސާލު.example"), "idna2008.މިސާލު.example"
+        )
+
+    @override_settings(ANYMAIL={"IDNA_ENCODER": f"{__name__}.custom_encoder"})
+    def test_custom_idna_dotted_path(self):
+        """IDNA_ENCODER can be set to a dotted import path to a custom function."""
+        connection = mail.get_connection()
+        self.assertEqual(connection.idna_encode("example.com"), "CUSTOM:example.com")
+
+    @override_settings(ANYMAIL={"IDNA_ENCODER": custom_encoder})
+    def test_custom_idna_callable(self):
+        """IDNA_ENCODER can be set directly to a callable."""
+        connection = mail.get_connection()
+        self.assertEqual(connection.idna_encode("example.com"), "CUSTOM:example.com")
+
+    def test_custom_idna_param(self):
+        """IDNA_ENCODER can be overridden in backend initialization params."""
+        connection = mail.get_connection(idna_encoder=custom_encoder)
+        self.assertEqual(connection.idna_encode("example.com"), "CUSTOM:example.com")
+
+    @override_settings(
+        ANYMAIL={
+            "IDNA_ENCODER": "raw",
+            "TEST_IDNA_ENCODER": "idna2003",  # (The TestBackend's esp_name is "test".)
+        }
+    )
+    def test_esp_specific_encoder(self):
+        """<ESP_NAME>_IDNA_ENCODER takes precedence over IDNA_ENCODER."""
+        connection = mail.get_connection()
+        self.assertEqual(connection.idna_encode("✉.example"), "xn--4bi.example")

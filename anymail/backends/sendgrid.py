@@ -1,5 +1,6 @@
 import uuid
 import warnings
+from email.message import MIMEPart
 
 from requests.structures import CaseInsensitiveDict
 
@@ -245,13 +246,9 @@ class SendGridPayload(RequestsPayload):
     # Payload construction
     #
 
-    @staticmethod
-    def email_object(email):
+    def email_object(self, email):
         """Converts EmailAddress to SendGrid API {email, name} dict"""
-        obj = {"email": email.addr_spec}
-        if email.display_name:
-            obj["name"] = email.display_name
-        return obj
+        return email.as_dict(idna_encode=self.backend.idna_encode)
 
     def set_from_email(self, email):
         self.data["from"] = self.email_object(email)
@@ -321,9 +318,19 @@ class SendGridPayload(RequestsPayload):
         )
 
     def add_attachment(self, attachment):
+        # SendGrid strips charset from `type` and doesn't include `charset`
+        # in the Content-Type header, so use utf-8 encoding for text and hope
+        # for the best. (See issue #150.)
+        content_type = attachment.content_type
+        if attachment.charset and attachment.charset != "utf-8":
+            # Rebuild content_type with charset=utf-8 to match what we'll send
+            temp = MIMEPart()
+            temp.add_header("Content-Type", attachment.mimetype, charset="utf-8")
+            content_type = temp["Content-Type"]
+
         att = {
-            "content": attachment.b64content,
-            "type": attachment.mimetype,
+            "content": attachment.b64content_utf8,
+            "type": content_type,
             # (filename is required -- submit empty string if unknown)
             "filename": attachment.name or "",
         }

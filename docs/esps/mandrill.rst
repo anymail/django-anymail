@@ -143,6 +143,12 @@ Limitations and quirks
   (Verified and reported to MailChimp support 4/2022;
   see `Anymail discussion #257`_ for more details.)
 
+**Non-ASCII display names may display incorrectly**
+  Mandrill's API incorrectly formats email addresses with display names that
+  include non-ASCII characters. Gmail overlooks the mistake, but some email
+  clients may display the name as an RFC 2047 encoded-word (``=?utf-8?...``)
+  rather than the intended text.
+
 **Cc and bcc depend on "preserve_recipients"**
   Mandrill's handing of ``cc`` and ``bcc`` addresses depends on whether its
   ``preserve_recipients`` option is enabled for the message.
@@ -177,6 +183,18 @@ Limitations and quirks
   Anymail's :attr:`~anymail.message.AnymailMessage.envelope_sender` is used to
   populate Mandrill's `'return_path_domain'`---but only the domain portion.
   (Mandrill always generates its own encoded mailbox for the envelope sender.)
+
+**Non-ASCII mailboxes (EAI)**
+  Mandrill partially supports sending from or to Unicode mailboxes (the *user*
+  part of *user\@domain*---see :ref:`EAI <eai>`). Messages are correctly
+  delivered, but the :mailheader:`To` header is incorrectly formatted and will
+  display garbled (or not at all) in most email apps.
+
+  Also, Mandrill does not properly verify the receiving SMTP server supports EAI
+  (smtputf8). For valid EAI recipient addresses, this generally shouldn't cause
+  problems. For an EAI ``from_email`` or ``reply_to`` this could result in lost
+  or undeliverable messages.
+
 
 .. _Anymail discussion #257:
      https://github.com/anymail/django-anymail/discussions/257

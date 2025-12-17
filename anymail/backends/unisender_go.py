@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import re
 import typing
 import uuid
 from datetime import datetime, timezone
-from email.charset import QP, Charset
-from email.headerregistry import Address
 
 from django.core.mail import EmailMessage
 from requests import Response
@@ -13,12 +10,14 @@ from requests.structures import CaseInsensitiveDict
 
 from anymail.backends.base_requests import AnymailRequestsBackend, RequestsPayload
 from anymail.message import AnymailRecipientStatus
-from anymail.utils import Attachment, EmailAddress, get_anymail_setting, update_deep
-
-# Used to force RFC-2047 encoded word
-# in address formatting workaround
-QP_CHARSET = Charset("utf-8")
-QP_CHARSET.header_encoding = QP
+from anymail.utils import (
+    Attachment,
+    EmailAddress,
+    get_anymail_setting,
+    has_specials,
+    rfc2047_encode,
+    update_deep,
+)
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -184,9 +183,15 @@ class UnisenderGoPayload(RequestsPayload):
     #
 
     def set_from_email(self, email: EmailAddress) -> None:
-        self.data["from_email"] = email.addr_spec
-        if email.display_name:
-            self.data["from_name"] = email.display_name
+        self.data.update(
+            email.as_dict(
+                email="from_email",
+                name="from_name",
+                idna_encode=self.backend.idna_encode,
+            )
+        )
+
+    _display_name_bug_chars = set(",<>@")
 
     def _format_email_address(self, address):
         """
@@ -205,23 +210,21 @@ class UnisenderGoPayload(RequestsPayload):
         properly formats commas and other characters in `to_name` and `from_name`.
         (But see set_reply_to for a related issue.)
         """
-        formatted = address.address
-        if self.backend.workaround_display_name_bugs:
-            # Workaround: force RFC-2047 QP encoded word for display_name if it has
-            # prohibited chars (and isn't already encoded in the formatted address)
-            display_name = address.display_name
-            if re.search(r"[,<>@]", display_name) and display_name in formatted:
-                formatted = str(
-                    Address(
-                        display_name=QP_CHARSET.header_encode(address.display_name),
-                        addr_spec=address.addr_spec,
-                    )
-                )
-        return formatted
+        use_rfc2047 = True
+        if (
+            self.backend.workaround_display_name_bugs
+            and not self._display_name_bug_chars.isdisjoint(address.display_name)
+        ):
+            use_rfc2047 = "force"
+        return address.format(
+            use_rfc2047=use_rfc2047, idna_encode=self.backend.idna_encode
+        )
 
     def set_recipients(self, recipient_type: str, emails: list[EmailAddress]):
         for email in emails:
-            recipient = {"email": email.addr_spec}
+            recipient = {
+                "email": email.format_addr_spec(idna_encode=self.backend.idna_encode)
+            }
             if email.display_name:
                 recipient["substitutions"] = {"to_name": email.display_name}
             self.data["recipients"].append(recipient)
@@ -244,22 +247,42 @@ class UnisenderGoPayload(RequestsPayload):
             self.unsupported_feature("multiple reply_to addresses")
         if len(emails) > 0:
             reply_to = emails[0]
-            self.data["reply_to"] = reply_to.addr_spec
+            self.data["reply_to"] = reply_to.format_addr_spec(
+                idna_encode=self.backend.idna_encode
+            )
             display_name = reply_to.display_name
             if display_name:
+                use_rfc2047 = False
                 if self.backend.workaround_display_name_bugs:
-                    # Unisender Go doesn't properly "quote" (RFC 5322) a `reply_to_name`
-                    # containing special characters (comma, parens, etc.), resulting
-                    # in an invalid Reply-To header that can cause problems when the
-                    # recipient tries to reply. (They *do* properly handle special chars
-                    # in `to_name` and `from_name`; this only affects `reply_to_name`.)
-                    if reply_to.address.startswith('"'):  # requires quoted syntax
-                        # Workaround: force RFC-2047 encoded word
-                        display_name = QP_CHARSET.header_encode(display_name)
-                self.data["reply_to_name"] = display_name
+                    # Unisender Go has two bugs with display names in their generated
+                    # Reply-To headers:
+                    # - Non-ASCII display names are sent as unencoded (8-bit)
+                    #   ISO-8859-1, which can interfere with delivery.
+                    # - Display names with special characters (comma, parens, etc.) are
+                    #   not properly quoted (per RFC 5322), resulting in an invalid
+                    #   Reply-To header that can cause problems when the recipient
+                    #   tries to reply.
+                    # These issues only affect the reply_to_name. Unisender Go correctly
+                    # encodes display names in other address headers.
+                    if not display_name.isascii() or has_specials(display_name):
+                        use_rfc2047 = "force"
+                self.data["reply_to_name"] = reply_to.format_display_name(
+                    use_rfc2047=use_rfc2047
+                )
 
     def set_extra_headers(self, headers: dict[str, str]) -> None:
-        self.data["headers"].update(headers)
+        # Unisender Go incorrectly converts non-ASCII extra headers to ISO-8859-1
+        # and sends them as 8-bit content. Work around by converting to RFC 2047.
+        self.data["headers"].update(
+            {
+                field: (
+                    rfc2047_encode(value)
+                    if isinstance(value, str) and not value.isascii()
+                    else value
+                )
+                for field, value in headers.items()
+            }
+        )
 
     def set_text_body(self, body: str) -> None:
         if body:
@@ -281,7 +304,7 @@ class UnisenderGoPayload(RequestsPayload):
         name = attachment.cid if attachment.inline else attachment.name
         att = {
             "content": attachment.b64content,
-            "type": attachment.mimetype,
+            "type": attachment.content_type,
             "name": name or "",  # required - submit empty string if unknown
         }
         if attachment.inline:

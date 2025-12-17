@@ -238,6 +238,14 @@ See the :ref:`supported ESPs <supported-esps>` section for details.
 Here are the other settings Anymail supports:
 
 
+.. rubric:: IDNA_ENCODER
+
+.. versionadded:: vNext
+
+Controls the encoding used for international domain names (with non-ASCII
+characters) in email addresses. The default is ``"idna2008"``. See :ref:`idna`.
+
+
 .. setting:: ANYMAIL_IGNORE_RECIPIENT_STATUS
 
 .. rubric:: IGNORE_RECIPIENT_STATUS

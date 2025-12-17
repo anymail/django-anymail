@@ -117,46 +117,27 @@ error when you try to send a message using features that Resend doesn't support.
 You can tell Anymail to suppress these errors and send the messages
 anyway---see :ref:`unsupported-features`.
 
-**Restricted characters in ``from_email`` display names**
-  Resend's API does not accept many email address display names
-  (a.k.a. "friendly names" or "real names") formatted according
-  to the relevant standard (:rfc:`5322`). Anymail implements a
-  workaround for the ``to``, ``cc``, ``bcc`` and ``reply_to``
-  fields, but Resend rejects attempts to use this workaround
-  for ``from_email`` display names.
+**Attachment filename extension must match content type**
+  Resend silently drops messages with attachments whose filename extensions
+  are inconsistent with their content types (mimetype). E.g., sending
+  a *text/csv* attachment with the filename "data.txt" rather than "data.csv"
+  will not generate an API error or bounce, but the message will never be
+  delivered.
 
-  These characters will cause problems in a *From* address display name:
+  To avoid this, Anymail attempts to verify attachment filenames before sending,
+  and raises an :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error for
+  likely mismatches. (This is a best guess using Python's :mod:`mimetypes`
+  package. There's no way for Anymail to know exactly which extensions and
+  content types will cause Resend to drop a message.)
 
-      * Double quotes (``"``) and some other punctuation characters
-        can cause a "Resend API response 422" error complaining of an
-        "Invalid \`from\` field", or can result in a garbled *From* name
-        (missing segments, additional punctuation inserted) in the
-        resulting message.
-      * A question mark immediately followed by any alphabetic character
-        (e.g., ``?u``) will cause a "Resend API response 451" security error
-        complaining that "The email payload contain invalid characters".
-        (This behavior prevents use of standard :rfc:`2047` encoded words
-        in *From* display names---which is the workaround Anymail implements
-        for other address fields.)
+  If you try to send an attachment without a filename, Anymail will generate
+  a filename for you using "attachment\ *.ext*" with an appropriate extension
+  for the content type.
 
-  There may be other character combinations that also cause problems.
-  If you need to include punctuation in a *From* display name, be sure
-  to verify the results. (The issues were reported to Resend in October, 2023.)
+  .. versionchanged:: vNext
 
-**Attachment filename determines content type**
-  Resend determines the content type of an attachment from its filename extension.
-
-  If you try to send an attachment without a filename, Anymail will substitute
-  "attachment\ *.ext*" using an appropriate *.ext* for the content type.
-
-  If you try to send an attachment whose content type doesn't match its filename
-  extension, Resend will change the content type to match the extension.
-  (E.g., the filename "data.txt" will always be sent as "text/plain",
-  even if you specified a "text/csv" content type.)
-
-**No inline images**
-  Resend's API does not provide a mechanism to send inline content
-  or to specify :mailheader:`Content-ID` for an attachment.
+      Resend's API did not previously support specifying the content type,
+      and instead based attachment content type on the filename.
 
 **Anymail tags and metadata are exposed to recipient**
   Anymail implements its normalized :attr:`~anymail.message.AnymailMessage.tags`
@@ -203,6 +184,17 @@ anyway---see :ref:`unsupported-features`.
   If you send a message with multiple recipients (to, cc, and/or bcc),
   Resend's status webhooks do not identify which recipient applies
   for an event. See the :ref:`note below <resend-tracking-recipient>`.
+
+**No non-ASCII mailboxes (EAI)**
+  Resend does not support sending from or to Unicode mailboxes (the *user* part of
+  *user\@domain*---see :ref:`EAI <eai>`). Trying to use one will cause an API error.
+
+**Earlier limitations**
+
+    .. versionchanged:: vNext
+
+    Resend's API did not previously support inline images. Earlier Anymail
+    releases raised an error on attempts to send them through Resend.
 
 
 .. _resend-api-rate-limits:

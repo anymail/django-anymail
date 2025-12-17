@@ -59,12 +59,14 @@ classifiers = [
     "Framework :: Django :: 5.0",
     "Framework :: Django :: 5.1",
     "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
     "Environment :: Web Environment",
 ]
 
 requires-python = ">=3.8"
 dependencies = [
     "django>=4.0",
+    "idna",
     "requests>=2.4.3",
     "urllib3>=1.25.0",  # requests dependency: fixes RFC 7578 header encoding
     "typing_extensions>=4.12;python_version<'3.11'",  # for older Python compatibility
@@ -101,6 +103,9 @@ sendgrid = [
 sendinblue = []
 sparkpost = []
 unisender-go = []
+
+# Optional dependencies for IDNA encoding.
+uts46 = ["uts46"]
 
 [project.urls]
 Homepage = "https://github.com/anymail/django-anymail"

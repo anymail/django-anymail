@@ -31,6 +31,15 @@ class EmailBackend(AnymailRequestsBackend):
         )
         if not api_url.endswith("/"):
             api_url += "/"
+
+        # Undocumented setting to control checking attachment filename extensions.
+        # (See ResendPayload.make_attachment().)
+        self.verify_attachment_extensions = get_anymail_setting(
+            "verify_attachment_extensions",
+            esp_name=esp_name,
+            kwargs=kwargs,
+            default=True,
+        )
         super().__init__(api_url, **kwargs)
 
     def build_message_payload(self, message, defaults):
@@ -130,13 +139,15 @@ class ResendPayload(RequestsPayload):
         self.data = {}  # becomes json
 
     def set_from_email(self, email):
-        self.data["from"] = email.address
+        self.data["from"] = email.format(idna_encode=self.backend.idna_encode)
 
     def set_recipients(self, recipient_type, emails):
         assert recipient_type in ["to", "cc", "bcc"]
         if emails:
             field = recipient_type
-            self.data[field] = [email.address for email in emails]
+            self.data[field] = [
+                email.format(idna_encode=self.backend.idna_encode) for email in emails
+            ]
             self.recipients += emails
             if recipient_type == "to":
                 self.to_recipients = emails
@@ -146,7 +157,9 @@ class ResendPayload(RequestsPayload):
 
     def set_reply_to(self, emails):
         if emails:
-            self.data["reply_to"] = [email.address for email in emails]
+            self.data["reply_to"] = [
+                email.format(idna_encode=self.backend.idna_encode) for email in emails
+            ]
 
     def set_extra_headers(self, headers):
         # Resend requires header values to be strings (not integers) as of 2023-10-20.
@@ -168,25 +181,43 @@ class ResendPayload(RequestsPayload):
             self.unsupported_feature("multiple html parts")
         self.data["html"] = body
 
-    @staticmethod
-    def make_attachment(attachment):
+    def make_attachment(self, attachment):
         """Returns Resend attachment dict for attachment"""
+        # Resend silently drops messages with attachments that don't have
+        # a filename, or whose filename extensions don't match the content_type.
+        # (But it *will* send attachments with unknown extensions and types.)
+        # Try to detect and prevent attachments that might silently fail.
+        # If Resend fixes their API, you can disable this check in settings.py:
+        #    ANYMAIL = { ..., "RESEND_VERIFY_ATTACHMENT_EXTENSIONS": False }
         filename = attachment.name or ""
+        if filename and self.backend.verify_attachment_extensions:
+            mimetype, _ = mimetypes.guess_type(filename)
+            if mimetype and mimetype != attachment.mimetype:
+                self.unsupported_feature(
+                    f"attachments of type {attachment.mimetype} with name {filename!r}"
+                )
         if not filename:
-            # Provide default name with reasonable extension.
-            # (Resend guesses content type from the filename extension;
-            # there doesn't seem to be any other way to specify it.)
-            ext = mimetypes.guess_extension(attachment.content_type)
-            if ext is not None:
+            # No name provided. Generate default name with reasonable extension.
+            ext = mimetypes.guess_extension(attachment.mimetype)
+            if ext:
                 filename = f"attachment{ext}"
-        att = {"content": attachment.b64content, "filename": filename}
-        # attachment.inline / attachment.cid not supported
+            else:
+                self.unsupported_feature(
+                    f"unnamed attachments of type {attachment.mimetype}"
+                )
+        att = {
+            "content": attachment.b64content,
+            "filename": filename,
+            "content_type": attachment.content_type,
+        }
+        if attachment.inline:
+            if not attachment.cid:
+                self.unsupported_feature("inline attachments without Content-ID")
+            att["content_id"] = attachment.cid
         return att
 
     def set_attachments(self, attachments):
         if attachments:
-            if any(att.content_id for att in attachments):
-                self.unsupported_feature("inline content-id")
             self.data["attachments"] = [
                 self.make_attachment(attachment) for attachment in attachments
             ]

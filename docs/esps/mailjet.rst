@@ -153,19 +153,25 @@ Limitations and quirks
      Earlier Anymail versions would default to an empty string, resulting in
      a Mailjet API error.
 
+**Non-ASCII mailboxes (EAI)**
+  Mailjet fully supports sending from or to Unicode mailboxes (the *user* part
+  of *user\@domain*---see :ref:`EAI <eai>`). Messages with EAI addresses are
+  delivered correctly to receiving SMTP servers that support EAI, and will
+  bounce as expected for those that don't.
+
 **Older limitations**
 
-.. versionchanged:: 6.0
+    .. versionchanged:: 6.0
 
-    Earlier versions of Anymail were unable to mix ``cc`` or ``bcc`` fields
-    and :attr:`~anymail.message.AnymailMessage.merge_data` in the same Mailjet message.
-    This limitation was removed in Anymail 6.0.
+        Earlier versions of Anymail were unable to mix ``cc`` or ``bcc`` fields
+        and :attr:`~anymail.message.AnymailMessage.merge_data` in the same Mailjet message.
+        This limitation was removed in Anymail 6.0.
 
-.. versionchanged:: 8.0
+    .. versionchanged:: 8.0
 
-    Earlier Anymail versions had special handling to work around a Mailjet v3 API bug
-    with commas in recipient display names. Anymail 8.0 uses Mailjet's v3.1 API, which
-    does not have the bug.
+        Earlier Anymail versions had special handling to work around a Mailjet v3 API bug
+        with commas in recipient display names. Anymail 8.0 uses Mailjet's v3.1 API, which
+        does not have the bug.
 
 
 .. _mailjet-templates:

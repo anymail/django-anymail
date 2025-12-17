@@ -1,7 +1,9 @@
+from email.message import MIMEPart
 from email.mime.image import MIMEImage
 from email.utils import make_msgid, unquote
 from pathlib import Path
 
+import django
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 
 from .utils import UNSET
@@ -74,9 +76,26 @@ def attach_inline_image(
     # Content ID per RFC 2045 section 7 (with <...>):
     content_id = make_msgid(idstring, domain)
 
-    image = MIMEImage(content, subtype)
-    image.add_header("Content-Disposition", "inline", filename=filename)
-    image.add_header("Content-ID", content_id)
+    if django.VERSION >= (6, 0):
+        image = MIMEPart()
+        if subtype is None:
+            # Use MIMEImage to guess the content type (not in MIMEPart.set_content)
+            subtype = MIMEImage(content).get_content_subtype()
+        extra = {"filename": filename} if filename else {}
+        image.set_content(
+            content,
+            maintype="image",
+            subtype=subtype,
+            disposition="inline",
+            cid=content_id,
+            **extra,
+        )
+    else:
+        # MIMEBase deprecated in Django 6.0, removed in Django 7.0
+        image = MIMEImage(content, subtype)
+        image.add_header("Content-Disposition", "inline", filename=filename)
+        image.add_header("Content-ID", content_id)
+
     message.attach(image)
     return unquote(content_id)  # Without <...>, for use as the <img> tag src
 

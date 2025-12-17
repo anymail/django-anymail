@@ -160,6 +160,15 @@ anyway---see :ref:`unsupported-features`.
   Scaleway does not support setting
   :attr:`~anymail.message.AnymailMessage.envelope_sender`.
 
+**No non-ASCII mailboxes (EAI)**
+  Scaleway incorrectly handles attempts to send from or to Unicode mailboxes
+  (the *user* part of *user\@domain*---see :ref:`EAI <eai>`). The resulting
+  message is lost or bounces internally within Scaleway's infrastructure,
+  presumably due to incorrectly formatted header fields.
+
+  To avoid this, Anymail raises an :exc:`~anymail.exceptions.AnymailUnsupportedFeature`
+  error if you attempt to send a message using an EAI address with Scaleway.
+
 
 .. _scaleway-templates:
 

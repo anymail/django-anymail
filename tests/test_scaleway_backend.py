@@ -8,18 +8,13 @@ from anymail.exceptions import (
     AnymailConfigurationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import attach_inline_image_file
+from anymail.message import attach_inline_image
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
-from .utils import (
-    SAMPLE_IMAGE_FILENAME,
-    decode_att,
-    sample_image_content,
-    sample_image_path,
-)
+from .utils import create_text_attachment, decode_att, sample_image_content
 
 # Minimal required ANYMAIL settings for Scaleway, used in multiple tests
 SCALEWAY_BASE_SETTINGS = {
@@ -171,51 +166,119 @@ class ScalewayBackendStandardEmailTests(ScalewayBackendMockAPITestCase):
             ],
         )
 
-    def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
-        self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+    def test_non_ascii_headers(self):
+        # Scaleway correctly encodes non-ASCII display-names and most headers.
+        # Anymail must handle RFC 2047 encoding for the constructed Reply-To header
+        # and perform IDNA encoding for non-ASCII domain names.
+        # Scaleway doesn't support EAI (see next test).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
         )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["from"],
+            {
+                "name": "Odesílatel, z adresy",
+                "email": "from@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["to"],
+            [
+                {
+                    "name": "Příjemce, na adresu",
+                    "email": "to@xn--pklad-zsa96e.example.cz",
+                }
+            ],
+        )
+        self.assertEqual(data["subject"], "Předmět e-mailu")
+        self.assertCountEqual(
+            data["additional_headers"],
+            [
+                {"key": "X-Extra", "value": "Další"},
+                {
+                    "key": "Reply-To",
+                    "value": "=?utf-8?b?T2Rwb3bEm8SPLCBhZHJlc2E=?="
+                    " <reply@xn--pklad-zsa96e.example.cz>",
+                },
+            ],
+        )
+
+    def test_eai_unsupported(self):
+        """
+        Scaleway generates an undeliverable message (that seems to bounce or
+        get dropped within Scaleway's own infrastructure) if any address header
+        uses EAI. To prevent delivery problems, Anymail treats EAI as unsupported.
+        """
+        with self.subTest(field="from_email"):
+            self.message.from_email = "тест@example.com"
+            with self.assertRaisesMessage(
+                AnymailUnsupportedFeature, "EAI in from_email"
+            ):
+                self.message.send()
+
+        for field in ["to", "cc", "bcc", "reply_to"]:
+            message = mail.EmailMultiAlternatives(
+                "Subject", "Text Body", "from@example.com", ["to@example.com"]
+            )
+            with self.subTest(field=field):
+                setattr(message, field, ["тест@example.com"])
+                with self.assertRaisesMessage(
+                    AnymailUnsupportedFeature, f"EAI in {field}"
+                ):
+                    message.send()
+
+    def test_attachments(self):
+        # Scaleway supports non-utf-8 content with charset in the `type` field.
+        # Scaleway does not require attachment filenames. It allows non-ASCII
+        # filenames (though incorrectly applies rfc2047 when sending).
+        # Scaleway does not support inline images (tested separately below).
+        text_content = "pièce jointe\n"
+        self.message.attach(
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
+        )
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(len(data["attachments"]), 1)
-        self.assertEqual(data["attachments"][0]["name"], "test.txt")
-        self.assertEqual(data["attachments"][0]["type"], "text/plain")
+
+        attachments = data["attachments"]
+        self.assertEqual(len(attachments), 2)
+        self.assertEqual(attachments[0]["type"], 'text/plain; charset="iso-8859-1"')
+        self.assertIsNone(attachments[0]["name"])
         self.assertEqual(
-            decode_att(data["attachments"][0]["content"]).decode(), text_content
+            decode_att(attachments[0]["content"]).decode("iso-8859-1"), text_content
         )
+        self.assertEqual(attachments[1]["type"], "image/x-emoticon")
+        self.assertEqual(attachments[1]["name"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["content"]), b";-)")
 
     def test_inline_images(self):
         # Scaleway's API doesn't have a way to specify content-id
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
-        html_content = f'<p>This has an <img src="cid:{cid}" alt="inline" /> image.</p>'
-        self.message.attach_alternative(html_content, "text/html")
-
+        attach_inline_image(self.message, sample_image_content(), "test.png")
         with self.assertRaisesMessage(AnymailUnsupportedFeature, "inline attachments"):
             self.message.send()
 
     @override_settings(ANYMAIL_IGNORE_UNSUPPORTED_FEATURES=True)
     def test_inline_images_ignore_unsupported(self):
         # Sends as ordinary attachment when ignoring unsupported features
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_content = sample_image_content(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
-        html_content = f'<p>This has an <img src="cid:{cid}" alt="inline" /> image.</p>'
-        self.message.attach_alternative(html_content, "text/html")
+        image_data = sample_image_content()
+        attach_inline_image(self.message, image_data, "test.png")
 
         self.message.send()
         data = self.get_api_call_json()
         self.assertEqual(len(data["attachments"]), 1)
-        self.assertEqual(data["attachments"][0]["name"], image_filename)
+        self.assertEqual(data["attachments"][0]["name"], "test.png")
         self.assertEqual(data["attachments"][0]["type"], "image/png")
         self.assertEqual(
             decode_att(data["attachments"][0]["content"]),
-            image_content,
+            image_data,
         )
 
     def test_api_failure(self):

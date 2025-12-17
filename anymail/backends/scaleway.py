@@ -99,21 +99,22 @@ class ScalewayPayload(RequestsPayload):
             "project_id": self.project_id,
         }
 
-    def _scaleway_email(self, email):
-        """Expand an Anymail EmailAddress into Scaleway's {"email", "name"} dict"""
-        result = {"email": email.addr_spec}
-        if email.display_name:
-            result["name"] = email.display_name
-        return result
-
     def set_from_email(self, email):
-        self.data["from"] = self._scaleway_email(email)
+        # Scaleway generates an invalid message (that bounces or gets lost)
+        # if any address header uses EAI.
+        if email.uses_eai:
+            self.unsupported_feature("EAI in from_email")
+        self.data["from"] = email.as_dict(idna_encode=self.backend.idna_encode)
 
     def set_recipients(self, recipient_type, emails):
         assert recipient_type in {"to", "cc", "bcc"}
+        # Scaleway generates an invalid message (that bounces or gets lost)
+        # if any address header uses EAI.
+        if any(email.uses_eai for email in emails):
+            self.unsupported_feature(f"EAI in {recipient_type}")
         if emails:
             self.data[recipient_type] = [
-                self._scaleway_email(email) for email in emails
+                email.as_dict(idna_encode=self.backend.idna_encode) for email in emails
             ]
 
     def set_subject(self, subject):
@@ -134,7 +135,7 @@ class ScalewayPayload(RequestsPayload):
         self.data.setdefault("attachments", []).append(
             {
                 "name": attachment.name,
-                "type": attachment.mimetype,
+                "type": attachment.content_type,
                 "content": attachment.b64content,
             }
         )
@@ -145,8 +146,17 @@ class ScalewayPayload(RequestsPayload):
         )
 
     def set_reply_to(self, emails):
+        # Scaleway generates an invalid message (that bounces or gets lost)
+        # if any address header uses EAI.
+        if any(email.uses_eai for email in emails):
+            self.unsupported_feature("EAI in reply_to")
         if emails:
-            reply_to_string = ", ".join([str(email) for email in emails])
+            reply_to_string = ", ".join(
+                [
+                    email.format(use_rfc2047=True, idna_encode=self.backend.idna_encode)
+                    for email in emails
+                ]
+            )
             self.data.setdefault("additional_headers", []).append(
                 {"key": "Reply-To", "value": reply_to_string}
             )

@@ -3,14 +3,37 @@
 import base64
 import copy
 import pickle
+import unittest
+from email import message_from_bytes, policy
+from email.message import EmailMessage as PyEmailMessage, Message as PyMessage, MIMEPart
 from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
+from textwrap import dedent
 
+from django import VERSION as DJANGO_VERSION
+from django.core.mail import EmailMessage as DjangoEmailMessage
 from django.http import QueryDict
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import (
+    RequestFactory,
+    SimpleTestCase,
+    ignore_warnings,
+    override_settings,
+)
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy
 
+try:
+    from django.core.mail import EmailAttachment
+except ImportError:
+    EmailAttachment = None
+
+try:
+    from django.utils.deprecation import RemovedInDjango70Warning
+except ImportError:
+    # A category for @ignore_warnings that won't match anything:
+    RemovedInDjango70Warning = SyntaxWarning
+
+from anymail._idna import idna2008
 from anymail.exceptions import AnymailInvalidAddress, _LazyError
 from anymail.utils import (
     UNSET,
@@ -23,6 +46,7 @@ from anymail.utils import (
     force_non_lazy_list,
     get_request_basic_auth,
     get_request_uri,
+    has_specials,
     is_lazy,
     last,
     merge_dicts_deep,
@@ -32,6 +56,10 @@ from anymail.utils import (
     parse_rfc2822date,
     parse_single_address,
     querydict_getfirst,
+    quote_string,
+    rfc2047_decode,
+    rfc2047_encode,
+    unquote_string,
     update_deep,
 )
 
@@ -81,7 +109,7 @@ class ParseAddressListTests(SimpleTestCase):
         # formatted display-name automatically shifts
         # to quoted-printable/base64 for non-ascii chars:
         self.assertEqual(
-            parsed.address, "=?utf-8?b?VW5pY29kZSDinaQ=?= <test@example.com>"
+            parsed.address, "Unicode \N{HEAVY BLACK HEART} <test@example.com>"
         )
 
     def test_invalid_display_name(self):
@@ -91,7 +119,7 @@ class ParseAddressListTests(SimpleTestCase):
             parse_address_list(["webmaster"])
 
         with self.assertRaisesMessage(
-            AnymailInvalidAddress, "Maybe missing quotes around a display-name?"
+            AnymailInvalidAddress, "maybe missing quotes around a display-name?"
         ):
             # this parses as multiple email addresses, because of the comma:
             parse_address_list(["Display Name, Inc. <test@example.com>"])
@@ -101,8 +129,8 @@ class ParseAddressListTests(SimpleTestCase):
         self.assertEqual(len(parsed_list), 1)
         parsed = parsed_list[0]
         self.assertEqual(parsed.addr_spec, "idn@\N{ENVELOPE}.example.com")
-        # punycode-encoded domain:
-        self.assertEqual(parsed.address, "idn@xn--4bi.example.com")
+        # No attempt to apply IDNA to domain (leave that to the backend):
+        self.assertEqual(parsed.address, "idn@\N{ENVELOPE}.example.com")
         self.assertEqual(parsed.username, "idn")
         self.assertEqual(parsed.domain, "\N{ENVELOPE}.example.com")
 
@@ -120,16 +148,17 @@ class ParseAddressListTests(SimpleTestCase):
             parse_address_list([" "])
 
     def test_invalid_address(self):
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["localonly"])
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["localonly@"])
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["@domainonly"])
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["<localonly@>"])
-        with self.assertRaises(AnymailInvalidAddress):
-            parse_address_list(["<@domainonly>"])
+        invalid_addresses = [
+            "localonly",
+            "localonly@",
+            "@domainonly",
+            "<localonly@>",
+            "<@domainonly>",
+        ]
+        for address in invalid_addresses:
+            with self.subTest(address=address):
+                with self.assertRaises(AnymailInvalidAddress):
+                    parse_address_list([address])
 
     def test_email_list(self):
         parsed_list = parse_address_list(["first@example.com", "second@example.com"])
@@ -190,9 +219,11 @@ class ParseAddressListTests(SimpleTestCase):
         with self.assertRaisesMessage(AnymailInvalidAddress, "Invalid email address"):
             parse_single_address(" ")
 
+
+class EmailAddressTests(SimpleTestCase):
+    """Test utils.EmailAddress"""
+
     def test_no_newlines(self):
-        # (Parsing shouldn't even be able to even generate these cases,
-        # but in case anyone constructs an EmailAddress directly...)
         for name, addr in [
             ("Potential\nInjection", "addr@example.com"),
             ("Potential\rInjection", "addr@example.com"),
@@ -200,81 +231,689 @@ class ParseAddressListTests(SimpleTestCase):
             ("Name", "potential\rinjection@example.com"),
         ]:
             with self.subTest(name=name, addr=addr):
-                with self.assertRaisesMessage(ValueError, "cannot contain newlines"):
+                with self.assertRaisesMessage(
+                    AnymailInvalidAddress, "cannot contain CR or LF"
+                ):
                     _ = EmailAddress(name, addr)
 
-    def test_email_address_repr(self):
+    def test_repr(self):
         self.assertEqual(
             "EmailAddress('Name', 'addr@example.com')",
             repr(EmailAddress("Name", "addr@example.com")),
         )
 
+    def test_address_property(self):
+        cases = [
+            # display_name, addr_spec, expected
+            ("John Smith", "john@example.com", "John Smith <john@example.com>"),
+            ("Smith, John", "john@example.com", '"Smith, John" <john@example.com>'),
+            ("Juan Lopéz", "juan@example.com", "Juan Lopéz <juan@example.com>"),
+            (None, "juan@éxample.com", "juan@éxample.com"),
+            ("Juan Lopéz", "juan@éxample.com", "Juan Lopéz <juan@éxample.com>"),
+            (None, "maría@example.com", "maría@example.com"),
+            ("María Lopéz", "maría@éxample.com", "María Lopéz <maría@éxample.com>"),
+        ]
+        for display_name, addr_spec, expected in cases:
+            with self.subTest(display_name=display_name, addr_spec=addr_spec):
+                email = EmailAddress(display_name, addr_spec)
+                self.assertEqual(email.address, expected)
 
+    def test_format_display_name(self):
+        cases = [
+            # display_name, format_display_name() kwargs, expected
+            ("John Smith", {}, "John Smith"),
+            ("Smith, John", {}, "Smith, John"),
+            # use_quotes
+            ("Smith, John", {"use_quotes": True}, '"Smith, John"'),
+            ("John Smith", {"use_quotes": True}, "John Smith"),
+            ("John Smith", {"use_quotes": "force"}, '"John Smith"'),
+            # use_rfc2047
+            ("Juan Lopéz", {}, "Juan Lopéz"),
+            ("Juan Lopéz", {"use_rfc2047": True}, "=?utf-8?q?Juan_Lop=C3=A9z?="),
+            ("John Smith", {"use_rfc2047": True}, "John Smith"),
+            ("John Smith", {"use_rfc2047": "force"}, "=?utf-8?q?John_Smith?="),
+            # rfc2047 is never quoted
+            (
+                "Juan Lopéz",
+                {"use_rfc2047": True, "use_quotes": True},
+                "=?utf-8?q?Juan_Lop=C3=A9z?=",
+            ),
+            (
+                "Lopéz, Juan Carlo",
+                {"use_rfc2047": True, "use_quotes": True},
+                "=?utf-8?q?Lop=C3=A9z=2C_Juan_Carlo?=",
+            ),
+            (
+                "Juan Lopéz",
+                {"use_rfc2047": True, "use_quotes": "force"},
+                "=?utf-8?q?Juan_Lop=C3=A9z?=",
+            ),
+            (
+                "John Smith",
+                {"use_rfc2047": "force", "use_quotes": "force"},
+                "=?utf-8?q?John_Smith?=",
+            ),
+            # Corner cases
+            ("", {}, ""),
+            ("", {"use_quotes": "force"}, '""'),
+        ]
+        for display_name, args, expected in cases:
+            with self.subTest(display_name=display_name, args=args):
+                email = EmailAddress(display_name, "user@example.com")
+                result = email.format_display_name(**args)
+                self.assertEqual(result, expected)
+
+    def test_format_addr_spec(self):
+        cases = [
+            # addr_spec, format_addr_spec() kwargs, expected
+            ("user@example.com", {}, "user@example.com"),
+            ("user@exämple.com", {}, "user@exämple.com"),
+            ("user@example.com", {"idna_encode": idna2008}, "user@example.com"),
+            (
+                "user@exämple.com",
+                {"idna_encode": idna2008},
+                "user@xn--exmple-cua.com",
+            ),
+            ("user+tag@example.com", {}, "user+tag@example.com"),
+            ('"user@example.net"@example.com', {}, '"user@example.net"@example.com'),
+            ("üser@exämple.com", {}, "üser@exämple.com"),
+            (
+                "üser@exämple.com",
+                {"idna_encode": idna2008},
+                "üser@xn--exmple-cua.com",
+            ),
+        ]
+        for addr_spec, args, expected in cases:
+            with self.subTest(addr_spec=addr_spec, args=args):
+                email = EmailAddress(addr_spec=addr_spec)
+                result = email.format_addr_spec(**args)
+                self.assertEqual(result, expected)
+
+    def test_format(self):
+        cases = [
+            # email, format() kwargs, expected
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {},
+                "John Smith <john@example.com>",
+            ),
+            (
+                EmailAddress("Smith, John", "john@example.com"),
+                {},
+                '"Smith, John" <john@example.com>',
+            ),
+            (
+                EmailAddress("", "john@example.com"),
+                {},
+                "john@example.com",
+            ),
+            (
+                EmailAddress("Juan Lopéz", "juan@example.com"),
+                {},
+                "Juan Lopéz <juan@example.com>",
+            ),
+            (
+                EmailAddress("Lopéz, Juan", "juan@example.com"),
+                {},
+                '"Lopéz, Juan" <juan@example.com>',
+            ),
+            (
+                EmailAddress("", "user@exämple.com"),
+                {},
+                "user@exämple.com",
+            ),
+            # RFC 2047
+            (
+                EmailAddress("Juan Lopéz", "juan@example.com"),
+                {"use_rfc2047": True},
+                "=?utf-8?q?Juan_Lop=C3=A9z?= <juan@example.com>",
+            ),
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {"use_rfc2047": True},
+                "John Smith <john@example.com>",
+            ),
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {"use_rfc2047": "force"},
+                "=?utf-8?q?John_Smith?= <john@example.com>",
+            ),
+            # IDNA
+            (
+                EmailAddress("", "user@exämple.com"),
+                {"idna_encode": idna2008},
+                "user@xn--exmple-cua.com",
+            ),
+            (
+                EmailAddress("", "user@example.com"),
+                {"idna_encode": idna2008},
+                "user@example.com",
+            ),
+            (
+                EmailAddress("John Smith", "user@exämple.com"),
+                {"idna_encode": idna2008},
+                "John Smith <user@xn--exmple-cua.com>",
+            ),
+            # Combinations
+            (
+                EmailAddress("Juan Lopéz", "user@exämple.com"),
+                {"use_rfc2047": True, "idna_encode": idna2008},
+                "=?utf-8?q?Juan_Lop=C3=A9z?= <user@xn--exmple-cua.com>",
+            ),
+        ]
+
+        for email, args, expected in cases:
+            with self.subTest(email=email, args=args):
+                self.assertEqual(email.format(**args), expected)
+
+    def test_as_dict(self):
+        cases = [
+            # email, kwargs, expected
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {},
+                {"name": "John Smith", "email": "john@example.com"},
+            ),
+            (
+                EmailAddress(None, "john@example.com"),
+                {},
+                {"email": "john@example.com"},
+            ),
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {"name": "Name", "email": "Address"},
+                {"Name": "John Smith", "Address": "john@example.com"},
+            ),
+            (
+                EmailAddress("Smith, John", "john@example.com"),
+                {"quote_name": True},
+                {"name": '"Smith, John"', "email": "john@example.com"},
+            ),
+            (
+                EmailAddress("Juan Lopéz", "juan@éxample.com"),
+                {"idna_encode": idna2008},
+                {"name": "Juan Lopéz", "email": "juan@xn--xample-9ua.com"},
+            ),
+            (
+                EmailAddress("Juan Lopéz", "juan@example.com"),
+                {"use_rfc2047": True},
+                {"name": "=?utf-8?q?Juan_Lop=C3=A9z?=", "email": "juan@example.com"},
+            ),
+            (
+                EmailAddress("John Smith", "john@example.com"),
+                {"use_rfc2047": "force"},
+                {"name": "=?utf-8?q?John_Smith?=", "email": "john@example.com"},
+            ),
+            (
+                EmailAddress("John Smith", "john@exämple.com"),
+                {"quote_name": "force", "idna_encode": idna2008},
+                {"name": '"John Smith"', "email": "john@xn--exmple-cua.com"},
+            ),
+        ]
+        for email, kwargs, expected in cases:
+            with self.subTest(email=email, args=kwargs):
+                result = email.as_dict(**kwargs)
+                self.assertEqual(result, expected)
+
+    def test_long_unicode(self):
+        # (Earlier implementations using Django's sanitize_address could incorrectly
+        # introduce folding in the formatted address.)
+        display_name = (
+            "* * * 💲 Snag Your Free Gift! Click Here:"
+            " https://spam.example.com/uploads/spammy.php?spammy 💲 * * * 8v1e8k"
+        )
+        address = EmailAddress(display_name, "addr@example.com")
+        self.assertNotIn("\n", str(address))
+
+    def test_uses_eai(self):
+        cases = [
+            (EmailAddress(addr_spec="j.lópez@example.com"), True),
+            (EmailAddress(addr_spec="j.lopez@example.com"), False),
+            (EmailAddress(addr_spec="john@exämple.com"), False),
+            (EmailAddress(display_name="Jörg", addr_spec="jorg@example.com"), False),
+            (EmailAddress(display_name="Jörg", addr_spec="jörg@example.com"), True),
+        ]
+        for email, expected in cases:
+            with self.subTest(email=email):
+                self.assertIs(email.uses_eai, expected)
+
+
+class RFC2047Tests(SimpleTestCase):
+    cases = [
+        # text, encoded
+        ("ascii text", "=?utf-8?q?ascii_text?="),
+        ("Café", "=?utf-8?b?Q2Fmw6k=?="),
+        ("Café Florence", "=?utf-8?q?Caf=C3=A9_Florence?="),
+        ("こんにちは", "=?utf-8?b?44GT44KT44Gr44Gh44Gv?="),
+        ("Hello, World!", "=?utf-8?q?Hello=2C_World!?="),
+        ("", ""),
+    ]
+
+    decode_only_cases = [
+        # Cases where `encoded` is a valid representation of `text`,
+        # but not the one used by rfc2047_encode().
+        # text, encoded
+        ("Café Florence", "=?utf-8?q?Caf=C3=A9?= Florence"),
+        ("Café Florence", "=?utf-8?q?Caf=C3=A9?= =?utf-8?q?_Florence?="),
+        ("Café Florence", "Café Florence"),
+        (
+            "Café Café Café",
+            "=?utf-8?q?Caf=C3=A9_?= =?iso-8859-1?q?Caf=E9_?= =?utf-8?b?Q2Fmw6k=?=",
+        ),
+    ]
+
+    def test_rfc2047_encode(self):
+        for text, expected in self.cases:
+            with self.subTest(text=text):
+                result = rfc2047_encode(text)
+                self.assertEqual(result, expected)
+
+    def test_rfc2047_decode(self):
+        for text, encoded in self.cases + self.decode_only_cases:
+            with self.subTest(encoded=encoded):
+                result = rfc2047_decode(encoded)
+                self.assertEqual(result, text)
+
+
+class TestQuoting(SimpleTestCase):
+    def test_has_specials(self):
+        cases = [
+            # (value, expected)
+            ("", False),
+            ("Abc's åßç & $%=*+_^#! \t", False),
+            ("1, 2", True),
+            ("<3", True),
+            (">", True),
+            ("foo@bar@baz", True),
+            ("(Remark", True),
+            (")", True),
+            ('"dquote"', True),
+            ("back\\slash", True),
+            (";", True),
+            (".", True),
+            (":", True),
+            ("[bracket", True),
+            ("]", True),
+        ]
+        for value, expected in cases:
+            with self.subTest(value=value):
+                result = has_specials(value)
+                self.assertIs(result, expected)
+
+    def test_quote_display_name(self):
+        cases = [
+            # name, expected
+            ("John Doe", "John Doe"),
+            ("John, Doe", '"John, Doe"'),
+            ("Juan Lopéz", "Juan Lopéz"),
+            ("Lopéz, Juan", '"Lopéz, Juan"'),
+            ('Name "Namey"', r'"Name \"Namey\""'),
+            (r"John\Doe", r'"John\\Doe"'),
+            (r'"John\"Doe', r'"\"John\\\"Doe"'),
+            ("Name <Namey>", '"Name <Namey>"'),
+            ("Name@Email", '"Name@Email"'),
+            ("Name: Details;", '"Name: Details;"'),
+            ("(Remark)", '"(Remark)"'),
+        ]
+        for name, expected in cases:
+            with self.subTest(name=name):
+                result = quote_string(name)
+                self.assertEqual(result, expected)
+
+    def test_quote_display_name_force(self):
+        cases = [
+            # name, expected (with force=True)
+            ("John Doe", '"John Doe"'),
+            ("Juan Lopéz", '"Juan Lopéz"'),
+            ('John "Doe"', r'"John \"Doe\""'),
+        ]
+        for name, expected in cases:
+            with self.subTest(name=name):
+                result = quote_string(name, force=True)
+                self.assertEqual(result, expected)
+
+    def test_unquote_string(self):
+        cases = [
+            # quoted, expected
+            ('"John Doe"', "John Doe"),
+            ("John Doe", "John Doe"),
+            (
+                r'"inline \"quotes\" and \\backslashes"',
+                r'inline "quotes" and \backslashes',
+            ),
+            # Doesn't touch angle brackets (unlike email.utils.unquote)
+            ('"<foo@bar>"', "<foo@bar>"),
+            ("<foo@bar>", "<foo@bar>"),
+            # Corner cases
+            ('"', ""),
+            ("", ""),
+        ]
+        for quoted, expected in cases:
+            with self.subTest(quoted=quoted):
+                result = unquote_string(quoted)
+                self.assertEqual(result, expected)
+
+
+@ignore_warnings(category=RemovedInDjango70Warning, message="MIMEBase attachments")
 class NormalizedAttachmentTests(SimpleTestCase):
     """Test utils.Attachment"""
 
-    # (Several basic tests could be added here)
-
-    def test_content_disposition_attachment(self):
-        image = MIMEImage(b";-)", "x-emoticon")
-        image["Content-Disposition"] = 'attachment; filename="emoticon.txt"'
-        att = Attachment(image, "ascii")
-        self.assertEqual(att.name, "emoticon.txt")
-        self.assertEqual(att.content, b";-)")
-        self.assertFalse(att.inline)
-        self.assertIsNone(att.content_id)
-        self.assertEqual(att.cid, "")
-        self.assertEqual(
-            repr(att), "Attachment<image/x-emoticon, len=3, name='emoticon.txt'>"
-        )
-
-    def test_content_disposition_inline(self):
-        image = MIMEImage(b";-)", "x-emoticon")
-        image["Content-Disposition"] = "inline"
-        att = Attachment(image, "ascii")
-        self.assertIsNone(att.name)
-        self.assertEqual(att.content, b";-)")
-        self.assertTrue(att.inline)  # even without the Content-ID
-        self.assertIsNone(att.content_id)
-        self.assertEqual(att.cid, "")
-        self.assertEqual(
-            repr(att), "Attachment<inline, image/x-emoticon, len=3, content_id=None>"
-        )
-
-        image["Content-ID"] = "<abc123@example.net>"
-        att = Attachment(image, "ascii")
-        self.assertEqual(att.content_id, "<abc123@example.net>")
-        self.assertEqual(att.cid, "abc123@example.net")
-        self.assertEqual(
-            repr(att),
-            "Attachment<inline, image/x-emoticon, len=3,"
-            " content_id='<abc123@example.net>'>",
-        )
-
-    def test_content_id_implies_inline(self):
-        """A MIME object with a Content-ID should be assumed to be inline"""
-        image = MIMEImage(b";-)", "x-emoticon")
-        image["Content-ID"] = "<abc123@example.net>"
-        att = Attachment(image, "ascii")
-        self.assertTrue(att.inline)
-        self.assertEqual(att.content_id, "<abc123@example.net>")
-        self.assertEqual(
-            repr(att),
-            "Attachment<inline, image/x-emoticon, len=3,"
-            " content_id='<abc123@example.net>'>",
-        )
-
-        # ... but not if explicit Content-Disposition says otherwise
-        image["Content-Disposition"] = "attachment"
-        att = Attachment(image, "ascii")
-        self.assertFalse(att.inline)
-        self.assertIsNone(att.content_id)  # ignored for non-inline Attachment
-        self.assertEqual(repr(att), "Attachment<image/x-emoticon, len=3>")
-
-    def test_content_type(self):
-        att = Attachment(MIMEText("text", "plain", "iso8859-1"), "ascii")
+    def test_tuple_text(self):
+        att = Attachment(("test.txt", "¡text!", "text/plain"))
+        self.assertEqual(att.name, "test.txt")
         self.assertEqual(att.mimetype, "text/plain")
-        self.assertEqual(att.content_type, 'text/plain; charset="iso8859-1"')
+        self.assertEqual(att.maintype, "text")
+        self.assertEqual(att.subtype, "plain")
+        self.assertEqual(att.charset, "utf-8")
+        self.assertEqual(att.content_type, 'text/plain; charset="utf-8"')
+        self.assertEqual(att.content, "¡text!")
+        self.assertEqual(att.content_bytes, b"\xc2\xa1text!")
+        self.assertEqual(att.content_utf8_bytes, b"\xc2\xa1text!")
+        self.assertEqual(att.b64content, "wqF0ZXh0IQ==")
+        self.assertEqual(att.b64content_utf8, "wqF0ZXh0IQ==")
+        self.assertIs(att.inline, False)
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+        self.assertEqual(repr(att), "Attachment<text/plain, len=6, name='test.txt'>")
+
+    def test_tuple_bytes(self):
+        att = Attachment(("test.img", b":-)", "image/x-emoticon"))
+        self.assertEqual(att.name, "test.img")
+        self.assertEqual(att.mimetype, "image/x-emoticon")
+        self.assertEqual(att.maintype, "image")
+        self.assertEqual(att.subtype, "x-emoticon")
+        self.assertIsNone(att.charset)
+        self.assertEqual(att.content_type, "image/x-emoticon")
+        self.assertEqual(att.content, b":-)")
+        self.assertEqual(att.content_bytes, b":-)")
+        self.assertEqual(att.content_utf8_bytes, b":-)")
+        self.assertEqual(att.b64content, "Oi0p")
+        self.assertEqual(att.b64content_utf8, "Oi0p")
+        self.assertIs(att.inline, False)
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+        self.assertEqual(
+            repr(att), "Attachment<image/x-emoticon, len=3, name='test.img'>"
+        )
+
+    @unittest.skipIf(
+        EmailAttachment is None, "EmailAttachment not supported in this Django version"
+    )
+    def test_named_tuple(self):
+        # django.core.mail.EmailAttachment added in Django 5.2.
+        # It should be handled just like the tuples covered above.
+        # noinspection PyCallingNonCallable
+        att = Attachment(EmailAttachment("test.txt", "text", "text/plain"))
+        self.assertEqual(att.name, "test.txt")
+        self.assertEqual(att.mimetype, "text/plain")
+        self.assertEqual(att.content, "text")
+
+    def test_mimepart_text(self):
+        # MIMEPart attachments added in Django 6.0. (Supported in any Anymail
+        # version, but difficult to get into EmailMessage.attachments pre-6.0.)
+        # MIMEPart forces trailing newline in text content.
+        mimepart = MIMEPart()
+        mimepart.set_content("¡text!\n", "plain", filename="test.txt")
+
+        att = Attachment(mimepart)
+        self.assertEqual(att.name, "test.txt")
+        self.assertEqual(att.mimetype, "text/plain")
+        self.assertEqual(att.maintype, "text")
+        self.assertEqual(att.subtype, "plain")
+        self.assertEqual(att.charset, "utf-8")
+        self.assertEqual(att.content_type, 'text/plain; charset="utf-8"')
+        self.assertEqual(att.content, "¡text!\n")
+        self.assertEqual(att.content_bytes, b"\xc2\xa1text!\n")
+        self.assertEqual(att.content_utf8_bytes, b"\xc2\xa1text!\n")
+        self.assertEqual(att.b64content, "wqF0ZXh0IQo=")
+        self.assertEqual(att.b64content_utf8, "wqF0ZXh0IQo=")
+        self.assertIs(att.inline, False)
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+
+    def test_mimepart_text_other_charset(self):
+        mimepart = MIMEPart()
+        mimepart.set_content(
+            "¡text!\n", "plain", charset="iso-8859-1", filename="test.txt"
+        )
+
+        att = Attachment(mimepart)
+        self.assertEqual(att.name, "test.txt")
+        self.assertEqual(att.mimetype, "text/plain")
+        self.assertEqual(att.maintype, "text")
+        self.assertEqual(att.subtype, "plain")
+        self.assertEqual(att.charset, "iso-8859-1")
+        self.assertEqual(att.content_type, 'text/plain; charset="iso-8859-1"')
+        self.assertEqual(att.content, "¡text!\n")
+        self.assertEqual(att.content_bytes, b"\xa1text!\n")
+        self.assertEqual(att.content_utf8_bytes, b"\xc2\xa1text!\n")
+        self.assertEqual(att.b64content, "oXRleHQhCg==")
+        self.assertEqual(att.b64content_utf8, "wqF0ZXh0IQo=")
+        self.assertIs(att.inline, False)
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+
+    def test_mimepart_bytes(self):
+        # Also tests MIMEPart with no filename
+        mimepart = MIMEPart()
+        mimepart.set_content(
+            b":-)",
+            maintype="image",
+            subtype="x-emoticon",
+            disposition="inline",
+            cid="<foo@bar>",
+        )
+
+        att = Attachment(mimepart)
+        self.assertIsNone(att.name)
+        self.assertEqual(att.mimetype, "image/x-emoticon")
+        self.assertEqual(att.maintype, "image")
+        self.assertEqual(att.subtype, "x-emoticon")
+        self.assertIsNone(att.charset)
+        self.assertEqual(att.content_type, "image/x-emoticon")
+        self.assertEqual(att.content, b":-)")
+        self.assertEqual(att.content_bytes, b":-)")
+        self.assertEqual(att.content_utf8_bytes, b":-)")
+        self.assertEqual(att.b64content, "Oi0p")
+        self.assertEqual(att.b64content_utf8, "Oi0p")
+        self.assertIs(att.inline, True)
+        self.assertEqual(att.content_id, "<foo@bar>")
+        self.assertEqual(att.cid, "foo@bar")
+
+    def test_modern_email_message(self):
+        # Content can be an email.message.EmailMessage
+        raw_content = dedent(
+            """\
+            From: sender@example.com
+            To: someone@example.net
+            Subject: subject
+            Content-Type: text/plain; charset="us-ascii"
+
+            This is a test message.
+            """
+        ).encode()
+        forwarded_message = message_from_bytes(raw_content, policy=policy.default)
+        self.assertIsInstance(forwarded_message, PyEmailMessage)
+
+        att = Attachment((None, forwarded_message, None))
+        self.assertIsNone(att.name)
+        self.assertEqual(att.mimetype, "message/rfc822")
+        self.assertEqual(att.maintype, "message")
+        self.assertEqual(att.subtype, "rfc822")
+        self.assertIsNone(att.charset)  # (not the forwarded message's charset)
+        self.assertEqual(att.content_type, "message/rfc822")
+        self.assertEqual(att.content, raw_content.replace(b"\n", b"\r\n"))
+
+    def test_legacy_email_message(self):
+        # Content can be an email.message.Message
+        raw_content = dedent(
+            """\
+            From: sender@example.com
+            To: someone@example.net
+            Subject: subject
+            Content-Type: text/plain; charset="us-ascii"
+
+            This is a test message.
+            """
+        ).encode()
+        forwarded_message = message_from_bytes(raw_content, policy=policy.compat32)
+        self.assertIsInstance(forwarded_message, PyMessage)
+
+        att = Attachment((None, forwarded_message, None))
+        self.assertIsNone(att.name)
+        self.assertEqual(att.mimetype, "message/rfc822")
+        self.assertEqual(att.maintype, "message")
+        self.assertEqual(att.subtype, "rfc822")
+        self.assertIsNone(att.charset)
+        self.assertEqual(att.content_type, "message/rfc822")
+        self.assertEqual(att.content, raw_content.replace(b"\n", b"\r\n"))
+
+    def test_django_email_message(self):
+        # content can be a django.core.mail.EmailMessage
+        forwarded_message = DjangoEmailMessage(
+            from_email="sender@example.com",
+            to=["someone@example.net"],
+            subject="subject",
+            body="This is a test message.\n",
+        )
+        att = Attachment((None, forwarded_message, None))
+        self.assertIsNone(att.name)
+        self.assertEqual(att.mimetype, "message/rfc822")
+        self.assertEqual(att.maintype, "message")
+        self.assertEqual(att.subtype, "rfc822")
+        self.assertIsNone(att.charset)
+        self.assertEqual(att.content_type, "message/rfc822")
+        # Django will add a Date and Message-Id header.
+        # Just verify a few parts of content.
+        self.assertIn(b"\r\nTo: someone@example.net\r\n", att.content)
+        self.assertIn(b"\r\n\r\nThis is a test message.\r\n", att.content)
+
+    @unittest.skipIf(
+        DJANGO_VERSION >= (7, 0), "MIMEText not supported in this Django version"
+    )
+    def test_mimetext(self):
+        mimetext = MIMEText("¡text!", "plain")
+        mimetext.set_param("filename", "test.txt", header="Content-Disposition")
+        att = Attachment(mimetext)
+
+        self.assertEqual(att.name, "test.txt")
+        self.assertEqual(att.mimetype, "text/plain")
+        self.assertEqual(att.maintype, "text")
+        self.assertEqual(att.subtype, "plain")
+        self.assertEqual(att.charset, "utf-8")
+        self.assertEqual(att.content_type, 'text/plain; charset="utf-8"')
+        self.assertEqual(att.content, "¡text!")
+        self.assertEqual(att.content_bytes, b"\xc2\xa1text!")
+        self.assertEqual(att.content_utf8_bytes, b"\xc2\xa1text!")
+        self.assertEqual(att.b64content, "wqF0ZXh0IQ==")
+        self.assertEqual(att.b64content_utf8, "wqF0ZXh0IQ==")
+        self.assertIs(att.inline, False)
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+
+    @unittest.skipIf(
+        DJANGO_VERSION >= (7, 0), "MIMEText not supported in this Django version"
+    )
+    def test_mimetext_other_charset(self):
+        # Also tests MIMEBase with no filename
+        mimetext = MIMEText("¡text!", "plain", "iso-8859-1")
+        att = Attachment(mimetext)
+        self.assertIsNone(att.name)
+        self.assertEqual(att.charset, "iso-8859-1")
+        self.assertEqual(att.charset, "iso-8859-1")
+        self.assertEqual(att.content_type, 'text/plain; charset="iso-8859-1"')
+        self.assertEqual(att.content, "¡text!")
+        self.assertEqual(att.content_bytes, b"\xa1text!")
+        self.assertEqual(att.content_utf8_bytes, b"\xc2\xa1text!")
+        self.assertEqual(att.b64content, "oXRleHQh")
+        self.assertEqual(att.b64content_utf8, "wqF0ZXh0IQ==")
+
+    @unittest.skipIf(
+        DJANGO_VERSION >= (7, 0), "MIMEImage not supported in this Django version"
+    )
+    def test_mimeimage(self):
+        mimeimage = MIMEImage(b":-)", "x-emoticon")
+        mimeimage["Content-Disposition"] = 'attachment; filename="test.img"'
+        att = Attachment(mimeimage)
+        self.assertEqual(att.name, "test.img")
+        self.assertEqual(att.mimetype, "image/x-emoticon")
+        self.assertEqual(att.maintype, "image")
+        self.assertEqual(att.subtype, "x-emoticon")
+        self.assertIsNone(att.charset)
+        self.assertEqual(att.content_type, "image/x-emoticon")
+        self.assertEqual(att.content, b":-)")
+        self.assertEqual(att.content_bytes, b":-)")
+        self.assertEqual(att.content_utf8_bytes, b":-)")
+        self.assertEqual(att.b64content, "Oi0p")
+        self.assertEqual(att.b64content_utf8, "Oi0p")
+        self.assertIs(att.inline, False)
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+
+    @unittest.skipIf(
+        DJANGO_VERSION >= (7, 0), "MIMEImage not supported in this Django version"
+    )
+    def test_mimeimage_inline(self):
+        mimeimage = MIMEImage(b";-)", "x-emoticon")
+        mimeimage["Content-Disposition"] = 'inline; filename="test.img"'
+        att = Attachment(mimeimage)
+        self.assertIs(att.inline, True)  # even without the Content-ID
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+
+    @unittest.skipIf(
+        DJANGO_VERSION >= (7, 0), "MIMEImage not supported in this Django version"
+    )
+    def test_mimeimage_implicit_inline(self):
+        # Content-ID with no Content-Disposition implies inline
+        mimeimage = MIMEImage(b";-)", "x-emoticon")
+        mimeimage["Content-Id"] = "<foo@bar>"
+        att = Attachment(mimeimage)
+        self.assertIs(att.inline, True)
+        self.assertEqual(att.content_id, "<foo@bar>")
+        self.assertEqual(att.cid, "foo@bar")
+
+    @unittest.skipIf(
+        DJANGO_VERSION >= (7, 0), "MIMEImage not supported in this Django version"
+    )
+    def test_mimeimage_explicit_attachment(self):
+        # Content-ID with Content-Disposition: attachment is *not* inline
+        mimeimage = MIMEImage(b";-)", "x-emoticon")
+        mimeimage["Content-Disposition"] = 'attachment; filename="test.img"'
+        mimeimage["Content-Id"] = "<foo@bar>"
+        att = Attachment(mimeimage)
+        self.assertIs(att.inline, False)
+        # content_id suppressed when not inline
+        self.assertIsNone(att.content_id)
+        self.assertEqual(att.cid, "")
+
+    def test_guesses_content_type_from_filename(self):
+        att = Attachment(("test.csv", "foo,bar", None))
+        self.assertEqual(att.mimetype, "text/csv")
+        self.assertEqual(att.maintype, "text")
+        self.assertEqual(att.subtype, "csv")
+        self.assertEqual(att.charset, "utf-8")
+        self.assertEqual(att.content_type, 'text/csv; charset="utf-8"')
+
+    def test_falls_back_to_default_attachment_mimetype(self):
+        att = Attachment(("test.unknown", b"data", None))
+        self.assertEqual(att.mimetype, "application/octet-stream")
+        self.assertEqual(att.maintype, "application")
+        self.assertEqual(att.subtype, "octet-stream")
+        self.assertIsNone(att.charset)
+        self.assertEqual(att.content_type, "application/octet-stream")
+
+    def test_forces_charset_for_str_content(self):
+        # If the attachment content is a string, we need to convey its charset.
+        # (Could change to us-ascii or omit for 7-bit, but utf-8 seems good enough.)
+        att = Attachment(("test.unknown", "string", "application/x-exotic"))
+        self.assertEqual(att.mimetype, "application/x-exotic")
+        self.assertEqual(att.charset, "utf-8")
+        self.assertEqual(att.content_type, 'application/x-exotic; charset="utf-8"')
+
+    def test_filename_none(self):
+        att = Attachment((None, "text", "text/plain"))
+        self.assertIsNone(att.name)
         self.assertEqual(repr(att), "Attachment<text/plain, len=4>")
 
 

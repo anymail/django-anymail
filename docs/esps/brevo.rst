@@ -155,6 +155,12 @@ Brevo can handle.
   Anymail has no way to communicate an attachment's desired content-type
   to the Brevo API if the name is not set correctly.
 
+**Non-ASCII attachment filenames will be garbled**
+  Brevo's API does not properly encode Unicode characters in attachment
+  filenames. Some email clients will display those characters incorrectly.
+  The only workaround is to limit attachment filenames to ASCII when sending
+  through Brevo.
+
 **Single Reply-To**
   Brevo's v3 API only supports a single Reply-To address.
 
@@ -166,6 +172,39 @@ Brevo can handle.
   as a JSON-encoded string using their :mailheader:`X-Mailin-custom` email header.
   This header is included in the sent message, so **metadata will be visible to
   message recipients** if they view the raw message source.
+
+**Metadata and extra_headers values must be ASCII**
+  Brevo's API incorrectly handles non-ASCII Unicode characters in custom email
+  headers, sending them as raw utf-8. Unencoded 8-bit values in an email header
+  are usually invalid, and can cause bounces or silently undelivered messages.
+
+  Anymail is not able to work around this problem, so will raise an
+  :exc:`AnymailUnsupportedFeature` error for non-ASCII ``extra_headers`` or
+  :attr:`~anymail.message.AnymailMessage.merge_headers` values.
+
+  Because Anymail's metadata uses Brevo's :mailheader:`X-Mailin-custom` header,
+  this also affects :attr:`~anymail.message.AnymailMessage.metadata` and
+  :attr:`~anymail.message.AnymailMessage.merge_metadata`.
+
+  .. versionchanged:: vNext
+
+     Earlier releases did not detect this situation and could send
+     undeliverable messages with non-ASCII headers or metadata.
+
+**Avoid mixing non-ASCII characters and punctuation in Reply-To**
+  Brevo's API incorrectly handles non-ASCII characters combined with commas and
+  certain other punctuation in address header display names.
+
+  Anymail is able to work around the problem in ``to``, ``cc`` and ``bcc`` names.
+  It applies the same workaround to ``reply_to`` names, but this triggers another
+  Brevo bug that may cause some recipients to see an RFC 2047 encoded-word
+  (``=?utf-8?...``) in their email client .
+
+  .. versionchanged:: vNext
+
+     Earlier releases did not include the workaround, resulting in Brevo
+     sending messages with potentially missing display names in ``to``, ``cc``
+     and ``bcc`` and possibly undeliverable messages for ``reply_to``.
 
 **Special headers**
   Brevo uses special email headers to control certain features.
@@ -202,6 +241,18 @@ Brevo can handle.
 **No envelope sender overrides**
   Brevo does not support overriding :attr:`~anymail.message.AnymailMessage.envelope_sender`
   on individual messages.
+
+**Non-ASCII mailboxes (EAI)**
+  Brevo partially supports sending from or to Unicode mailboxes (the *user* part
+  of *user\@domain*---see :ref:`EAI <eai>`). Messages are delivered correctly,
+  but in the ``to`` field any display name with an EAI address will be missing
+  from the delivered message. And if any EAI address appears in the ``cc`` field,
+  the entire :mailheader:`Cc` header will be omitted, making it effectively a ``bcc``.
+
+  Also, Brevo does not properly verify the receiving SMTP server supports EAI
+  (smtputf8). For valid EAI recipient addresses, this generally shouldn't cause
+  problems. For an EAI ``from_email`` or ``reply_to`` this could result in lost
+  or undeliverable messages.
 
 
 .. _brevo-templates:

@@ -281,25 +281,32 @@ Limitations and quirks
 
   (Tested March, 2016)
 
-**Wrong character set on text attachments**
-  Under some conditions, SendGrid incorrectly identifies text attachments (text/plain,
-  text/calendar, etc.) as using ISO-8859-1 encoding, and forces ``charset="iso-8859-1"``
-  into the attachments' MIME headers. This generally causes any non-ASCII characters in
-  the attachments to be replaced with incorrect or illegal characters in the recipient's
-  email client.
+**Non-ASCII text attachments may be garbled**
+  SendGrid's API ignores the character set used for text attachment content.
+  It either strips the ``charset`` parameter from the :mailheader:`Content-Type`
+  attachment header or arbitrarily changes it to ``charset="iso-8859-1"``,
+  even when some other charset is specified. This will display incorrectly or
+  cause errors in many email clients.
 
-  The behavior is unpredictable, and may vary by SendGrid account or change over time.
-  There is no reliable, general workaround that Anymail could implement. You may be able
-  to counteract the issue by enabling open and/or click tracking in your SendGrid
-  account. The only way to completely avoid the problem is switching to a non-text
-  attachment type (e.g., application/pdf) or limiting your text attachments to use only
+  The behavior is unpredictable and may vary by SendGrid account or change over
+  time. It has been reported to SendGrid repeatedly. You may be able to counteract
+  the issue by enabling open and/or click tracking in your SendGrid account. The
+  only way to completely avoid the problem is switching to a non-text attachment
+  type (e.g., application/pdf) or limiting your text attachments to use only
   ASCII characters. See `issue 150 <https://github.com/anymail/django-anymail/issues/150>`_
   for more information and other possible workarounds.
 
-  If this impacts your usage, it's helpful to report it to SendGrid support, so they can
-  quantify customers affected and prioritize a fix.
+  .. versionchanged:: vNext
 
-  (Noted June, 2019 and December, 2019)
+      Anymail forces utf-8 encoding for text attachments and specifically includes
+      that charset in the appropriate SendGrid API parameter. (Even with this change,
+      SendGrid seems to ignore the charset and implement its own logic.)
+
+**Non-ASCII attachment filenames will be garbled**
+  SendGrid does not properly encode Unicode characters in attachment
+  filenames. Some email clients will display those characters incorrectly.
+  The only workaround is to limit attachment filenames to ASCII when sending
+  through SendGrid.
 
 **Arbitrary alternative parts allowed**
   SendGrid is one of the few ESPs that *does* support sending arbitrary alternative

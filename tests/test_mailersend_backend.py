@@ -1,8 +1,6 @@
 from calendar import timegm
 from datetime import date, datetime
 from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 
 from django.core import mail
 from django.test import override_settings, tag
@@ -18,15 +16,10 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import attach_inline_image_file
+from anymail.message import attach_inline_image
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase
-from .utils import (
-    SAMPLE_IMAGE_FILENAME,
-    decode_att,
-    sample_image_content,
-    sample_image_path,
-)
+from .utils import create_text_attachment, decode_att, sample_image_content
 
 
 @tag("mailersend")
@@ -211,94 +204,77 @@ class MailerSendBackendStandardEmailTests(MailerSendBackendMockAPITestCase):
             data["reply_to"], {"email": "reply@example.com", "name": "Reply Name"}
         )
 
-    def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
-        self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+    def test_non_ascii_headers(self):
+        # MailerSend correctly encodes non-ASCII display-names and other headers
+        # (but requires IDNA encoding for non-ASCII domain names).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
         )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["from"],
+            {
+                "name": "Odesílatel, z adresy",
+                "email": "from@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["to"],
+            [
+                {
+                    "name": "Příjemce, na adresu",
+                    "email": "to@xn--pklad-zsa96e.example.cz",
+                }
+            ],
+        )
+        self.assertEqual(data["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["reply_to"],
+            {"name": "Odpověď, adresa", "email": "reply@xn--pklad-zsa96e.example.cz"},
+        )
+        self.assertEqual(data["headers"], [{"name": "X-Extra", "value": "Další"}])
 
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
-
-        # Should work with a MIMEBase object (also tests no filename)...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf params"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        self.message.attach(mimeattachment)
+    def test_attachments(self):
+        # Mailersend has no way to include a charset for text attachments.
+        # It guesses content type from the filename. It allows non-ASCII
+        # filenames, and correctly rfc2231 encodes the Content-Disposition
+        # filename param (but incorrectly applies rfc2047 to the obsolete
+        # Content-Type name param).
+        text_content = "pièce jointe\n"
+        self.message.attach(
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
+        )
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
 
         self.message.send()
         data = self.get_api_call_json()
         attachments = data["attachments"]
         self.assertEqual(len(attachments), 3)
+
+        # Missing filename is generated. Text is sent as utf-8, despite charset.
         self.assertEqual(attachments[0]["disposition"], "attachment")
-        self.assertEqual(attachments[0]["filename"], "test.txt")
+        self.assertEqual(attachments[0]["filename"], "attachment.txt")
         self.assertEqual(
-            decode_att(attachments[0]["content"]).decode("ascii"), text_content
+            decode_att(attachments[0]["content"]).decode("utf-8"), text_content
         )
+
+        # (Filename with ".img" extension would cause a Brevo API error.)
         self.assertEqual(attachments[1]["disposition"], "attachment")
-        self.assertEqual(attachments[1]["filename"], "test.png")
-        self.assertEqual(decode_att(attachments[1]["content"]), png_content)
-        self.assertEqual(attachments[2]["disposition"], "attachment")
-        self.assertEqual(attachments[2]["filename"], "attachment.pdf")  # generated
-        self.assertEqual(decode_att(attachments[2]["content"]), pdf_content)
+        self.assertEqual(attachments[1]["filename"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["content"]), b";-)")
 
-    def test_unicode_attachment_correctly_decoded(self):
-        # Slight modification from the Django unicode docs:
-        # http://django.readthedocs.org/en/latest/ref/unicode.html#email
-        self.message.attach(
-            "Une pièce jointe.html", "<p>\u2019</p>", mimetype="text/html"
-        )
-        self.message.send()
-        data = self.get_api_call_json()
-        attachments = data["attachments"]
-        self.assertEqual(len(attachments), 1)
-
-    def test_embedded_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(data["html"], html_content)
-
-        self.assertEqual(len(data["attachments"]), 1)
-        self.assertEqual(data["attachments"][0]["disposition"], "inline")
-        self.assertEqual(data["attachments"][0]["filename"], image_filename)
-        self.assertEqual(data["attachments"][0]["id"], cid)
-        self.assertEqual(decode_att(data["attachments"][0]["content"]), image_data)
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly
-        image = MIMEImage(image_data)
-        self.message.attach(image)
-
-        self.message.send()
-        data = self.get_api_call_json()
-        attachments = data["attachments"]
-        self.assertEqual(len(attachments), 2)
-        self.assertEqual(attachments[0]["disposition"], "attachment")
-        self.assertEqual(attachments[0]["filename"], image_filename)
-        self.assertEqual(decode_att(attachments[0]["content"]), image_data)
-        self.assertNotIn("id", attachments[0])  # not inline
-        self.assertEqual(attachments[1]["disposition"], "attachment")
-        self.assertEqual(attachments[1]["filename"], "attachment.png")  # generated
-        self.assertEqual(decode_att(attachments[1]["content"]), image_data)
-        self.assertNotIn("id", attachments[0])  # not inline
+        self.assertEqual(attachments[2]["disposition"], "inline")
+        self.assertEqual(attachments[2]["filename"], "test.png")
+        self.assertEqual(attachments[2]["id"], cid)
+        self.assertEqual(decode_att(attachments[2]["content"]), image_data)
 
     def test_multiple_html_alternatives(self):
         # Multiple text/html alternatives not allowed

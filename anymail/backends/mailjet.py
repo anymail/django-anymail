@@ -130,13 +130,11 @@ class MailjetPayload(RequestsPayload):
             to_recipients = self.data["Messages"][0].get("To", [])
             self.data["Messages"] = [{"To": [to]} for to in to_recipients]
 
-    @staticmethod
-    def _mailjet_email(email):
+    def _mailjet_email(self, email):
         """Expand an Anymail EmailAddress into Mailjet's {"Email", "Name"} dict"""
-        result = {"Email": email.addr_spec}
-        if email.display_name:
-            result["Name"] = email.display_name
-        return result
+        return email.as_dict(
+            name="Name", email="Email", idna_encode=self.backend.idna_encode
+        )
 
     def set_from_email(self, email):
         self.data["Globals"]["From"] = self._mailjet_email(email)
@@ -196,11 +194,13 @@ class MailjetPayload(RequestsPayload):
             self.data["Globals"]["HTMLPart"] = body
 
     def add_attachment(self, attachment):
+        # Mailjet adds `charset=utf-8` to text/* ContentType (even if charset
+        # already there), so omit charset and always use utf-8 for text content.
+        # Mailjet requires a non-empty Filename.
         att = {
-            "ContentType": attachment.mimetype,
-            # Mailjet requires a non-empty Filename.
+            "ContentType": attachment.mimetype,  # (not content_type with charset)
             "Filename": attachment.name or "attachment",
-            "Base64Content": attachment.b64content,
+            "Base64Content": attachment.b64content_utf8,
         }
         if attachment.inline:
             field = "InlinedAttachments"

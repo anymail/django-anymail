@@ -30,12 +30,116 @@ vNext
 
 *Unreleased changes*
 
+This release improves handling of non-ASCII characters everywhere email messages
+allow them, based on extensive testing of Unicode handling for all supported
+ESPs. There are several new workarounds for ESP bugs and a handful of new
+errors to help you avoid bugs that don't have workarounds. See
+`International email <https://anymail.dev/en/latest/tips/international_email/#idna>`_
+in the docs for more information.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+* **International domain names:** When sending email to a non-ASCII domain name,
+  use IDNA 2008 with UTS-46 pre-processing rather than obsolete IDNA 2003
+  encoding. This ensures email can be sent to newer domains enabled by IDNA 2008.
+
+  This change should make no difference for virtually all real-world email
+  addresses that worked with earlier Anymail releases. But trying to send to
+  emoji domains or others no longer allowed by IDNA 2008 will now raise an
+  ``AnymailInvalidAddress`` error.
+
+  To restore the old behavior or select a different encoding, use the new
+  ``IDNA_ENCODER`` setting. See
+  `Domains (IDNA) <https://anymail.dev/en/latest/tips/international_email/#idna>`_
+  in the docs.
+
+  As part of this change, Anymail now has a direct dependency on the ``idna``
+  package. (It was already being installed as a sub-dependency of ``requests``.)
+
+* **Brevo:** Raise an error if metadata or custom header values include non-ASCII
+  characters. This avoids a Brevo API bug that sends unencoded 8-bit headers,
+  which can cause bounces or dropped messages.
+
+* **Mailgun:** Raise an error if the ``from_email`` uses EAI (has a non-ASCII
+  local part). This avoids a Mailgun API bug that generates undeliverable
+  messages.
+
+* **Resend:** Raise an error if an attachment's filename has an extension that
+  doesn't match its content type. This tries to help you avoid a Resend API bug
+  that can silently drop sent messages.
+
+* **Scaleway TEM:** Raise an error if any address field uses EAI (has a non-ASCII
+  local part). This avoids a Scaleway API bug that generates undeliverable messages.
+
 Features
 ~~~~~~~~
+
+* Support Django 6.0.
+
+* Allow Python's modern MIMEPart object as attachments (new in Django 6.0).
+  Use MIMEPart for Anymail's ``attach_inline_image`` helpers under Django 6.0
+  and later.
 
 * **Mailtrap:** Add support for this ESP.
   (See `docs <https://anymail.dev/en/latest/esps/mailtrap/>`__.
   Thanks to `@cahna`_ for the contribution.)
+
+* **Resend:** Add support for inline images. Identify attachment content type
+  using new API parameter, including accurately specifying charset for
+  non-ASCII text attachments. (See related Resend breaking change above.)
+
+Fixes
+~~~~~
+
+* Handle sending attached messages (e.g., forwarded emails) consistently with
+  Django's SMTP EmailBackend.
+
+* Exempt webhooks from Django's LoginRequiredMiddleware.
+  (Thanks to `@Zerotask`_ for reporting the issue.)
+
+* **Brevo, Mailgun, Mandrill, Postal, Postmark, Scaleway TEM, Unisender Go:**
+  Fix Anymail bugs that could cause text attachments with non-ASCII content
+  to display incorrectly in some email clients.
+
+* **Brevo:** Work around a Brevo API bug which loses non-ASCII display names
+  that also contain a comma or certain other punctuation.
+
+* **Mailgun:** Use ``"attachment"`` as the default attachment filename (rather
+  than raising an error) for consistency with Anymail's handling of missing
+  attachment filenames in other ESPs.
+
+* **Postmark:** Prevent a KeyError in the tracking webhook when handling
+  an unsubscribe request due to a bounce. (Thanks to `@dshunfen`_ for reporting
+  the issue.)
+
+Other
+~~~~~
+
+* **Brevo:** Document a Brevo API bug that causes non-ASCII attachment
+  filenames to display incorrectly in some email clients.
+
+* **Mandrill:** Document a Mandrill API bug that can cause an address with a
+  non-ASCII display name to display incorrectly in some email clients.
+
+* **SendGrid:** Document a SendGrid API bug that causes non-ASCII attachment
+  filenames to display incorrectly in some email clients. Clarify handling and
+  documentation of SendGrid API bugs around text attachment content encoding.
+
+* **Unisender Go:** Document a Unisender Go API bug that can cause an Reply-To
+  address (only) with a non-ASCII display name to display incorrectly in some
+  email clients.
+
+Deprecations
+~~~~~~~~~~~~
+
+* This will be the last Anymail release to support Django 4.0 and 4.1
+  (which reached end of extended support on 2023-04-01 and 2023-12-01,
+  respectively).
+
+* This will be the last Anymail release to support Python 3.8 and 3.9
+  (which reached end of life on 2024-10-07 and 2025-10-31, respectively).
+
 
 v13.1
 -----
@@ -1843,6 +1947,7 @@ Features
 .. _@dgilmanAIDENTIFIED: https://github.com/dgilmanAIDENTIFIED
 .. _@dimitrisor: https://github.com/dimitrisor
 .. _@dominik-lekse: https://github.com/dominik-lekse
+.. _@dshunfen: https://github.com/dshunfen
 .. _@Ecno92: https://github.com/Ecno92
 .. _@erikdrums: https://github.com/erikdrums
 .. _@ewingrj: https://github.com/ewingrj
@@ -1890,3 +1995,4 @@ Features
 .. _@vgrebenschikov: https://github.com/vgrebenschikov
 .. _@vitaliyf: https://github.com/vitaliyf
 .. _@yourcelf: https://github.com/yourcelf
+.. _@Zerotask: https://github.com/Zerotask

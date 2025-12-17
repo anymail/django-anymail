@@ -1,9 +1,6 @@
 import json
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
-from email.mime.text import MIMEText
 
 from django.core import mail
 from django.test import override_settings, tag
@@ -19,15 +16,10 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import AnymailMessage, attach_inline_image_file
+from anymail.message import AnymailMessage, attach_inline_image
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase
-from .utils import (
-    SAMPLE_IMAGE_FILENAME,
-    decode_att,
-    sample_image_content,
-    sample_image_path,
-)
+from .utils import create_text_attachment, decode_att, sample_image_content
 
 
 @tag("sparkpost")
@@ -238,110 +230,85 @@ class SparkPostBackendStandardEmailTests(SparkPostBackendMockAPITestCase):
         # don't lose other headers:
         self.assertEqual(data["content"]["headers"], {"X-Other": "Keep"})
 
+    def test_non_ascii_headers(self):
+        # Sparkpost correctly encodes non-ASCII display-names and other headers,
+        # including applying RFC 2047 encoding within constructed address headers.
+        # It can handle _some_ non-ASCII domain names (though not all),
+        # but Anymail applies its own IDNA_ENCODER for consistency.
+        # Sparkpost supports EAI in all address fields (but does not verify smtputf8).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from-тест@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to-тест@příklad.example.cz>'],
+            cc=['"Příjemce, adresa kopie" <cc-тест@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply-тест@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["content"]["from"],
+            '"Odesílatel, z adresy" <from-тест@xn--pklad-zsa96e.example.cz>',
+        )
+        self.assertEqual(
+            data["recipients"][0]["address"],
+            {
+                "email": "to-тест@xn--pklad-zsa96e.example.cz",
+                "header_to": '"Příjemce, na adresu" <to-тест@xn--pklad-zsa96e.example.cz>',
+            },
+        )
+        self.assertEqual(
+            data["recipients"][1]["address"],
+            {
+                "email": "cc-тест@xn--pklad-zsa96e.example.cz",
+                "header_to": '"Příjemce, na adresu" <to-тест@xn--pklad-zsa96e.example.cz>',
+            },
+        )
+        self.assertEqual(data["content"]["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["content"]["reply_to"],
+            '"Odpověď, adresa" <reply-тест@xn--pklad-zsa96e.example.cz>',
+        )
+        self.assertEqual(
+            data["content"]["headers"],
+            {
+                "Cc": '"Příjemce, adresa kopie" <cc-тест@xn--pklad-zsa96e.example.cz>',
+                "X-Extra": "Další",
+            },
+        )
+
     def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
+        # Sparkpost supports non-utf-8 content with charset in the `type` field.
+        # Sparkpost does not require attachment filenames. It allows non-ASCII
+        # filenames (though incorrectly applies rfc2047 when sending).
+        text_content = "pièce jointe\n"
         self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
         )
-
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
-
-        # Should work with a MIMEBase object (also tests no filename)...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf params"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        self.message.attach(mimeattachment)
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
 
         self.message.send()
         data = self.get_api_call_json()
-        attachments = data["content"]["attachments"]
-        self.assertEqual(len(attachments), 3)
-        self.assertEqual(attachments[0]["type"], "text/plain")
-        self.assertEqual(attachments[0]["name"], "test.txt")
-        self.assertEqual(
-            decode_att(attachments[0]["data"]).decode("ascii"), text_content
-        )
-        self.assertEqual(attachments[1]["type"], "image/png")  # inferred from filename
-        self.assertEqual(attachments[1]["name"], "test.png")
-        self.assertEqual(decode_att(attachments[1]["data"]), png_content)
-        self.assertEqual(attachments[2]["type"], "application/pdf")
-        self.assertEqual(attachments[2]["name"], "")  # none
-        self.assertEqual(decode_att(attachments[2]["data"]), pdf_content)
-        # Make sure the image attachment is not treated as embedded:
-        self.assertNotIn("inline_images", data["content"])
 
-    def test_unicode_attachment_correctly_decoded(self):
-        # Slight modification from the Django unicode docs:
-        # http://django.readthedocs.org/en/latest/ref/unicode.html#email
-        self.message.attach(
-            "Une pièce jointe.html", "<p>\u2019</p>", mimetype="text/html"
-        )
-        self.message.send()
-        data = self.get_api_call_json()
-        attachments = data["content"]["attachments"]
-        self.assertEqual(len(attachments), 1)
-
-    def test_attachment_charset(self):
-        # SparkPost allows charset param in attachment type
-        self.message.attach(MIMEText("Une pièce jointe", "plain", "iso8859-1"))
-        self.message.send()
-        data = self.get_api_call_json()
-        attachment = data["content"]["attachments"][0]
-        self.assertEqual(attachment["type"], 'text/plain; charset="iso8859-1"')
-        self.assertEqual(
-            decode_att(attachment["data"]), "Une pièce jointe".encode("iso8859-1")
-        )
-
-    def test_embedded_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(data["content"]["html"], html_content)
-
-        self.assertEqual(len(data["content"]["inline_images"]), 1)
-        self.assertEqual(data["content"]["inline_images"][0]["type"], "image/png")
-        self.assertEqual(data["content"]["inline_images"][0]["name"], cid)
-        self.assertEqual(
-            decode_att(data["content"]["inline_images"][0]["data"]), image_data
-        )
-        # Make sure neither the html nor the inline image is treated as an attachment:
-        self.assertNotIn("attachments", data["content"])
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly
-        image = MIMEImage(image_data)
-        self.message.attach(image)
-
-        self.message.send()
-        data = self.get_api_call_json()
         attachments = data["content"]["attachments"]
         self.assertEqual(len(attachments), 2)
-        self.assertEqual(attachments[0]["type"], "image/png")
-        self.assertEqual(attachments[0]["name"], image_filename)
-        self.assertEqual(decode_att(attachments[0]["data"]), image_data)
-        self.assertEqual(attachments[1]["type"], "image/png")
-        self.assertEqual(attachments[1]["name"], "")  # unknown -- not attached as file
-        self.assertEqual(decode_att(attachments[1]["data"]), image_data)
-        # Make sure the image attachments are not treated as embedded:
-        self.assertNotIn("inline_images", data["content"])
+        self.assertEqual(attachments[0]["type"], 'text/plain; charset="iso-8859-1"')
+        self.assertEqual(attachments[0]["name"], "")  # no filename
+        self.assertEqual(
+            decode_att(attachments[0]["data"]).decode("iso-8859-1"), text_content
+        )
+        self.assertEqual(attachments[1]["type"], "image/x-emoticon")
+        self.assertEqual(attachments[1]["name"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["data"]), b";-)")
+
+        inlines = data["content"]["inline_images"]
+        self.assertEqual(len(inlines), 1)
+        self.assertEqual(inlines[0]["type"], "image/png")  # from filename
+        self.assertEqual(inlines[0]["name"], cid)
+        self.assertEqual(decode_att(inlines[0]["data"]), image_data)
 
     def test_multiple_html_alternatives(self):
         # Multiple text/html alternatives not allowed

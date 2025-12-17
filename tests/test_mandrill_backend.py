@@ -1,7 +1,5 @@
 from datetime import date, datetime
 from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
@@ -24,11 +22,10 @@ from .mock_requests_backend import (
     SessionSharingTestCases,
 )
 from .utils import (
-    SAMPLE_IMAGE_FILENAME,
     AnymailTestMixin,
+    create_text_attachment,
     decode_att,
     sample_image_content,
-    sample_image_path,
 )
 
 
@@ -147,6 +144,47 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
         # Don't use Mandrill's bcc_address "logging" feature for bcc's:
         self.assertNotIn("bcc_address", data["message"])
 
+    def test_non_ascii_headers(self):
+        # Mandrill incorrectly converts non-ASCII display names to rfc2047
+        # encoded-words _inside a quoted_string_. (Pre-encoding before calling
+        # the API gives the same result, so there is no workaround.)
+        # Mandrill correctly handles other non-ASCII headers
+        # (but requires IDNA encoding for non-ASCII domain names).
+        # Mandrill supports EAI in all address fields (with some bugs--see docs).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from-тест@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to-тест@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply-тест@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["message"]["from_email"],
+            "from-тест@xn--pklad-zsa96e.example.cz",
+        )
+        self.assertEqual(data["message"]["from_name"], "Odesílatel, z adresy")
+        self.assertEqual(
+            data["message"]["to"],
+            [
+                {
+                    "name": "Příjemce, na adresu",
+                    "email": "to-тест@xn--pklad-zsa96e.example.cz",
+                    "type": "to",
+                }
+            ],
+        )
+        self.assertEqual(data["message"]["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["message"]["headers"],
+            {
+                "Reply-To": '"Odpověď, adresa" <reply-тест@xn--pklad-zsa96e.example.cz>',
+                "X-Extra": "Další",
+            },
+        )
+
     def test_html_message(self):
         text_content = "This is an important message."
         html_content = "<p>This is an <strong>important</strong> message.</p>"
@@ -191,92 +229,37 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
         self.assertEqual(data["message"]["headers"]["X-Other"], "Keep")
 
     def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
+        # Mandrill supports non-utf-8 content with charset in the `type` field.
+        # Mandrill does not require attachment filenames. It accepts non-ASCII
+        # filenames but sends them incorrectly as raw 8-bit utf-8.
+        text_content = "pièce jointe\n"
         self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
         )
-
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
-
-        # Should work with a MIMEBase object (also tests no filename)...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf data"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        self.message.attach(mimeattachment)
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
 
         self.message.send()
         data = self.get_api_call_json()
-        attachments = data["message"]["attachments"]
-        self.assertEqual(len(attachments), 3)
-        self.assertEqual(attachments[0]["type"], "text/plain")
-        self.assertEqual(attachments[0]["name"], "test.txt")
-        self.assertEqual(
-            decode_att(attachments[0]["content"]).decode("ascii"), text_content
-        )
-        self.assertEqual(attachments[1]["type"], "image/png")  # inferred from filename
-        self.assertEqual(attachments[1]["name"], "test.png")
-        self.assertEqual(decode_att(attachments[1]["content"]), png_content)
-        self.assertEqual(attachments[2]["type"], "application/pdf")
-        self.assertEqual(attachments[2]["name"], "")  # none
-        self.assertEqual(decode_att(attachments[2]["content"]), pdf_content)
-        # Make sure the image attachment is not treated as embedded:
-        self.assertFalse("images" in data["message"])
 
-    def test_unicode_attachment_correctly_decoded(self):
-        self.message.attach(
-            "Une pièce jointe.html", "<p>\u2019</p>", mimetype="text/html"
-        )
-        self.message.send()
-        data = self.get_api_call_json()
-        attachments = data["message"]["attachments"]
-        self.assertEqual(len(attachments), 1)
-
-    def test_embedded_images(self):
-        image_data = sample_image_content()  # Read from a png file
-
-        cid = attach_inline_image(self.message, image_data)
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(len(data["message"]["images"]), 1)
-        self.assertEqual(data["message"]["images"][0]["type"], "image/png")
-        self.assertEqual(data["message"]["images"][0]["name"], cid)
-        self.assertEqual(
-            decode_att(data["message"]["images"][0]["content"]), image_data
-        )
-        # Make sure neither the html nor the inline image is treated as an attachment:
-        self.assertFalse("attachments" in data["message"])
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file:
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly:
-        image = MIMEImage(image_data)
-        self.message.attach(image)
-
-        self.message.send()
-        data = self.get_api_call_json()
         attachments = data["message"]["attachments"]
         self.assertEqual(len(attachments), 2)
-        self.assertEqual(attachments[0]["type"], "image/png")
-        self.assertEqual(attachments[0]["name"], image_filename)
-        self.assertEqual(decode_att(attachments[0]["content"]), image_data)
-        self.assertEqual(attachments[1]["type"], "image/png")
-        self.assertEqual(attachments[1]["name"], "")  # unknown -- not attached as file
-        self.assertEqual(decode_att(attachments[1]["content"]), image_data)
-        # Make sure the image attachments are not treated as embedded:
-        self.assertFalse("images" in data["message"])
+        self.assertEqual(attachments[0]["type"], 'text/plain; charset="iso-8859-1"')
+        self.assertEqual(attachments[0]["name"], "")  # no filename
+        self.assertEqual(
+            decode_att(attachments[0]["content"]).decode("iso-8859-1"), text_content
+        )
+        self.assertEqual(attachments[1]["type"], "image/x-emoticon")
+        self.assertEqual(attachments[1]["name"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["content"]), b";-)")
+
+        inlines = data["message"]["images"]
+        self.assertEqual(len(data["message"]["images"]), 1)
+        self.assertEqual(len(inlines), 1)
+        self.assertEqual(inlines[0]["type"], "image/png")  # from filename
+        self.assertEqual(inlines[0]["name"], cid)
+        self.assertEqual(decode_att(inlines[0]["content"]), image_data)
 
     def test_multiple_html_alternatives(self):
         # Multiple alternatives not allowed

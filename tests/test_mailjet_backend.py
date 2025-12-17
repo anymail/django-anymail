@@ -1,8 +1,5 @@
 import json
-from base64 import b64encode
 from decimal import Decimal
-from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
@@ -14,18 +11,17 @@ from anymail.exceptions import (
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import attach_inline_image, attach_inline_image_file
+from anymail.message import attach_inline_image
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
 from .utils import (
-    SAMPLE_IMAGE_FILENAME,
     AnymailTestMixin,
+    create_text_attachment,
     decode_att,
     sample_image_content,
-    sample_image_path,
 )
 
 
@@ -232,127 +228,84 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         # don't lose other headers:
         self.assertEqual(data["Globals"]["Headers"], {"X-Other": "Keep"})
 
-    def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
-        self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+    def test_non_ascii_headers(self):
+        # Mailjet correctly encodes non-ASCII display-names and other headers
+        # (but requires IDNA encoding for non-ASCII domain names).
+        # Mailjet fully supports EAI in all address fields.
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from-тест@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to-тест@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply-тест@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
         )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["Globals"]["From"],
+            {
+                "Name": "Odesílatel, z adresy",
+                "Email": "from-тест@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(
+            data["Messages"][0]["To"],
+            [
+                {
+                    "Name": "Příjemce, na adresu",
+                    "Email": "to-тест@xn--pklad-zsa96e.example.cz",
+                }
+            ],
+        )
+        self.assertEqual(data["Globals"]["Subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["Globals"]["ReplyTo"],
+            {
+                "Name": "Odpověď, adresa",
+                "Email": "reply-тест@xn--pklad-zsa96e.example.cz",
+            },
+        )
+        self.assertEqual(data["Globals"]["Headers"], {"X-Extra": "Další"})
 
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
-
-        # Should work with a MIMEBase object (also tests no filename)...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf data"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        self.message.attach(mimeattachment)
+    def test_attachments(self):
+        # Mailjet adds `charset=utf-8` to all text Content-Type fields, even
+        # if another charset is already present in the ContentType API param.
+        # (To avoid this, send text as utf-8 and omit the charset.)
+        # Mailjet allows and correctly encodes a non-ASCII Filename.
+        # It requires a non-empty Filename, but places no other restrictions on it.
+        text_content = "pièce jointe\n"
+        self.message.attach(
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
+        )
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
 
         self.message.send()
         data = self.get_api_call_json()
         attachments = data["Globals"]["Attachments"]
-        self.assertEqual(len(attachments), 3)
-        self.assertEqual(attachments[0]["Filename"], "test.txt")
-        self.assertEqual(attachments[0]["ContentType"], "text/plain")
+        self.assertEqual(len(attachments), 2)
+        self.assertEqual(attachments[0]["Filename"], "attachment")  # generated
+        self.assertEqual(attachments[0]["ContentType"], "text/plain")  # no charset
         self.assertEqual(
-            decode_att(attachments[0]["Base64Content"]).decode("ascii"), text_content
+            # utf-8, despite original charset
+            decode_att(attachments[0]["Base64Content"]).decode("utf-8"),
+            text_content,
         )
         self.assertNotIn("ContentID", attachments[0])
 
-        # inferred from filename:
-        self.assertEqual(attachments[1]["ContentType"], "image/png")
-        self.assertEqual(attachments[1]["Filename"], "test.png")
-        self.assertEqual(decode_att(attachments[1]["Base64Content"]), png_content)
-        # make sure image not treated as inline:
+        self.assertEqual(attachments[1]["ContentType"], "image/x-emoticon")
+        self.assertEqual(attachments[1]["Filename"], "émoticône.img")
+        self.assertEqual(decode_att(attachments[1]["Base64Content"]), b";-)")
         self.assertNotIn("ContentID", attachments[1])
 
-        self.assertEqual(attachments[2]["ContentType"], "application/pdf")
-        self.assertEqual(attachments[2]["Filename"], "attachment")
-        self.assertEqual(decode_att(attachments[2]["Base64Content"]), pdf_content)
-        self.assertNotIn("ContentID", attachments[2])
-
-        self.assertNotIn("InlinedAttachments", data["Globals"])
-
-    def test_unicode_attachment_correctly_decoded(self):
-        self.message.attach(
-            "Une pièce jointe.html", "<p>\u2019</p>", mimetype="text/html"
-        )
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["Globals"]["Attachments"],
-            [
-                {
-                    "Filename": "Une pièce jointe.html",
-                    "ContentType": "text/html",
-                    "Base64Content": b64encode("<p>\u2019</p>".encode("utf-8")).decode(
-                        "ascii"
-                    ),
-                }
-            ],
-        )
-
-    def test_embedded_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)  # Read from a png file
-        cid2 = attach_inline_image(self.message, image_data)
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(data["Globals"]["HTMLPart"], html_content)
-
-        attachments = data["Globals"]["InlinedAttachments"]
-        self.assertEqual(len(attachments), 2)
-        self.assertEqual(attachments[0]["Filename"], image_filename)
-        self.assertEqual(attachments[0]["ContentID"], cid)
-        self.assertEqual(attachments[0]["ContentType"], "image/png")
-        self.assertEqual(decode_att(attachments[0]["Base64Content"]), image_data)
-        # Mailjet requires a filename for all attachments, so make sure it's not empty:
-        self.assertEqual(attachments[1]["Filename"], "attachment")
-        self.assertEqual(attachments[1]["ContentID"], cid2)
-        self.assertEqual(attachments[1]["ContentType"], "image/png")
-        self.assertEqual(decode_att(attachments[1]["Base64Content"]), image_data)
-
-        self.assertNotIn("Attachments", data["Globals"])
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file:
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly:
-        image = MIMEImage(image_data)
-        self.message.attach(image)
-
-        image_data_b64 = b64encode(image_data).decode("ascii")
-
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(
-            data["Globals"]["Attachments"],
-            [
-                {
-                    "Filename": image_filename,  # the named one
-                    "ContentType": "image/png",
-                    "Base64Content": image_data_b64,
-                },
-                {
-                    "Filename": "attachment",  # the unnamed one
-                    "ContentType": "image/png",
-                    "Base64Content": image_data_b64,
-                },
-            ],
-        )
+        inlines = data["Globals"]["InlinedAttachments"]
+        self.assertEqual(len(inlines), 1)
+        self.assertEqual(inlines[0]["Filename"], "test.png")
+        self.assertEqual(inlines[0]["ContentID"], cid)
+        self.assertEqual(inlines[0]["ContentType"], "image/png")
+        self.assertEqual(decode_att(inlines[0]["Base64Content"]), image_data)
 
     def test_multiple_html_alternatives(self):
         # Multiple alternatives not allowed

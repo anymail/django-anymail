@@ -1,9 +1,8 @@
 from datetime import date, datetime
-from email import message_from_bytes
-from email.mime.base import MIMEBase
+from email.message import MIMEPart
 from email.mime.image import MIMEImage
-from textwrap import dedent
 
+import django
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, override_settings, tag
@@ -19,19 +18,13 @@ from anymail.exceptions import (
     AnymailRequestsAPIError,
     AnymailUnsupportedFeature,
 )
-from anymail.message import attach_inline_image_file
+from anymail.message import attach_inline_image
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
-from .utils import (
-    SAMPLE_IMAGE_FILENAME,
-    AnymailTestMixin,
-    sample_email_content,
-    sample_image_content,
-    sample_image_path,
-)
+from .utils import AnymailTestMixin, create_text_attachment, sample_image_content
 
 
 @tag("mailgun")
@@ -173,222 +166,103 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
         )
         self.assertEqual(data["h:X-Other"], "Keep")  # don't lose other headers
 
+    def test_non_ascii_headers(self):
+        # Mailgun correctly encodes non-ASCII display-names and other headers.
+        # It even correctly handles non-ASCII domain names (with UTS46),
+        # but Anymail pre-encodes the domains to allow use of the IDNA_ENCODER setting.
+        # Mailgun delivers EAI addresses correctly but generates invalid headers,
+        # so Anymail prevents EAI from_email that blocks delivery (next test).
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to-тест@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply-тест@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_data()
+        self.assertEqual(
+            data["from"], ['"Odesílatel, z adresy" <from@xn--pklad-zsa96e.example.cz>']
+        )
+        self.assertEqual(
+            data["to"], ['"Příjemce, na adresu" <to-тест@xn--pklad-zsa96e.example.cz>']
+        )
+        self.assertEqual(data["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["h:Reply-To"],
+            '"Odpověď, adresa" <reply-тест@xn--pklad-zsa96e.example.cz>',
+        )
+        self.assertEqual(data["h:X-Extra"], "Další")
+
+    def test_eai_from_email_unsupported(self):
+        """Mailgun generates an undeliverable From header with EAI."""
+        self.message.from_email = "тест@example.com"
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "EAI in from_email"):
+            self.message.send()
+
     def test_attachments(self):
-        text_content = "* Item one\n* Item two\n* Item three"
+        # Mailgun supports non-utf-8 content with charset in the form data
+        # headers. It requires attachment filenames. It supports non-ASCII
+        # filenames which *must* be sent to the API using 8-bit utf-8 per
+        # RFC 7578 (and which Mailgun incorrectly changes to rfc2047 when
+        # sending).
+        text_content = "pièce jointe\n"
         self.message.attach(
-            filename="test.txt", content=text_content, mimetype="text/plain"
+            create_text_attachment("pièce jointe\n", charset="iso-8859-1")
         )
-
-        # Should guess mimetype if not provided...
-        png_content = b"PNG\xb4 pretend this is the contents of a png file"
-        self.message.attach(filename="test.png", content=png_content)
-
-        # Should work with a MIMEBase object...
-        pdf_content = b"PDF\xb4 pretend this is valid pdf data"
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(pdf_content)
-        # Mailgun requires filename:
-        mimeattachment["Content-Disposition"] = 'attachment; filename="custom filename"'
-        self.message.attach(mimeattachment)
-
-        # And also with an message/rfc822 attachment
-        forwarded_email_content = sample_email_content()
-        forwarded_email = message_from_bytes(forwarded_email_content)
-        rfcmessage = MIMEBase("message", "rfc822")
-        # Mailgun requires filename:
-        rfcmessage.add_header(
-            "Content-Disposition", "attachment", filename="forwarded message"
-        )
-        rfcmessage.attach(forwarded_email)
-        self.message.attach(rfcmessage)
-
-        self.message.send()
-        files = self.get_api_call_files()
-        attachments = [value for (field, value) in files if field == "attachment"]
-        self.assertEqual(len(attachments), 4)
-        self.assertEqual(attachments[0], ("test.txt", text_content, "text/plain"))
-        self.assertEqual(
-            # (type inferred from filename)
-            attachments[1],
-            ("test.png", png_content, "image/png"),
-        )
-        self.assertEqual(
-            attachments[2], ("custom filename", pdf_content, "application/pdf")
-        )
-        # Email messages can get a bit changed with respect to whitespace characters
-        # in headers, without breaking the message, so we tolerate that:
-        self.assertEqual(attachments[3][0], "forwarded message")
-        self.assertEqualIgnoringHeaderFolding(
-            attachments[3][1],
-            b"Content-Type: message/rfc822\nMIME-Version: 1.0\n"
-            + b'Content-Disposition: attachment; filename="forwarded message"\n'
-            + b"\n"
-            + forwarded_email_content,
-        )
-        self.assertEqual(attachments[3][2], "message/rfc822")
-
-        # Make sure the image attachment is not treated as embedded:
-        inlines = [value for (field, value) in files if field == "inline"]
-        self.assertEqual(len(inlines), 0)
-
-    def test_unicode_attachment_correctly_decoded(self):
-        self.message.attach(
-            "Une pièce jointe.html", "<p>\u2019</p>", mimetype="text/html"
-        )
-        self.message.send()
-
-        # Verify the RFC 7578 compliance workaround has kicked in:
-        data = self.get_api_call_data()
-        if isinstance(data, dict):
-            # workaround not needed or used (but let's double check actual request)
-            workaround = False
-            prepared = self.get_api_prepared_request()
-            data = prepared.body
-        else:
-            workaround = True
-        data = data.decode("utf-8").replace("\r\n", "\n")
-        self.assertNotIn("filename*=", data)  # No RFC 2231 encoding
-        self.assertIn(
-            'Content-Disposition: form-data; name="attachment";'
-            ' filename="Une pièce jointe.html"',
-            data,
-        )
-
-        if workaround:
-            files = self.get_api_call_files(required=False)
-            self.assertFalse(files)  # files should have been moved to formdata body
-
-    def test_rfc_7578_compliance(self):
-        # Check some corner cases in the workaround
-        # that undoes RFC 2231 multipart/form-data encoding...
-        self.message.subject = "Testing for filename*=utf-8''problems"
-        self.message.body = (
-            "The attached message should have an attachment named 'vedhæftet fil.txt'"
-        )
-        # A forwarded message with its own attachment:
-        forwarded_message = dedent(
-            """\
-            MIME-Version: 1.0
-            From: sender@example.com
-            Subject: This is a test message
-            Content-Type: multipart/mixed; boundary="boundary"
-
-            --boundary
-            Content-Type: text/plain
-
-            This message has an attached file with a non-ASCII filename.
-            --boundary
-            Content-Type: text/plain; name*=utf-8''vedh%C3%A6ftet%20fil.txt
-            Content-Disposition: attachment; filename*=utf-8''vedh%C3%A6ftet%20fil.txt
-
-            This is an attachment.
-            --boundary--
-            """
-        )
-        self.message.attach(
-            "besked med vedhæftede filer", forwarded_message, "message/rfc822"
-        )
-        self.message.send()
-
-        data = self.get_api_call_data()
-        if isinstance(data, dict):
-            # workaround not needed or used (but let's double check actual request)
-            prepared = self.get_api_prepared_request()
-            data = prepared.body
-        data = data.decode("utf-8").replace("\r\n", "\n")
-
-        # Top-level attachment (in form-data)
-        # should have RFC 7578 filename (raw Unicode):
-        self.assertIn(
-            'Content-Disposition: form-data; name="attachment";'
-            ' filename="besked med vedhæftede filer"',
-            data,
-        )
-        # Embedded message/rfc822 attachment should retain its RFC 2231 encoded
-        # filename:
-        self.assertIn(
-            "Content-Type: text/plain; name*=utf-8''vedh%C3%A6ftet%20fil.txt", data
-        )
-        self.assertIn(
-            "Content-Disposition: attachment;"
-            " filename*=utf-8''vedh%C3%A6ftet%20fil.txt",
-            data,
-        )
-        # References to RFC 2231 in message text should remain intact:
-        self.assertIn("Testing for filename*=utf-8''problems", data)
-        self.assertIn(
-            "The attached message should have an attachment named 'vedhæftet fil.txt'",
-            data,
-        )
-
-    def test_attachment_missing_filename(self):
-        """Mailgun silently drops attachments without filenames, so warn the caller"""
-        mimeattachment = MIMEBase("application", "pdf")
-        mimeattachment.set_payload(b"PDF\xb4 pretend this is valid pdf data")
-        mimeattachment["Content-Disposition"] = "attachment"
-        self.message.attach(mimeattachment)
-
-        with self.assertRaisesMessage(
-            AnymailUnsupportedFeature, "attachments without filenames"
-        ):
-            self.message.send()
-
-    def test_inline_missing_contnet_id(self):
-        mimeattachment = MIMEImage(b"imagedata", "x-fakeimage")
-        mimeattachment["Content-Disposition"] = 'inline; filename="fakeimage.txt"'
-        self.message.attach(mimeattachment)
-        with self.assertRaisesMessage(
-            AnymailUnsupportedFeature, "inline attachments without Content-ID"
-        ):
-            self.message.send()
-
-    def test_embedded_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        cid = attach_inline_image_file(self.message, image_path)
-        html_content = (
-            '<p>This has an <img src="cid:%s" alt="inline" /> image.</p>' % cid
-        )
-        self.message.attach_alternative(html_content, "text/html")
-
-        self.message.send()
-        data = self.get_api_call_data()
-        self.assertEqual(data["html"], html_content)
-
-        files = self.get_api_call_files()
-        inlines = [value for (field, value) in files if field == "inline"]
-        self.assertEqual(len(inlines), 1)
-        # filename is cid; type is guessed:
-        self.assertEqual(inlines[0], (cid, image_data, "image/png"))
-        # Make sure neither the html nor the inline image is treated as an attachment:
-        attachments = [value for (field, value) in files if field == "attachment"]
-        self.assertEqual(len(attachments), 0)
-
-    def test_attached_images(self):
-        image_filename = SAMPLE_IMAGE_FILENAME
-        image_path = sample_image_path(image_filename)
-        image_data = sample_image_content(image_filename)
-
-        # option 1: attach as a file:
-        self.message.attach_file(image_path)
-
-        # option 2: construct the MIMEImage and attach it directly:
-        image = MIMEImage(image_data)
-        # Mailgun requires filenames:
-        image.set_param("filename", "custom-filename", "Content-Disposition")
-        self.message.attach(image)
+        self.message.attach("émoticône.img", b";-)", "image/x-emoticon")
+        image_data = sample_image_content()
+        cid = attach_inline_image(self.message, image_data, "test.png")
 
         self.message.send()
         files = self.get_api_call_files()
         attachments = [value for (field, value) in files if field == "attachment"]
         self.assertEqual(len(attachments), 2)
-        self.assertEqual(attachments[0], (image_filename, image_data, "image/png"))
-        self.assertEqual(attachments[1], ("custom-filename", image_data, "image/png"))
-        # Make sure the image attachments are not treated as inline:
+
+        # Missing filename defaults to "attachment".
+        self.assertEqual(
+            attachments[0],
+            (
+                "attachment",
+                text_content.encode("iso-8859-1"),
+                'text/plain; charset="iso-8859-1"',
+            ),
+        )
+        self.assertEqual(attachments[1], ("émoticône.img", b";-)", "image/x-emoticon"))
+
         inlines = [value for (field, value) in files if field == "inline"]
-        self.assertEqual(len(inlines), 0)
+        self.assertEqual(len(inlines), 1)
+        self.assertEqual(inlines[0], (cid, image_data, "image/png"))
+
+        request_body = self.get_api_prepared_request().body
+        # Verify charset was included for the text attachment
+        self.assertIn(b'Content-Type: text/plain; charset="iso-8859-1"', request_body)
+        self.assertIn(text_content.encode("iso-8859-1"), request_body)
+        # Verify RFC 7578 was used for the non-ASCII filename
+        self.assertNotIn(b"filename*=", request_body)  # no RFC 2231 encoding
+        self.assertIn('filename="émoticône.img"'.encode("utf-8"), request_body)
+
+    def test_inline_missing_content_id(self):
+        # Mailgun silently drops inline images without Content-Id
+        if django.VERSION >= (6, 0):
+            mimeattachment = MIMEPart()
+            mimeattachment.set_content(
+                b"imagedata",
+                maintype="image",
+                subtype="x-fakeimage",
+                disposition="inline",
+                filename="fakeimage.txt",
+            )
+        else:
+            # MIMEBase attachments deprecated in Django 6.0, removed in Django 7.0
+            mimeattachment = MIMEImage(b"imagedata", "x-fakeimage")
+            mimeattachment["Content-Disposition"] = 'inline; filename="fakeimage.txt"'
+        self.message.attach(mimeattachment)
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "inline attachments without Content-ID"
+        ):
+            self.message.send()
 
     def test_multiple_html_alternatives(self):
         # Multiple alternatives not allowed

@@ -5,6 +5,8 @@ import uuid
 import warnings
 from base64 import b64decode
 from contextlib import contextmanager
+from email.message import MIMEPart
+from email.mime.text import MIMEText
 from io import BytesIO, StringIO
 from pathlib import Path
 from unittest import TestCase
@@ -65,6 +67,29 @@ def sample_email_content(filename=SAMPLE_EMAIL_FILENAME):
     Returns bytes contents of an email file (e.g., for forwarding as an attachment)
     """
     return test_file_content(filename)
+
+
+#
+# Text attachment with charset
+#
+
+
+def create_text_attachment(content, *, subtype="plain", charset="utf-8", filename=None):
+    """
+    Return a MIME text attachment object compatible with current Django version,
+    using specified charset.
+    """
+    if django.VERSION < (6, 0):
+        # MIMEBase deprecated in Django 6.0, removed in Django 7.0
+        mime_text = MIMEText(content, subtype, charset)
+    else:
+        # MIMEPart added in Django 6.0
+        mime_text = MIMEPart()
+        mime_text.set_content(content, subtype=subtype, charset=charset)
+
+    cd_params = {} if filename is None else {"filename": filename}
+    mime_text.add_header("Content-Disposition", "attachment", **cd_params)
+    return mime_text
 
 
 #
