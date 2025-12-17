@@ -445,3 +445,33 @@ class PostmarkDeliveryTestCase(WebhookTestCase):
             "john@example.com",
         )
         self.assertEqual(event.reject_reason, "bounced")
+
+    def test_bounce_unsubscribe_variant(self):
+        # https://github.com/anymail/django-anymail/issues/447
+        raw_event = {
+            "Description": "Unsubscribe or Remove request.",
+            "ID": 555555555,  # scrubbed
+            "MessageID": "5555555-5555555-5555-5555555",  # scrubbed
+            "MessageStream": "outbound",
+            "Name": "Unsubscribe request",
+            "RecordType": "Bounce",
+            "ServerID": 111111111,  # scrubbed
+            "Tag": "",
+            "Type": "Unsubscribe",
+            "TypeCode": 16,
+        }
+        response = self.client.post(
+            "/anymail/postmark/tracking/",
+            content_type="application/json",
+            data=json.dumps(raw_event),
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(
+            self.tracking_handler,
+            sender=PostmarkTrackingWebhookView,
+            event=ANY,
+            esp_name="Postmark",
+        )
+        event = kwargs["event"]
+        self.assertEqual(event.event_type, "unsubscribed")
+        self.assertEqual(event.message_id, "5555555-5555555-5555-5555555")

@@ -105,6 +105,10 @@ Fixes
   than raising an error) for consistency with Anymail's handling of missing
   attachment filenames in other ESPs.
 
+* **Postmark:** Prevent a KeyError in the tracking webhook when handling
+  an unsubscribe request due to a bounce. (Thanks to `@dshunfen`_ for reporting
+  the issue.)
+
 Other
 ~~~~~
 
@@ -1938,6 +1942,7 @@ Features
 .. _@dgilmanAIDENTIFIED: https://github.com/dgilmanAIDENTIFIED
 .. _@dimitrisor: https://github.com/dimitrisor
 .. _@dominik-lekse: https://github.com/dominik-lekse
+.. _@dshunfen: https://github.com/dshunfen
 .. _@Ecno92: https://github.com/Ecno92
 .. _@erikdrums: https://github.com/erikdrums
 .. _@ewingrj: https://github.com/ewingrj

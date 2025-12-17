@@ -103,7 +103,7 @@ class PostmarkTrackingWebhookView(PostmarkBaseWebhookView):
             except KeyError:
                 pass
         if event_type == EventType.UNSUBSCRIBED:
-            if esp_event["SuppressSending"]:
+            if esp_event.get("SuppressSending", True):
                 # Postmark doesn't provide a way to distinguish between
                 # explicit unsubscribes and bounces
                 try:
