@@ -31,6 +31,25 @@ def freeze_readme_versions(text: str, version: str) -> str:
     )
 
 
+def strip_section(text: str, start: str, end: str) -> str:
+    """Remove lines between start and end, inclusive."""
+    lines = text.splitlines(keepends=True)
+    result = []
+    skip = False
+
+    for line in lines:
+        if line.strip() == start:
+            skip = True
+            continue
+        if line.strip() == end:
+            skip = False
+            continue
+        if not skip:
+            result.append(line)
+
+    return "".join(result)
+
+
 class CustomMetadataHook(MetadataHookInterface):
     def update(self, metadata):
         """
@@ -41,6 +60,11 @@ class CustomMetadataHook(MetadataHookInterface):
         version = metadata["version"]
 
         readme_text = readme_path.read_text()
+        # Remove sponsor-logos (uses raw html directive that doesn't work
+        # on PyPI, plus we don't really want to bake logos into releases).
+        readme_text = strip_section(
+            readme_text, ".. BEGIN sponsor-logos", ".. END sponsor-logos"
+        )
         readme_text = freeze_readme_versions(readme_text, version)
 
         metadata["readme"] = {

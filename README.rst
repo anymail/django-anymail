@@ -6,7 +6,8 @@ Anymail: Django email integration for transactional ESPs
     * Docs: shared-intro section gets included in docs/index.rst
             quickstart section gets included in docs/quickstart.rst
     * PyPI: project page (via pyproject.toml readme; see also
-            hatch_build.py which edits in the release version number)
+            hatch_build.py which edits in the release version number
+            and strips out sponsor-logos that wouldn't render on PyPI)
     You can use docutils 1.0 markup, but *not* any Sphinx additions.
     GitHub rst supports code-block, but *no other* block directives.
 
@@ -176,3 +177,38 @@ or SparkPost or any other supported ESP where you see "mailgun":
 See the `full documentation <https://anymail.dev/en/stable/>`_
 for more features and options, including receiving messages and tracking
 sent message status.
+
+
+Thanks
+------
+
+Anymail wouldn't exist without the work of many code
+`contributors <https://github.com/anymail/django-anymail/graphs/contributors>`_
+and countless others who have taken time to track down bugs, report issues and
+participate in discussions. Thank you!
+
+Special thanks to `Anymail's sponsors <https://github.com/sponsors/anymail>`_
+for their financial support.
+
+.. BEGIN sponsor-logos
+
+..  These are included only on GitHub. (PyPI's readme renderer doesn't allow
+    the raw directive, and figure directives don't work as expected on GitHub.)
+    List sponsors horizontally in a single <p>, using &emsp; between them.
+
+.. raw:: html
+
+      <p>
+      <img alt src="https://avatars.githubusercontent.com/u/228706481?s=100&amp;v=4" width="50" valign="middle"
+        >&nbsp;<a href="https://github.com/mailtrap" rel="nofollow"><strong>Mailtrap</strong></a>
+      </p>
+
+      <p>Past sponsors:
+      <img alt src="https://avatars.githubusercontent.com/u/98474690?s=60&v=4" width="30" valign="middle"
+        >&nbsp;<a href="https://github.com/ecosyste-ms" rel="nofollow">Ecosystems</a>
+      </p>
+
+.. END sponsor-logos
+
+Anymail is an independent project not affiliated with any email service
+provider. Sponsorship is not meant to imply endorsement.
