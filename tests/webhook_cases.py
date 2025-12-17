@@ -1,7 +1,9 @@
 import base64
+import unittest
 from unittest.mock import ANY, create_autospec
 
-from django.test import SimpleTestCase, override_settings
+import django
+from django.test import SimpleTestCase, modify_settings, override_settings
 
 from anymail.exceptions import AnymailInsecureWebhookWarning
 from anymail.signals import inbound, tracking
@@ -140,3 +142,15 @@ class WebhookBasicAuthTestCase(WebhookTestCase):
         self.set_basic_auth("baduser", "wrongpassword")
         response = self.call_webhook()
         self.assertEqual(response.status_code, 400)
+
+    @unittest.skipIf(
+        django.VERSION < (5, 1),
+        "LoginRequiredMiddleware not available in this Django version",
+    )
+    @modify_settings(
+        MIDDLEWARE={"append": "django.contrib.auth.middleware.LoginRequiredMiddleware"}
+    )
+    def test_works_with_login_required_middleware(self):
+        """Webhooks don't use Django login, so shouldn't require it"""
+        response = self.call_webhook()
+        self.assertEqual(response.status_code, 200)

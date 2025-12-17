@@ -91,6 +91,9 @@ Fixes
 * Handle sending attached messages (e.g., forwarded emails) consistently with
   Django's SMTP EmailBackend.
 
+* Exempt webhooks from Django's LoginRequiredMiddleware.
+  (Thanks to `@Zerotask`_ for reporting the issue.)
+
 * **Brevo, Mailgun, Mandrill, Postal, Postmark, Scaleway TEM, Unisender Go:**
   Fix Anymail bugs that could cause text attachments with non-ASCII content
   to display incorrectly in some email clients.
@@ -1982,3 +1985,4 @@ Features
 .. _@vgrebenschikov: https://github.com/vgrebenschikov
 .. _@vitaliyf: https://github.com/vitaliyf
 .. _@yourcelf: https://github.com/yourcelf
+.. _@Zerotask: https://github.com/Zerotask
