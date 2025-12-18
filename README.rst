@@ -51,6 +51,8 @@ Anymail includes:
 * Extensions to expose common ESP-added functionality, like tags, metadata,
   and tracking, with code that's portable between ESPs
 * Simplified inline images for HTML email
+* Full support for Unicode characters everywhere they're allowed in email
+  (with workarounds where possible for ESPs that don't quite get it right)
 * Normalized sent-message status and tracking notification, by connecting
   your ESP's webhooks to Django signals
 * "Batch transactional" sends using your ESP's merge and template features

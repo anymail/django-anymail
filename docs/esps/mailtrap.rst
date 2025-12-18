@@ -3,7 +3,7 @@
 Mailtrap
 ========
 
-.. versionadded:: vNext
+.. versionadded:: 14.0
 
 Anymail integrates with `Mailtrap`_'s Email API/SMTP (transactional) and
 Email Sandbox (test) email services, using the `Mailtrap API v2`_.

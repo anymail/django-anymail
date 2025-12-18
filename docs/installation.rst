@@ -240,7 +240,7 @@ Here are the other settings Anymail supports:
 
 .. rubric:: IDNA_ENCODER
 
-.. versionadded:: vNext
+.. versionadded:: 14.0
 
 Controls the encoding used for international domain names (with non-ASCII
 characters) in email addresses. The default is ``"idna2008"``. See :ref:`idna`.

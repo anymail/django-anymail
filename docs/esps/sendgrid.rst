@@ -296,7 +296,7 @@ Limitations and quirks
   ASCII characters. See `issue 150 <https://github.com/anymail/django-anymail/issues/150>`_
   for more information and other possible workarounds.
 
-  .. versionchanged:: vNext
+  .. versionchanged:: 14.0
 
       Anymail forces utf-8 encoding for text attachments and specifically includes
       that charset in the appropriate SendGrid API parameter. (Even with this change,

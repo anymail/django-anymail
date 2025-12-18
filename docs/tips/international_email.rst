@@ -19,7 +19,7 @@ Unfortunately, ESPs (and the libraries they build on) often find the world
 of email specifications as complex as you would.
 **ESP bugs involving non-ASCII characters are extremely common.**
 
-As of vNext (December 2025), Anymail's developers have performed detailed
+As of version 14.0 (December 2025), Anymail's developers have performed detailed
 Unicode handling tests on each "fully supported" ESP. Similar tests will be
 run on new ESPs during their initial integration.
 
@@ -91,7 +91,7 @@ Domain
     But this is a complex topic, covered in detail in the next section:
     :ref:`idna`.
 
-    .. versionchanged:: vNext
+    .. versionchanged:: 14.0
 
         Earlier Anymail releases encoded email domains using IDNA 2003.
 
@@ -159,7 +159,7 @@ users expect, but rejects emoji domains that browsers would allow.)
 If you need different behavior, you can change IDNA encoders or defer encoding
 to your ESP.
 
-.. versionchanged:: vNext
+.. versionchanged:: 14.0
 
     Earlier Anymail releases used IDNA 2003 encoding, matching Django.
     (Django's SMTP EmailBackend still uses IDNA 2003.)
@@ -173,7 +173,7 @@ to your ESP.
 
 .. rubric:: IDNA_ENCODER
 
-.. versionadded:: vNext
+.. versionadded:: 14.0
 
 Controls the IDNA encoding used for email domains that contain non-ASCII
 characters. The default is ``"idna2008"``. To select a different option,

@@ -134,7 +134,7 @@ anyway---see :ref:`unsupported-features`.
   a filename for you using "attachment\ *.ext*" with an appropriate extension
   for the content type.
 
-  .. versionchanged:: vNext
+  .. versionchanged:: 14.0
 
       Resend's API did not previously support specifying the content type,
       and instead based attachment content type on the filename.
@@ -191,7 +191,7 @@ anyway---see :ref:`unsupported-features`.
 
 **Earlier limitations**
 
-    .. versionchanged:: vNext
+    .. versionchanged:: 14.0
 
     Resend's API did not previously support inline images. Earlier Anymail
     releases raised an error on attempts to send them through Resend.

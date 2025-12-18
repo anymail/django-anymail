@@ -186,7 +186,7 @@ Brevo can handle.
   this also affects :attr:`~anymail.message.AnymailMessage.metadata` and
   :attr:`~anymail.message.AnymailMessage.merge_metadata`.
 
-  .. versionchanged:: vNext
+  .. versionchanged:: 14.0
 
      Earlier releases did not detect this situation and could send
      undeliverable messages with non-ASCII headers or metadata.
@@ -200,7 +200,7 @@ Brevo can handle.
   Brevo bug that may cause some recipients to see an RFC 2047 encoded-word
   (``=?utf-8?...``) in their email client .
 
-  .. versionchanged:: vNext
+  .. versionchanged:: 14.0
 
      Earlier releases did not include the workaround, resulting in Brevo
      sending messages with potentially missing display names in ``to``, ``cc``

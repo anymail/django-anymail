@@ -214,7 +214,7 @@ Limitations and quirks
   To avoid unexpected behavior, Anymail will use ``"attachment"`` as the filename
   if you don't supply a filename.
 
-  .. versionchanged:: vNext
+  .. versionchanged:: 14.0
 
      Earlier Anymail versions raised :exc:`~anymail.exceptions.AnymailUnsupportedFeature`
      if you attempted to send an attachment through Mailgun without a filename.
