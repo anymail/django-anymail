@@ -230,7 +230,7 @@ Your Anymail signal receiver must be a function with this signature:
    :param AnymailTrackingEvent event: The normalized tracking event.
                                       Almost anything you'd be interested in
                                       will be in here.
-   :param str esp_name: e.g., "SendGrid" or "Postmark". If you are working
+   :param str esp_name: e.g., "Mailtrap" or "Postmark". If you are working
                         with multiple ESPs, you can use this to distinguish
                         ESP-specific handling in your shared event processing.
    :param \**kwargs: Required by Django's signal mechanism

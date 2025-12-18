@@ -27,9 +27,9 @@ but send admin emails directly through an SMTP server:
               connection=smtp_backend)
 
     # You can even use multiple Anymail backends in the same app:
-    sendgrid_backend = get_connection('anymail.backends.sendgrid.EmailBackend')
+    mailtrap_backend = get_connection('anymail.backends.mailtrap.EmailBackend')
     send_mail("Password reset", "Here you go", "noreply@example.com", ["user@example.com"],
-              connection=sendgrid_backend)
+              connection=mailtrap_backend)
 
     # You can override settings.py settings with kwargs to get_connection.
     # This example supplies credentials for a different Mailgun sub-acccount:

@@ -81,7 +81,7 @@ without raising any other errors.
            The message being sent. If your receiver modifies the message, those
            changes will be reflected in the ESP send call.
        :param str esp_name:
-           The name of the ESP backend in use (e.g., "SendGrid" or "Mailgun").
+           The name of the ESP backend in use (e.g., "Amazon SES" or "Mailgun").
        :param \**kwargs:
            Required by Django's signal mechanism (to support future extensions).
        :raises:
@@ -147,6 +147,6 @@ For example, you could implement your own ESP logging dashboard
            The normalized response from the ESP send call. (Also available as
            :attr:`message.anymail_status <anymail.message.AnymailMessage.anymail_status>`.)
        :param str esp_name:
-           The name of the ESP backend in use (e.g., "SendGrid" or "Mailgun").
+           The name of the ESP backend in use (e.g., "Amazon SES" or "Mailgun").
        :param \**kwargs:
            Required by Django's signal mechanism (to support future extensions).

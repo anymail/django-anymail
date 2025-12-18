@@ -12,9 +12,9 @@ To use Anymail in your Django project:
 
     .. code-block:: console
 
-        $ pip install "django-anymail[sendgrid,sparkpost]"
+        $ pip install "django-anymail[amazon-ses,mailtrap]"
 
-   The `[sendgrid,sparkpost]` part of that command tells pip you also
+   The `[amazon-ses,mailtrap]` part of that command tells pip you also
    want to install additional packages required for those ESPs.
    You can give one or more comma-separated, lowercase ESP names.
    (Most ESPs don't have additional requirements, so you can often
@@ -164,7 +164,7 @@ If you want to use Anymail's inbound or tracking webhooks:
      * *random:random* is the WEBHOOK_SECRET string you created in step 1
      * *yoursite.example.com* is your Django site
      * "anymail" is the url prefix (from step 2)
-     * *esp* is the lowercase name of your ESP (e.g., "sendgrid" or "mailgun")
+     * *esp* is the lowercase name of your ESP (e.g., "amazon_ses" or "mailtrap")
      * *type* is either "tracking" for Anymail's sent-mail event tracking webhooks,
        or "inbound" for receiving email
 
