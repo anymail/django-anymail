@@ -90,7 +90,7 @@ The default is ``SWEEGO_API_URL = "https://api.sweego.io/"``.
 .. rubric:: SWEEGO_WEBHOOK_SECRET
 
 The Sweego webhook secret used to verify webhook signatures.
-Recommended if you are using :ref:`status tracking <event-tracking>`, 
+Recommended if you are using :ref:`status tracking <event-tracking>`,
 otherwise not necessary:
 
   .. code-block:: python
@@ -250,15 +250,15 @@ uses ``{{ variable_name }}`` syntax for personalization:
         subject="Your order {{ order_no }} has shipped",
         body="""Hi {{ name }},
 
-We shipped your order {{ order_no }} on {{ ship_date }}.
+    We shipped your order {{ order_no }} on {{ ship_date }}.
 
-Thanks,
-{{ company }}""",
+    Thanks,
+    {{ company }}""",
         to=["alice@example.com", "bob@example.com"]
     )
     # Set HTML version with same variables
     message.content_subtype = "html"  # or use EmailMultiAlternatives
-    
+
     message.merge_data = {
         "alice@example.com": {"name": "Alice", "order_no": "12345"},
         "bob@example.com": {"name": "Bob", "order_no": "54321"},
@@ -287,7 +287,7 @@ handling:
         {"email": "bob@example.com", "name": "Bob", "order_no": "54321"},
         {"email": "charlie@example.com", "name": "Charlie", "order_no": "67890"},
     ]
-    
+
     for recipient in recipients:
         message = AnymailMessage(
             to=[recipient["email"]],
@@ -314,7 +314,7 @@ handling:
 This approach uses Sweego's ``/send`` endpoint for each recipient, providing:
 
 * Immediate error handling per recipient
-* Clear tracking with individual message IDs  
+* Clear tracking with individual message IDs
 * Simple retry logic for failed sends
 * No exposure of recipient lists to other recipients
 
@@ -455,20 +455,20 @@ When a Sweego inbound webhook includes attachments, Anymail creates
     def handle_inbound(sender, event, esp_name, **kwargs):
         if esp_name != "Sweego":
             return
-            
+
         message = event.message
-        
+
         # Attachment metadata is immediately available (no API call)
         for attachment in message.attachments:
             filename = attachment.get_filename()  # No API call
             size = attachment.size  # No API call (from webhook metadata)
             content_type = attachment.get_content_type()  # No API call
-            
+
             print(f"Attachment: {filename} ({content_type}, {size} bytes)")
-            
+
             # Content is fetched only when accessed (triggers API call)
             content = attachment.get_content_bytes()
-            
+
             # Subsequent access uses cached content (no additional API calls)
             content_again = attachment.get_content_bytes()
 
@@ -487,14 +487,14 @@ an :exc:`~anymail.exceptions.AnymailAPIError` is raised when you access the cont
 .. code-block:: python
 
     from anymail.exceptions import AnymailAPIError
-    
+
     @receiver(inbound)
     def handle_inbound(sender, event, esp_name, **kwargs):
         if esp_name != "Sweego":
             return
-            
+
         message = event.message
-        
+
         for attachment in message.attachments:
             try:
                 content = attachment.get_content_bytes()
@@ -512,12 +512,12 @@ an :exc:`~anymail.exceptions.AnymailAPIError` is raised when you access the cont
        for attachment in message.attachments:
            filename = attachment.get_filename()
            size = attachment.size
-           
+
            # Skip large attachments
            if size > 10 * 1024 * 1024:  # 10 MB
                print(f"Skipping large attachment: {filename}")
                continue
-           
+
            # Only fetch PDFs
            if filename.endswith('.pdf'):
                content = attachment.get_content_bytes()
@@ -528,7 +528,7 @@ an :exc:`~anymail.exceptions.AnymailAPIError` is raised when you access the cont
 
        from django.core.files.base import ContentFile
        from django.core.files.storage import default_storage
-       
+
        for attachment in message.attachments:
            try:
                content = attachment.get_content_bytes()
@@ -567,27 +567,27 @@ for the lifetime of the attachment object.
     def handle_inbound(sender, event, esp_name, **kwargs):
         if esp_name != "Sweego":
             return
-        
+
         message = event.message
         print(f"Received email from {message.envelope_sender}")
         print(f"Subject: {message['Subject']}")
         print(f"Body: {message.text}")
-        
+
         # Process attachments with lazy loading
         for attachment in message.attachments:
             filename = attachment.get_filename()
             size = attachment.size
             content_type = attachment.get_content_type()
-            
+
             print(f"\nAttachment: {filename}")
             print(f"  Type: {content_type}")
             print(f"  Size: {size} bytes")
-            
+
             # Skip large files
             if size > 5 * 1024 * 1024:  # 5 MB limit
                 print(f"  Skipped (too large)")
                 continue
-            
+
             # Fetch and save content
             try:
                 content = attachment.get_content_bytes()

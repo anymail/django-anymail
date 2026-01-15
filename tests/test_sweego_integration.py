@@ -23,7 +23,6 @@ You'll need to set the environment variables:
 
 import os
 import unittest
-from datetime import datetime
 
 from django.test import SimpleTestCase, override_settings, tag
 
@@ -130,7 +129,7 @@ class SweegoBackendIntegrationTests(SimpleTestCase):
 
     def test_send_to_multiple_recipients(self):
         """Test sending to multiple recipients uses bulk endpoint.
-        
+
         With 2+ recipients, Sweego backend uses /send/bulk/email
         so each recipient receives an individual email.
         """
@@ -148,7 +147,7 @@ class SweegoBackendIntegrationTests(SimpleTestCase):
 
     def test_send_bulk_with_merge_data(self):
         """Test bulk sending with per-recipient variables.
-        
+
         This test verifies that /send/bulk/email correctly handles
         merge_data with different variables for each recipient.
         """

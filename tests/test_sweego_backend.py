@@ -1,14 +1,15 @@
-import json
 from base64 import b64encode
-from datetime import datetime
 
 from django.core import mail
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import override_settings, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .mock_requests_backend import RequestsBackendMockAPITestCase, SessionSharingTestCases
+from .mock_requests_backend import (
+    RequestsBackendMockAPITestCase,
+    SessionSharingTestCases,
+)
 from .utils import sample_image_content
 
 
@@ -53,7 +54,7 @@ class SweegoBackendStandardEmailTests(SweegoBackendMockAPITestCase):
         headers = self.get_api_call_headers()
         self.assertEqual(headers["Api-Key"], "test_api_key_1234567890abcdef")
         self.assertEqual(headers["Content-Type"], "application/json")
-        
+
         data = self.get_api_call_json()
         self.assertEqual(data["subject"], "Subject here")
         self.assertEqual(data["message-txt"], "Here is the message.")
@@ -184,7 +185,7 @@ class SweegoBackendStandardEmailTests(SweegoBackendMockAPITestCase):
 
     def test_embedded_images(self):
         """Test that inline images are converted to regular attachments.
-        
+
         Sweego's /send API doesn't support inline attachments,
         so they are added as regular attachments instead.
         """
@@ -315,7 +316,8 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
 
     def test_merge_data_multiple_recipients(self):
         """Test merge_data with multiple recipients uses /send/bulk/email endpoint."""
-        self.set_mock_response(raw=b"""{
+        self.set_mock_response(
+            raw=b"""{
             "channel": "email",
             "provider": "sweego",
             "swg_uids": {
@@ -323,7 +325,8 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
                 "bob@example.com": "02-uid-bob"
             },
             "transaction_id": "tx-bulk-123"
-        }""")
+        }"""
+        )
         message = AnymailMessage(
             to=["alice@example.com", "bob@example.com"],
             subject="Hello {{name}}",
@@ -340,13 +343,18 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         # With multiple recipients, merge_data goes in each recipient's variables
         recipients = {r["email"]: r for r in data["recipients"]}
         self.assertEqual(recipients["alice@example.com"]["variables"]["name"], "Alice")
-        self.assertEqual(recipients["alice@example.com"]["variables"]["order_no"], "12345")
+        self.assertEqual(
+            recipients["alice@example.com"]["variables"]["order_no"], "12345"
+        )
         self.assertEqual(recipients["bob@example.com"]["variables"]["name"], "Bob")
-        self.assertEqual(recipients["bob@example.com"]["variables"]["order_no"], "67890")
+        self.assertEqual(
+            recipients["bob@example.com"]["variables"]["order_no"], "67890"
+        )
 
     def test_multiple_recipients_uses_bulk_endpoint(self):
         """Test that multiple recipients automatically use /send/bulk/email."""
-        self.set_mock_response(raw=b"""{
+        self.set_mock_response(
+            raw=b"""{
             "channel": "email",
             "provider": "sweego",
             "swg_uids": {
@@ -354,7 +362,8 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
                 "to2@example.com": "02-uid-2"
             },
             "transaction_id": "tx-bulk-456"
-        }""")
+        }"""
+        )
         message = AnymailMessage(
             to=["to1@example.com", "to2@example.com"],
             subject="Hello",
@@ -376,7 +385,8 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
 
     def test_merge_global_data_with_bulk(self):
         """Test merge_global_data is applied to all recipients in bulk mode."""
-        self.set_mock_response(raw=b"""{
+        self.set_mock_response(
+            raw=b"""{
             "channel": "email",
             "provider": "sweego",
             "swg_uids": {
@@ -384,7 +394,8 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
                 "bob@example.com": "02-uid-bob"
             },
             "transaction_id": "tx-bulk-789"
-        }""")
+        }"""
+        )
         message = AnymailMessage(
             to=["alice@example.com", "bob@example.com"],
             template_id="welcome",
@@ -398,9 +409,13 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         data = self.get_api_call_json()
         recipients = {r["email"]: r for r in data["recipients"]}
         # Global data should be merged with per-recipient data
-        self.assertEqual(recipients["alice@example.com"]["variables"]["company_name"], "Acme Inc")
+        self.assertEqual(
+            recipients["alice@example.com"]["variables"]["company_name"], "Acme Inc"
+        )
         self.assertEqual(recipients["alice@example.com"]["variables"]["name"], "Alice")
-        self.assertEqual(recipients["bob@example.com"]["variables"]["company_name"], "Acme Inc")
+        self.assertEqual(
+            recipients["bob@example.com"]["variables"]["company_name"], "Acme Inc"
+        )
         self.assertEqual(recipients["bob@example.com"]["variables"]["name"], "Bob")
 
     def test_default_omits_options(self):
@@ -453,9 +468,7 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         self.assertEqual(sent, 1)
         self.assertEqual(msg.anymail_status.status, {"queued"})
         # message_id is a set of all recipient message IDs
-        self.assertEqual(
-            msg.anymail_status.message_id, {"02-uid-to1", "02-uid-to2"}
-        )
+        self.assertEqual(msg.anymail_status.message_id, {"02-uid-to1", "02-uid-to2"})
         self.assertEqual(
             msg.anymail_status.recipients["to1@example.com"].status, "queued"
         )
@@ -474,13 +487,14 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
 
     def test_inline_attachment_without_cid(self):
         """Inline attachments are converted to regular attachments.
-        
+
         Sweego's /send API doesn't support inline attachments,
         so they are handled as regular attachments regardless of CID.
         """
+        from unittest.mock import MagicMock
+
         from anymail.backends.sweego import SweegoPayload
         from anymail.utils import Attachment
-        from unittest.mock import MagicMock
 
         # Create a mock attachment that is inline but has no CID
         mock_att = MagicMock(spec=Attachment)

@@ -8,7 +8,7 @@ from django.test import override_settings, tag
 from anymail.signals import AnymailTrackingEvent, EventType, RejectReason
 from anymail.webhooks.sweego import SweegoTrackingWebhookView
 
-from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
+from .webhook_cases import WebhookTestCase
 
 
 def sweego_sign_webhook(payload, secret):
@@ -37,7 +37,7 @@ class SweegoWebhookTestCase(WebhookTestCase):
             "/anymail/sweego/tracking/",
             data=payload,
             content_type=content_type,
-            **headers
+            **headers,
         )
         return request
 
@@ -135,8 +135,7 @@ class SweegoDeliveryTestCase(SweegoWebhookTestCase):
         self.assertEqual(event.recipient, "mymail@mydomain.com")
         self.assertEqual(event.event_id, "3e42ea83-f6a5-40cc-a1fa-8745669454")
         self.assertEqual(
-            event.timestamp,
-            datetime(2024, 9, 2, 8, 45, 5, tzinfo=timezone.utc)
+            event.timestamp, datetime(2024, 9, 2, 8, 45, 5, tzinfo=timezone.utc)
         )
 
     def test_delivered_event(self):
@@ -321,8 +320,7 @@ class SweegoDeliveryTestCase(SweegoWebhookTestCase):
         self.assertEqual(event.event_type, EventType.CLICKED)
         self.assertEqual(event.click_url, "https://google.com")
         self.assertEqual(
-            event.user_agent,
-            "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0"
+            event.user_agent, "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0"
         )
         self.assertEqual(event.recipient, "random@domain.com")
 
@@ -350,7 +348,10 @@ class SweegoDeliveryTestCase(SweegoWebhookTestCase):
             "subject": "Test webhook",
             "open": {
                 "ip_address": "1.2.3.4",
-                "user_agent": "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0 (via ggpht.com GoogleImageProxy)",
+                "user_agent": (
+                    "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0 "
+                    "(via ggpht.com GoogleImageProxy)"
+                ),
                 "proxy": True,
             },
         }
@@ -505,7 +506,6 @@ class SweegoInboundWebhookTestCase(WebhookTestCase):
     def build_request(self, payload, content_type="application/json", **headers):
         """Build a Django request object for testing parse_events directly"""
         from django.test import RequestFactory
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         factory = RequestFactory()
         if isinstance(payload, dict):
@@ -514,7 +514,7 @@ class SweegoInboundWebhookTestCase(WebhookTestCase):
             "/anymail/sweego/inbound/",
             data=payload,
             content_type=content_type,
-            **headers
+            **headers,
         )
         return request
 
@@ -534,7 +534,9 @@ class SweegoInboundWebhookTestCase(WebhookTestCase):
 class SweegoInboundSecurityTestCase(SweegoInboundWebhookTestCase):
     """Test Sweego inbound webhook signature validation"""
 
-    @override_settings(ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_inbound_webhook_secret_12345")
+    @override_settings(
+        ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_inbound_webhook_secret_12345"
+    )
     def test_verifies_correct_signature(self):
         payload = {
             "event_type": "email_inbound",
@@ -556,7 +558,9 @@ class SweegoInboundSecurityTestCase(SweegoInboundWebhookTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    @override_settings(ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_inbound_webhook_secret_12345")
+    @override_settings(
+        ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_inbound_webhook_secret_12345"
+    )
     def test_verifies_missing_signature(self):
         payload = {
             "event_type": "email_inbound",
@@ -572,7 +576,9 @@ class SweegoInboundSecurityTestCase(SweegoInboundWebhookTestCase):
         )
         self.assertEqual(response.status_code, 400)
 
-    @override_settings(ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_inbound_webhook_secret_12345")
+    @override_settings(
+        ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_inbound_webhook_secret_12345"
+    )
     def test_verifies_bad_signature(self):
         payload = {
             "event_type": "email_inbound",
@@ -601,16 +607,8 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
             "event_type": "email_inbound",
             "timestamp": "2024-12-19T13:49:28.849638+00:00",
             "swg_uid": "test-inbound-msg-uuid-aaaa-bbbb-aaaaaaaabbbb",
-            "from_": {
-                "email": "johndoe@swee.go",
-                "name": "John Doe"
-            },
-            "to": [
-                {
-                    "email": "parse@invoices.sweego.io",
-                    "name": ""
-                }
-            ],
+            "from_": {"email": "johndoe@swee.go", "name": "John Doe"},
+            "to": [{"email": "parse@invoices.sweego.io", "name": ""}],
             "cc": [],
             "text": "Invoice 42",
             "html": None,
@@ -618,7 +616,7 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
             "inbound_domain": "invoices.sweego.io",
             "event_id": "10c072f1-7821-4f30-9574-f13e3890701a",
             "channel": "email",
-            "transaction_id": None
+            "transaction_id": None,
         }
 
         view = SweegoInboundWebhookView()
@@ -632,7 +630,7 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
         self.assertEqual(event.event_id, "10c072f1-7821-4f30-9574-f13e3890701a")
         self.assertEqual(
             event.timestamp,
-            datetime(2024, 12, 19, 13, 49, 28, 849638, tzinfo=timezone.utc)
+            datetime(2024, 12, 19, 13, 49, 28, 849638, tzinfo=timezone.utc),
         )
 
         # Check message fields
@@ -667,7 +665,7 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
             "inbound_domain": "inbound.example.com",
             "event_id": "html-event-id",
             "channel": "email",
-            "transaction_id": None
+            "transaction_id": None,
         }
 
         view = SweegoInboundWebhookView()
@@ -690,12 +688,10 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
             "timestamp": "2024-12-19T14:00:00+00:00",
             "swg_uid": "04-cc-test-uid",
             "from_": {"email": "sender@example.com", "name": "Sender"},
-            "to": [
-                {"email": "primary@inbound.example.com", "name": "Primary"}
-            ],
+            "to": [{"email": "primary@inbound.example.com", "name": "Primary"}],
             "cc": [
                 {"email": "cc1@example.com", "name": "CC One"},
-                {"email": "cc2@example.com", "name": ""}
+                {"email": "cc2@example.com", "name": ""},
             ],
             "text": "Message with CC",
             "html": None,
@@ -703,7 +699,7 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
             "inbound_domain": "inbound.example.com",
             "event_id": "cc-event-id",
             "channel": "email",
-            "transaction_id": None
+            "transaction_id": None,
         }
 
         view = SweegoInboundWebhookView()
@@ -729,7 +725,7 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
             "from_": {"email": "sender@example.com", "name": ""},
             "to": [
                 {"email": "first@inbound.example.com", "name": "First"},
-                {"email": "second@inbound.example.com", "name": "Second"}
+                {"email": "second@inbound.example.com", "name": "Second"},
             ],
             "cc": [],
             "text": "Multiple recipients",
@@ -738,7 +734,7 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
             "inbound_domain": "inbound.example.com",
             "event_id": "multi-to-event-id",
             "channel": "email",
-            "transaction_id": None
+            "transaction_id": None,
         }
 
         view = SweegoInboundWebhookView()
@@ -755,8 +751,9 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_with_attachments(self):
         """Test inbound email with lazy-loaded attachments"""
+        from unittest.mock import Mock, patch
+
         from anymail.webhooks.sweego import SweegoInboundWebhookView
-        from unittest.mock import patch, Mock
 
         # Real Sweego webhook payload format - only metadata, no content
         payload = {
@@ -778,9 +775,9 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
                     "uuid": "test-attach-uuid-1111-2222-111111112222",
                     "name": "document.txt",
                     "content_type": "text/plain",
-                    "size": 23
+                    "size": 23,
                 }
-            ]
+            ],
         }
 
         view = SweegoInboundWebhookView()
@@ -788,7 +785,7 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
         view.api_key = "test-api-key"
         view.client_uuid = "test-client-uuid-aaaa-bbbb-aaaaaaaaabbbb"
         view.api_url = "https://api.sweego.io"
-        
+
         request = self.get_signed_request(payload)
         events = view.parse_events(request)
 
@@ -801,35 +798,36 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
         att = attachments[0]
         self.assertEqual(att.get_filename(), "document.txt")
         self.assertEqual(att.get_content_type(), "text/plain")
-        
+
         # Check that attachment is lazy (not fetched yet)
         self.assertFalse(att._fetched)
-        
+
         # Mock the API call to fetch attachment content
         mock_response = Mock()
         mock_response.content = b"Test attachment content"
         mock_response.raise_for_status = Mock()
-        
-        with patch('requests.get', return_value=mock_response) as mock_get:
+
+        with patch("requests.get", return_value=mock_response) as mock_get:
             # Access content triggers lazy load
             content = att.get_content_bytes()
-            
+
             # Verify API was called correctly
             mock_get.assert_called_once_with(
-                "https://api.sweego.io/clients/test-client-uuid-aaaa-bbbb-aaaaaaaaabbbb/domains/inbound/attachments/test-attach-uuid-1111-2222-111111112222",
+                "https://api.sweego.io/clients/test-client-uuid-aaaa-bbbb-aaaaaaaaabbbb/"
+                "domains/inbound/attachments/test-attach-uuid-1111-2222-111111112222",
                 headers={
                     "Api-Key": "test-api-key",
                     "Accept": "application/octet-stream",
                 },
                 timeout=30,
             )
-            
+
             # Verify content is correct
             self.assertEqual(content, b"Test attachment content")
-            
+
             # Verify attachment is now fetched
             self.assertTrue(att._fetched)
-            
+
             # Second access should not trigger another API call
             content2 = att.get_content_bytes()
             self.assertEqual(content2, b"Test attachment content")
@@ -858,15 +856,15 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
                     "uuid": "test-attach-uuid-3333-4444-333333334444",
                     "name": "document.txt",
                     "content_type": "text/plain",
-                    "size": 23
+                    "size": 23,
                 }
-            ]
+            ],
         }
 
         view = SweegoInboundWebhookView()
         view.webhook_secret = self.webhook_secret
         # Deliberately not setting api_key and client_uuid
-        
+
         request = self.get_signed_request(payload)
         events = view.parse_events(request)
 
@@ -901,7 +899,7 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
                 "swg_uid": "01-tracking-uid",
                 "recipient": "recipient@example.com",
                 "event_id": "tracking-id",
-            }
+            },
         ]
 
         view = SweegoInboundWebhookView()
@@ -981,7 +979,7 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
                 "to": [{"email": "inbox@example.com", "name": ""}],
                 "text": "Second message",
                 "event_id": "second-event-id",
-            }
+            },
         ]
 
         view = SweegoInboundWebhookView()

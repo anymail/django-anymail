@@ -7,7 +7,7 @@ from .base_requests import AnymailRequestsBackend, RequestsPayload
 class EmailBackend(AnymailRequestsBackend):
     """
     Sweego Email API Backend
-    
+
     Uses /send for single recipient, /send/bulk/email for multiple recipients.
     """
 
