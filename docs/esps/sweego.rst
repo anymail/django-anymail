@@ -124,11 +124,25 @@ Sweego backend supports most Anymail features.
   cause an API error from Sweego.
 
 **Metadata exposed to recipient**
-  Anymail implements its normalized :attr:`~anymail.message.AnymailMessage.metadata`
-  using custom email headers with ``X-Metadata-`` prefix. A maximum of 5 metadata
-  items are supported. These headers can be visible to recipients via their
-  email app's "show original message" (or similar) command. **Do not include
-  sensitive data in metadata.**
+  Anymail's :attr:`~anymail.message.AnymailMessage.metadata` is sent as
+  Sweego custom headers. Sweego automatically prefixes custom headers with
+  ``x-`` in the delivered email. A maximum of 5 metadata items are supported
+  (Sweego's API limit on custom headers).
+
+  .. code-block:: python
+
+      message.metadata = {
+          "user_id": "123",
+          "campaign": "welcome",
+          "source": "signup_form"
+      }
+      # Results in email headers:
+      # x-user_id: 123
+      # x-campaign: welcome
+      # x-source: signup_form
+
+  These headers can be visible to recipients via their email app's
+  "show original message" command. **Do not include sensitive data in metadata.**
 
 **Tracking**
   Open and click tracking are enabled or disabled per sending domain in your
@@ -137,9 +151,18 @@ Sweego backend supports most Anymail features.
   :attr:`~anymail.message.AnymailMessage.track_clicks` attributes for
   controlling tracking on individual messages.
 
-**No cc/bcc distinction**
-  Sweego's API uses a single ``recipients`` array. The cc and bcc fields are
-  merged with the to field. Each recipient receives an individual email.
+**CC/BCC support with /send endpoint only**
+  CC and BCC recipients are supported only with Sweego's ``/send`` endpoint
+  (single recipient or non-batch sends). When using
+  :attr:`~anymail.message.AnymailMessage.merge_data` for batch sending,
+  Anymail uses the ``/send/bulk/email`` endpoint which does not support
+  cc or bcc. Attempting to use cc/bcc with batch sending will raise
+  :exc:`~anymail.exceptions.AnymailUnsupportedFeature`.
+
+  With the ``/send`` endpoint, Sweego properly handles cc and bcc with
+  separate API fields. Recipients will see the correct To, CC, and BCC
+  headers in their email clients, with BCC recipients hidden from others
+  as expected.
 
 **No inline attachments**
   Sweego's ``/send`` API doesn't support inline (embedded) images. Inline
@@ -154,21 +177,60 @@ Batch sending/merge and ESP templates
 Sweego supports :ref:`ESP stored templates <esp-stored-templates>` and
 :ref:`batch sending <batch-send>` with per-recipient merge data.
 
-Anymail automatically selects the appropriate Sweego API endpoint based on
-the number of recipients:
 
-Sweego supports :ref:`ESP stored templates <esp-stored-templates>` and
-:ref:`batch sending <batch-send>` with per-recipient merge data.
+API Endpoint Comparison
+~~~~~~~~~~~~~~~~~~~~~~~
 
-Anymail automatically selects the appropriate Sweego API endpoint based on
-the number of recipients:
+Sweego provides two distinct sending APIs with different capabilities:
 
-* **Single recipient** (1 to address): Uses Sweego's ``/send`` endpoint
-* **Multiple recipients** (2+ to addresses): Uses Sweego's ``/send/bulk/email`` endpoint
+.. list-table::
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - Feature
+     - ``/send``
+     - ``/send/bulk/email``
+   * - Minimum recipients
+     - 1
+     - 2
+   * - Maximum recipients
+     - Unlimited
+     - Unlimited
+   * - CC/BCC support
+     - Yes
+     - No
+   * - Recipients see each other
+     - Yes (in To field)
+     - No (separate emails)
+   * - Variables with single recipient
+     - Yes
+     - Yes
+   * - Variables with multiple recipients
+     - No
+     - Yes (per recipient)
+   * - Tracking for CC/BCC
+     - Yes (unique swg_uid)
+     - N/A
+   * - Use case
+     - Individual emails, group emails, transactional with CC
+     - Bulk sends, newsletters, marketing with personalization
+
+Anymail automatically selects the appropriate endpoint:
+
+* Uses ``/send`` for single recipient or when cc/bcc are present
+* Uses ``/send/bulk/email`` for batch sending with
+  :attr:`~anymail.message.AnymailMessage.merge_data`
 
 Both endpoints support templates and personalization variables, but handle them
 slightly differently under the hood. Anymail abstracts these differences so you
 can use the same code for both cases.
+
+.. important::
+
+   CC and BCC recipients are only supported with the ``/send`` endpoint.
+   If you use :attr:`~anymail.message.AnymailMessage.merge_data` with
+   cc or bcc recipients, Anymail will raise an
+   :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error.
 
 
 Single recipient with template
@@ -248,25 +310,14 @@ uses ``{{ variable_name }}`` syntax for personalization:
     message = EmailMessage(
         from_email="shipping@example.com",
         subject="Your order {{ order_no }} has shipped",
-        body="""Hi {{ name }},
-
-    We shipped your order {{ order_no }} on {{ ship_date }}.
-
-    Thanks,
-    {{ company }}""",
+        body="Hi {{ name }}, your order {{ order_no }} shipped on {{ ship_date }}. Thanks, {{ company }}",
         to=["alice@example.com", "bob@example.com"]
     )
-    # Set HTML version with same variables
-    message.content_subtype = "html"  # or use EmailMultiAlternatives
-
     message.merge_data = {
         "alice@example.com": {"name": "Alice", "order_no": "12345"},
         "bob@example.com": {"name": "Bob", "order_no": "54321"},
     }
-    message.merge_global_data = {
-        "ship_date": "January 15",
-        "company": "ExampleCo"
-    }
+    message.merge_global_data = {"ship_date": "January 15", "company": "ExampleCo"}
     message.send()
 
 

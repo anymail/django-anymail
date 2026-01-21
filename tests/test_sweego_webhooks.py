@@ -1,34 +1,60 @@
+import base64
 import hashlib
 import hmac
 import json
+import time
 from datetime import datetime, timezone
+from unittest.mock import Mock, patch
 
-from django.test import override_settings, tag
+from django.test import RequestFactory, override_settings, tag
 
 from anymail.signals import AnymailTrackingEvent, EventType, RejectReason
-from anymail.webhooks.sweego import SweegoTrackingWebhookView
+from anymail.webhooks.sweego import SweegoInboundWebhookView, SweegoTrackingWebhookView
 
 from .webhook_cases import WebhookTestCase
 
 
-def sweego_sign_webhook(payload, secret):
-    """Generate Sweego webhook signature"""
+def sweego_sign_webhook(payload, secret, webhook_id=None, webhook_timestamp=None):
+    """
+    Generate Sweego webhook signature using the correct method:
+    HMAC-SHA256(base64_decode(secret), webhook_id.webhook_timestamp.payload)
+    """
+    # Generate default values if not provided
+    if webhook_id is None:
+        webhook_id = "test_webhook_id_12345"
+    if webhook_timestamp is None:
+        webhook_timestamp = str(int(time.time()))
+
     if isinstance(payload, str):
-        payload = payload.encode("utf-8")
-    return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+        payload_str = payload
+    else:
+        payload_str = json.dumps(payload)
+
+    # Format content to sign: webhook_id.webhook_timestamp.payload
+    content_to_sign = f"{webhook_id}.{webhook_timestamp}.{payload_str}".encode("utf-8")
+
+    # Decode secret from base64 (Sweego stores it as base64)
+    secret_bytes = base64.b64decode(secret)
+
+    # Compute HMAC-SHA256
+    signature_bytes = hmac.new(secret_bytes, content_to_sign, hashlib.sha256).digest()
+
+    # Encode to base64
+    signature = base64.b64encode(signature_bytes).decode("utf-8")
+
+    return signature, webhook_id, webhook_timestamp
 
 
 @tag("sweego")
 class SweegoWebhookTestCase(WebhookTestCase):
     def setUp(self):
         super().setUp()
-        self.webhook_secret = "test_webhook_secret_12345"
+        self.webhook_secret = "dGVzdF93ZWJob29rX3NlY3JldF8xMjM0NQ=="
         self.view = SweegoTrackingWebhookView()
         self.view.webhook_secret = self.webhook_secret
 
     def build_request(self, payload, content_type="application/json", **headers):
         """Build a Django request object for testing parse_events directly"""
-        from django.test import RequestFactory
 
         factory = RequestFactory()
         if isinstance(payload, dict):
@@ -45,11 +71,15 @@ class SweegoWebhookTestCase(WebhookTestCase):
         """Return a request with proper signature"""
         if isinstance(payload, (dict, list)):
             payload = json.dumps(payload)
-        signature = sweego_sign_webhook(payload, self.webhook_secret)
+        signature, webhook_id, webhook_timestamp = sweego_sign_webhook(
+            payload, self.webhook_secret
+        )
         return self.build_request(
             payload=payload,
             content_type="application/json",
             HTTP_X_SWEEGO_SIGNATURE=signature,
+            HTTP_WEBHOOK_ID=webhook_id,
+            HTTP_WEBHOOK_TIMESTAMP=webhook_timestamp,
         )
 
 
@@ -57,7 +87,9 @@ class SweegoWebhookTestCase(WebhookTestCase):
 class SweegoWebhookSecurityTestCase(SweegoWebhookTestCase):
     """Test Sweego webhook signature validation"""
 
-    @override_settings(ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_webhook_secret_12345")
+    @override_settings(
+        ANYMAIL_SWEEGO_WEBHOOK_SECRET="dGVzdF93ZWJob29rX3NlY3JldF8xMjM0NQ=="
+    )
     def test_verifies_correct_signature(self):
         payload = {
             "event_type": "delivered",
@@ -65,17 +97,23 @@ class SweegoWebhookSecurityTestCase(SweegoWebhookTestCase):
             "recipient": "test@example.com",
             "timestamp": "2024-09-02T08:45:08+00:00",
         }
+        payload_json = json.dumps(payload)
+        signature, webhook_id, webhook_timestamp = sweego_sign_webhook(
+            payload_json, "dGVzdF93ZWJob29rX3NlY3JldF8xMjM0NQ=="
+        )
         response = self.client.post(
             "/anymail/sweego/tracking/",
-            data=json.dumps(payload),
+            data=payload_json,
             content_type="application/json",
-            HTTP_X_SWEEGO_SIGNATURE=sweego_sign_webhook(
-                json.dumps(payload), "test_webhook_secret_12345"
-            ),
+            HTTP_X_SWEEGO_SIGNATURE=signature,
+            HTTP_WEBHOOK_ID=webhook_id,
+            HTTP_WEBHOOK_TIMESTAMP=webhook_timestamp,
         )
         self.assertEqual(response.status_code, 200)
 
-    @override_settings(ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_webhook_secret_12345")
+    @override_settings(
+        ANYMAIL_SWEEGO_WEBHOOK_SECRET="dGVzdF93ZWJob29rX3NlY3JldF8xMjM0NQ=="
+    )
     def test_verifies_missing_signature(self):
         payload = {"event_type": "delivered", "swg_uid": "msg_test123"}
         response = self.client.post(
@@ -86,7 +124,9 @@ class SweegoWebhookSecurityTestCase(SweegoWebhookTestCase):
         )
         self.assertEqual(response.status_code, 400)
 
-    @override_settings(ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_webhook_secret_12345")
+    @override_settings(
+        ANYMAIL_SWEEGO_WEBHOOK_SECRET="dGVzdF93ZWJob29rX3NlY3JldF8xMjM0NQ=="
+    )
     def test_verifies_bad_signature(self):
         payload = {"event_type": "delivered", "swg_uid": "msg_test123"}
         response = self.client.post(
@@ -501,11 +541,10 @@ class SweegoInboundWebhookTestCase(WebhookTestCase):
 
     def setUp(self):
         super().setUp()
-        self.webhook_secret = "test_inbound_webhook_secret_12345"
+        self.webhook_secret = "dGVzdF9pbmJvdW5kX3dlYmhvb2tfc2VjcmV0XzEyMzQ1"
 
     def build_request(self, payload, content_type="application/json", **headers):
         """Build a Django request object for testing parse_events directly"""
-        from django.test import RequestFactory
 
         factory = RequestFactory()
         if isinstance(payload, dict):
@@ -535,7 +574,7 @@ class SweegoInboundSecurityTestCase(SweegoInboundWebhookTestCase):
     """Test Sweego inbound webhook signature validation"""
 
     @override_settings(
-        ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_inbound_webhook_secret_12345"
+        ANYMAIL_SWEEGO_WEBHOOK_SECRET="dGVzdF9pbmJvdW5kX3dlYmhvb2tfc2VjcmV0XzEyMzQ1"
     )
     def test_verifies_correct_signature(self):
         payload = {
@@ -548,18 +587,22 @@ class SweegoInboundSecurityTestCase(SweegoInboundWebhookTestCase):
             "timestamp": "2024-12-19T13:49:28.849638+00:00",
             "event_id": "10c072f1-7821-4f30-9574-f13e3890701a",
         }
+        payload_json = json.dumps(payload)
+        signature, webhook_id, webhook_timestamp = sweego_sign_webhook(
+            payload_json, "dGVzdF9pbmJvdW5kX3dlYmhvb2tfc2VjcmV0XzEyMzQ1"
+        )
         response = self.client.post(
             "/anymail/sweego/inbound/",
-            data=json.dumps(payload),
+            data=payload_json,
             content_type="application/json",
-            HTTP_X_SWEEGO_SIGNATURE=sweego_sign_webhook(
-                json.dumps(payload), "test_inbound_webhook_secret_12345"
-            ),
+            HTTP_X_SWEEGO_SIGNATURE=signature,
+            HTTP_WEBHOOK_ID=webhook_id,
+            HTTP_WEBHOOK_TIMESTAMP=webhook_timestamp,
         )
         self.assertEqual(response.status_code, 200)
 
     @override_settings(
-        ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_inbound_webhook_secret_12345"
+        ANYMAIL_SWEEGO_WEBHOOK_SECRET="dGVzdF9pbmJvdW5kX3dlYmhvb2tfc2VjcmV0XzEyMzQ1"
     )
     def test_verifies_missing_signature(self):
         payload = {
@@ -577,7 +620,7 @@ class SweegoInboundSecurityTestCase(SweegoInboundWebhookTestCase):
         self.assertEqual(response.status_code, 400)
 
     @override_settings(
-        ANYMAIL_SWEEGO_WEBHOOK_SECRET="test_inbound_webhook_secret_12345"
+        ANYMAIL_SWEEGO_WEBHOOK_SECRET="dGVzdF9pbmJvdW5kX3dlYmhvb2tfc2VjcmV0XzEyMzQ1"
     )
     def test_verifies_bad_signature(self):
         payload = {
@@ -601,7 +644,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_basic_inbound_email(self):
         """Test basic inbound email parsing - based on Sweego documentation"""
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         payload = {
             "event_type": "email_inbound",
@@ -650,7 +692,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_with_html_body(self):
         """Test inbound email with HTML body"""
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         payload = {
             "event_type": "email_inbound",
@@ -681,7 +722,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_with_cc_recipients(self):
         """Test inbound email with CC recipients"""
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         payload = {
             "event_type": "email_inbound",
@@ -716,7 +756,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_with_multiple_to_recipients(self):
         """Test inbound email with multiple To recipients"""
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         payload = {
             "event_type": "email_inbound",
@@ -751,9 +790,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_with_attachments(self):
         """Test inbound email with lazy-loaded attachments"""
-        from unittest.mock import Mock, patch
-
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         # Real Sweego webhook payload format - only metadata, no content
         payload = {
@@ -813,8 +849,11 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
             # Verify API was called correctly
             mock_get.assert_called_once_with(
-                "https://api.sweego.io/clients/test-client-uuid-aaaa-bbbb-aaaaaaaaabbbb/"
-                "domains/inbound/attachments/test-attach-uuid-1111-2222-111111112222",
+                (
+                    "https://api.sweego.io/clients/"
+                    "test-client-uuid-aaaa-bbbb-aaaaaaaaabbbb/domains/inbound/"
+                    "attachments/test-attach-uuid-1111-2222-111111112222"
+                ),
                 headers={
                     "Api-Key": "test-api-key",
                     "Accept": "application/octet-stream",
@@ -835,7 +874,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_attachments_without_api_credentials(self):
         """Test that attachments are skipped if API credentials are not configured"""
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         payload = {
             "event_type": "email_inbound",
@@ -877,7 +915,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_ignores_non_inbound_events(self):
         """Test that non-inbound events are filtered out"""
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         payload = [
             {
@@ -914,7 +951,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_minimal_payload(self):
         """Test inbound with minimal required fields"""
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         payload = {
             "event_type": "email_inbound",
@@ -935,7 +971,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_spam_fields_are_none(self):
         """Test that spam detection fields are None (not provided by Sweego)"""
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         payload = {
             "event_type": "email_inbound",
@@ -959,7 +994,6 @@ class SweegoInboundEventTestCase(SweegoInboundWebhookTestCase):
 
     def test_inbound_batch_events(self):
         """Test handling multiple inbound events in a single webhook call"""
-        from anymail.webhooks.sweego import SweegoInboundWebhookView
 
         payload = [
             {

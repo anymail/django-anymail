@@ -1,10 +1,13 @@
 from base64 import b64encode
+from unittest.mock import MagicMock
 
 from django.core import mail
 from django.test import override_settings, tag
 
+from anymail.backends.sweego import SweegoPayload
 from anymail.exceptions import AnymailAPIError
-from anymail.message import AnymailMessage
+from anymail.message import AnymailMessage, attach_inline_image
+from anymail.utils import Attachment
 
 from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
@@ -75,13 +78,27 @@ class SweegoBackendStandardEmailTests(SweegoBackendMockAPITestCase):
         data = self.get_api_call_json()
         self.assertEqual(data["from"]["email"], "from@example.com")
         self.assertEqual(data["from"]["name"], "From Name")
-        # All recipients go to 'recipients' array in Sweego
+
+        # Check recipients in their respective fields
         recipients = data["recipients"]
         emails = [r["email"] for r in recipients]
         self.assertIn("to1@example.com", emails)
         self.assertIn("to2@example.com", emails)
-        self.assertIn("cc1@example.com", emails)
-        self.assertIn("bcc1@example.com", emails)
+        self.assertEqual(len(emails), 2)  # Only to addresses
+
+        # Check cc field
+        cc_recipients = data["cc"]
+        cc_emails = [r["email"] for r in cc_recipients]
+        self.assertIn("cc1@example.com", cc_emails)
+        self.assertIn("cc2@example.com", cc_emails)
+        self.assertEqual(cc_recipients[0]["name"], "Carbon Copy")
+
+        # Check bcc field
+        bcc_recipients = data["bcc"]
+        bcc_emails = [r["email"] for r in bcc_recipients]
+        self.assertIn("bcc1@example.com", bcc_emails)
+        self.assertIn("bcc2@example.com", bcc_emails)
+        self.assertEqual(bcc_recipients[0]["name"], "Blind Copy")
 
     def test_email_message(self):
         email = mail.EmailMessage(
@@ -96,14 +113,23 @@ class SweegoBackendStandardEmailTests(SweegoBackendMockAPITestCase):
         data = self.get_api_call_json()
         self.assertEqual(data["subject"], "Subject")
         self.assertEqual(data["message-txt"], "Body")
-        # All recipients go to 'recipients' array in Sweego
+
+        # Check recipients are in their respective fields
         recipients = data["recipients"]
         emails = [r["email"] for r in recipients]
-        self.assertEqual(len(recipients), 4)  # 2 to + 1 cc + 1 bcc
+        self.assertEqual(len(recipients), 2)  # Only to addresses
         self.assertIn("to1@example.com", emails)
         self.assertIn("to2@example.com", emails)
-        self.assertIn("bcc1@example.com", emails)
-        self.assertIn("cc1@example.com", emails)
+
+        # Check cc field
+        cc_emails = [r["email"] for r in data["cc"]]
+        self.assertEqual(len(data["cc"]), 1)
+        self.assertIn("cc1@example.com", cc_emails)
+
+        # Check bcc field
+        bcc_emails = [r["email"] for r in data["bcc"]]
+        self.assertEqual(len(data["bcc"]), 1)
+        self.assertIn("bcc1@example.com", bcc_emails)
 
     def test_html_message(self):
         text_content = "This is an important message."
@@ -152,6 +178,69 @@ class SweegoBackendStandardEmailTests(SweegoBackendMockAPITestCase):
         self.assertEqual(data["reply-to"]["email"], "reply@example.com")
         self.assertEqual(data["reply-to"]["name"], "Reply Name")
 
+    def test_cc_recipients(self):
+        """Test that cc recipients go to 'cc' field with /send endpoint."""
+        email = mail.EmailMessage(
+            "Subject",
+            "Body",
+            "from@example.com",
+            ["to@example.com"],
+            cc=["cc@example.com"],
+        )
+        email.send()
+        data = self.get_api_call_json()
+
+        # To should be in recipients
+        self.assertEqual(len(data["recipients"]), 1)
+        self.assertEqual(data["recipients"][0]["email"], "to@example.com")
+
+        # CC should be in separate cc field
+        self.assertIn("cc", data)
+        self.assertEqual(len(data["cc"]), 1)
+        self.assertEqual(data["cc"][0]["email"], "cc@example.com")
+
+    def test_bcc_recipients(self):
+        """Test that bcc recipients go to 'bcc' field with /send endpoint."""
+        email = mail.EmailMessage(
+            "Subject",
+            "Body",
+            "from@example.com",
+            ["to@example.com"],
+            bcc=["bcc@example.com"],
+        )
+        email.send()
+        data = self.get_api_call_json()
+
+        # To should be in recipients
+        self.assertEqual(len(data["recipients"]), 1)
+        self.assertEqual(data["recipients"][0]["email"], "to@example.com")
+
+        # BCC should be in separate bcc field
+        self.assertIn("bcc", data)
+        self.assertEqual(len(data["bcc"]), 1)
+        self.assertEqual(data["bcc"][0]["email"], "bcc@example.com")
+
+    def test_cc_and_bcc_together(self):
+        """Test that cc and bcc work together with /send endpoint."""
+        email = mail.EmailMessage(
+            "Subject",
+            "Body",
+            "from@example.com",
+            ["to1@example.com", "to2@example.com"],
+            cc=["cc1@example.com", "cc2@example.com"],
+            bcc=["bcc@example.com"],
+        )
+        email.send()
+        data = self.get_api_call_json()
+
+        # Check all three fields are present and correct
+        self.assertEqual(len(data["recipients"]), 2)
+        self.assertEqual(len(data["cc"]), 2)
+        self.assertEqual(len(data["bcc"]), 1)
+
+        # Verify uses /send endpoint (not bulk)
+        self.assert_esp_called("/send")
+
     def test_attachments(self):
         text_content = "* Item one\n* Item two\n* Item three"
         self.message.attach(
@@ -189,8 +278,6 @@ class SweegoBackendStandardEmailTests(SweegoBackendMockAPITestCase):
         Sweego's /send API doesn't support inline attachments,
         so they are added as regular attachments instead.
         """
-        from anymail.message import attach_inline_image
-
         image_filename = "image.png"
         image_content = sample_image_content()
         cid = attach_inline_image(self.message, image_content, filename=image_filename)
@@ -256,9 +343,9 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         self.message.send()
         data = self.get_api_call_json()
         self.assertIn("headers", data)
-        # Metadata should be stored as X-Metadata-* headers
-        self.assertEqual(data["headers"]["X-Metadata-user_id"], "12345")
-        self.assertEqual(data["headers"]["X-Metadata-order_id"], "67890")
+        # Metadata is sent as custom headers (no X-Metadata- prefix)
+        self.assertEqual(data["headers"]["user_id"], "12345")
+        self.assertEqual(data["headers"]["order_id"], "67890")
 
     def test_tags(self):
         self.message.tags = ["receipt", "important"]
@@ -352,7 +439,7 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         )
 
     def test_multiple_recipients_uses_bulk_endpoint(self):
-        """Test that multiple recipients automatically use /send/bulk/email."""
+        """Test that multiple recipients with merge_data use /send/bulk/email."""
         self.set_mock_response(
             raw=b"""{
             "channel": "email",
@@ -368,6 +455,10 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
             to=["to1@example.com", "to2@example.com"],
             subject="Hello",
             body="Test message",
+            merge_data={
+                "to1@example.com": {"name": "Recipient 1"},
+                "to2@example.com": {"name": "Recipient 2"},
+            },
         )
         message.send()
         self.assert_esp_called("/send/bulk/email")
@@ -491,11 +582,6 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         Sweego's /send API doesn't support inline attachments,
         so they are handled as regular attachments regardless of CID.
         """
-        from unittest.mock import MagicMock
-
-        from anymail.backends.sweego import SweegoPayload
-        from anymail.utils import Attachment
-
         # Create a mock attachment that is inline but has no CID
         mock_att = MagicMock(spec=Attachment)
         mock_att.inline = True

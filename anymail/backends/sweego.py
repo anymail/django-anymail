@@ -1,4 +1,4 @@
-from ..exceptions import AnymailAPIError
+from ..exceptions import AnymailAPIError, AnymailUnsupportedFeature
 from ..message import AnymailRecipientStatus
 from ..utils import get_anymail_setting
 from .base_requests import AnymailRequestsBackend, RequestsPayload
@@ -67,6 +67,8 @@ class EmailBackend(AnymailRequestsBackend):
 class SweegoPayload(RequestsPayload):
     def __init__(self, message, defaults, backend, *args, **kwargs):
         self.all_recipients = []  # for parse_recipient_status
+        self.cc_recipients = []  # for checking bulk compatibility
+        self.bcc_recipients = []  # for checking bulk compatibility
         self.merge_data = {}  # store merge_data for later use
         self.merge_global_data = {}  # store global variables
         http_headers = kwargs.pop("headers", {})
@@ -77,10 +79,34 @@ class SweegoPayload(RequestsPayload):
         )
 
     def get_api_endpoint(self):
-        # Use /send/bulk/email for multiple recipients (2+)
-        # Use /send for single recipient
-        if len(self.all_recipients) > 1:
+        # Sweego has two endpoints:
+        # - /send: single recipient (even with merge_data), or multiple
+        #   without per-recipient data
+        # - /send/bulk/email: multiple recipients with per-recipient
+        #   merge_data
+
+        # Note: Sweego only supports per-recipient merge_data (variables).
+        # It does NOT support per-recipient merge_headers or merge_metadata.
+        # Headers and metadata are the same for all recipients.
+
+        # Use /send/bulk/email only when BOTH conditions are met:
+        # 1. Multiple recipients (2+)
+        # 2. Per-recipient merge_data is provided
+        has_multiple_recipients = len(self.all_recipients) > 1
+        has_per_recipient_data = bool(self.merge_data)
+
+        if has_multiple_recipients and has_per_recipient_data:
+            # Bulk endpoint doesn't support cc/bcc
+            if self.cc_recipients or self.bcc_recipients:
+                raise AnymailUnsupportedFeature(
+                    "Sweego's /send/bulk/email endpoint does not support cc or bcc. "
+                    "Use only 'to' recipients for batch sending, "
+                    "or send individual messages with cc/bcc using the /send endpoint.",
+                    backend=self.backend,
+                    email_message=self.message,
+                )
             return "send/bulk/email"
+
         return "send"
 
     def init_payload(self):
@@ -100,14 +126,27 @@ class SweegoPayload(RequestsPayload):
     def set_recipients(self, recipient_type, emails):
         assert recipient_type in ["to", "cc", "bcc"]
         if emails:
-            # Sweego uses 'recipients' array for all recipient types
-            # Note: Sweego doesn't have native cc/bcc support in API
-            # All recipients go to 'recipients' array
+            # Track cc and bcc for bulk endpoint compatibility check
+            if recipient_type == "cc":
+                self.cc_recipients = list(emails)
+            elif recipient_type == "bcc":
+                self.bcc_recipients = list(emails)
+
+            # Sweego has separate fields for to, cc, and bcc
+            # /send endpoint: supports all three with proper headers
+            # /send/bulk/email endpoint: only supports recipients (no cc/bcc)
+
+            if recipient_type == "to":
+                field_name = "recipients"
+            else:
+                field_name = recipient_type  # "cc" or "bcc"
+
             for email in emails:
                 recipient = {"email": email.addr_spec}
                 if email.display_name:
                     recipient["name"] = email.display_name
-                self.data.setdefault("recipients", []).append(recipient)
+                self.data.setdefault(field_name, []).append(recipient)
+
             self.all_recipients += emails
 
     def set_subject(self, subject):
@@ -150,12 +189,12 @@ class SweegoPayload(RequestsPayload):
         self.data.setdefault("attachments", []).append(att)
 
     def set_metadata(self, metadata):
-        # Sweego stores metadata as custom headers (max 5)
-        # Headers use X-Metadata- prefix
+        # Sweego exposes metadata through custom headers
+        # Limited to 5 custom headers total
         if metadata:
-            for key, value in list(metadata.items())[:5]:  # Max 5 headers
-                header_key = f"X-Metadata-{key}"
-                self.data.setdefault("headers", {})[header_key] = str(value)
+            self.data.setdefault("headers", {}).update(
+                {k: str(v) for k, v in list(metadata.items())[:5]}
+            )
 
     def set_tags(self, tags):
         # Sweego uses campaign-tags field
@@ -179,12 +218,30 @@ class SweegoPayload(RequestsPayload):
         if merge_global_data:
             self.merge_global_data = merge_global_data
 
+    def set_merge_headers(self, merge_headers):
+        # Sweego does not support per-recipient headers
+        # Headers are the same for all recipients
+        if merge_headers:
+            self.unsupported_feature("merge_headers")
+
+    def set_merge_metadata(self, merge_metadata):
+        # Sweego does not support per-recipient metadata
+        # Metadata is the same for all recipients
+        if merge_metadata:
+            self.unsupported_feature("merge_metadata")
+
     def set_esp_extra(self, extra):
         self.data.update(extra)
 
     def serialize_data(self):
         # Apply merge_data and merge_global_data before serializing
-        if len(self.all_recipients) > 1:
+        # Use the same logic as get_api_endpoint to determine format
+        # Note: Sweego only supports per-recipient variables (merge_data),
+        # not per-recipient headers or metadata
+        has_multiple_recipients = len(self.all_recipients) > 1
+        has_per_recipient_data = bool(self.merge_data)
+
+        if has_multiple_recipients and has_per_recipient_data:
             # Bulk endpoint: variables go in each recipient object
             if self.merge_data or self.merge_global_data:
                 for recipient in self.data.get("recipients", []):
@@ -199,7 +256,7 @@ class SweegoPayload(RequestsPayload):
                     if variables:
                         recipient["variables"] = variables
         else:
-            # Single recipient: variables go in root "variables" field
+            # Single recipient (or non-batch): variables go in root "variables" field
             if self.all_recipients:
                 email = self.all_recipients[0].addr_spec
                 variables = {}
