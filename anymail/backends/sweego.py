@@ -69,7 +69,7 @@ class SweegoPayload(RequestsPayload):
         self.all_recipients = []  # for parse_recipient_status
         self.cc_recipients = []  # for checking bulk compatibility
         self.bcc_recipients = []  # for checking bulk compatibility
-        self.merge_data = {}  # store merge_data for later use
+        self.merge_headers = {}  # store merge_headers for later use
         self.merge_global_data = {}  # store global variables
         http_headers = kwargs.pop("headers", {})
         http_headers["Api-Key"] = backend.api_key
@@ -80,20 +80,20 @@ class SweegoPayload(RequestsPayload):
 
     def get_api_endpoint(self):
         # Sweego has two endpoints:
-        # - /send: single recipient (even with merge_data), or multiple
+        # - /send: single recipient (even with merge_headers), or multiple
         #   without per-recipient data
         # - /send/bulk/email: multiple recipients with per-recipient
-        #   merge_data
+        #   merge_headers
 
-        # Note: Sweego only supports per-recipient merge_data (variables).
-        # It does NOT support per-recipient merge_headers or merge_metadata.
-        # Headers and metadata are the same for all recipients.
+        # Note: Sweego only supports per-recipient merge_headers (variables).
+        # It does NOT support per-recipient merge_metadata.
+        # Metadata are the same for all recipients.
 
         # Use /send/bulk/email only when BOTH conditions are met:
         # 1. Multiple recipients (2+)
-        # 2. Per-recipient merge_data is provided
+        # 2. Per-recipient merge_headers is provided
         has_multiple_recipients = len(self.all_recipients) > 1
-        has_per_recipient_data = bool(self.merge_data)
+        has_per_recipient_data = bool(self.merge_headers)
 
         if has_multiple_recipients and has_per_recipient_data:
             # Bulk endpoint doesn't support cc/bcc
@@ -165,8 +165,8 @@ class SweegoPayload(RequestsPayload):
 
     def set_extra_headers(self, headers):
         # Sweego limits to 5 custom headers
-        self.data.setdefault("headers", {}).update(
-            {k: str(v) for k, v in headers.items()}
+        self.data.update(
+            {k: v for k, v in headers.items()}
         )
 
     def set_text_body(self, body):
@@ -206,23 +206,17 @@ class SweegoPayload(RequestsPayload):
     def set_template_id(self, template_id):
         self.data["template-id"] = template_id
 
-    def set_merge_data(self, merge_data):
-        # Store merge_data to apply in serialize_data
+    def set_merge_headers(self, merge_headers):
+        # Store merge_headers to apply in serialize_data
         # For /send/bulk/email: variables go in each recipient object
         # For /send (single recipient): variables go in root "variables" field
-        if merge_data:
-            self.merge_data = merge_data
+        if merge_headers:
+            self.merge_headers = merge_headers
 
     def set_merge_global_data(self, merge_global_data):
         # Store global variables to apply in serialize_data
         if merge_global_data:
             self.merge_global_data = merge_global_data
-
-    def set_merge_headers(self, merge_headers):
-        # Sweego does not support per-recipient headers
-        # Headers are the same for all recipients
-        if merge_headers:
-            self.unsupported_feature("merge_headers")
 
     def set_merge_metadata(self, merge_metadata):
         # Sweego does not support per-recipient metadata
@@ -234,16 +228,16 @@ class SweegoPayload(RequestsPayload):
         self.data.update(extra)
 
     def serialize_data(self):
-        # Apply merge_data and merge_global_data before serializing
+        # Apply merge_headers and merge_global_data before serializing
         # Use the same logic as get_api_endpoint to determine format
-        # Note: Sweego only supports per-recipient variables (merge_data),
+        # Note: Sweego only supports per-recipient variables (merge_headers),
         # not per-recipient headers or metadata
         has_multiple_recipients = len(self.all_recipients) > 1
-        has_per_recipient_data = bool(self.merge_data)
+        has_per_recipient_data = bool(self.merge_headers)
 
         if has_multiple_recipients and has_per_recipient_data:
             # Bulk endpoint: variables go in each recipient object
-            if self.merge_data or self.merge_global_data:
+            if self.merge_headers or self.merge_global_data:
                 for recipient in self.data.get("recipients", []):
                     email = recipient["email"]
                     variables = {}
@@ -251,8 +245,8 @@ class SweegoPayload(RequestsPayload):
                     if self.merge_global_data:
                         variables.update(self.merge_global_data)
                     # Add per-recipient variables (override global)
-                    if self.merge_data and email in self.merge_data:
-                        variables.update(self.merge_data[email])
+                    if self.merge_headers and email in self.merge_headers:
+                        variables.update(self.merge_headers[email])
                     if variables:
                         recipient["variables"] = variables
         else:
@@ -262,8 +256,8 @@ class SweegoPayload(RequestsPayload):
                 variables = {}
                 if self.merge_global_data:
                     variables.update(self.merge_global_data)
-                if self.merge_data and email in self.merge_data:
-                    variables.update(self.merge_data[email])
+                if self.merge_headers and email in self.merge_headers:
+                    variables.update(self.merge_headers[email])
                 if variables:
                     self.data["variables"] = variables
 
