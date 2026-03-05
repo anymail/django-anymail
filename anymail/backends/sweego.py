@@ -165,9 +165,7 @@ class SweegoPayload(RequestsPayload):
 
     def set_extra_headers(self, headers):
         # Sweego limits to 5 custom headers
-        self.data.update(
-            {k: v for k, v in headers.items()}
-        )
+        self.data.update({k: v for k, v in headers.items()})
 
     def set_text_body(self, body):
         if body:
