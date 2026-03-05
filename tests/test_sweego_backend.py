@@ -315,13 +315,13 @@ class SweegoBackendStandardEmailTests(SweegoBackendMockAPITestCase):
         self.message.extra_headers = {"X-Custom": "custom value"}
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(data["headers"]["X-Custom"], "custom value")
+        self.assertEqual(data["X-Custom"], "custom value")
 
     def test_extra_headers_serialization(self):
         self.message.extra_headers = {"X-Custom-Number": 123}
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(data["headers"]["X-Custom-Number"], "123")
+        self.assertEqual(data["X-Custom-Number"], 123)
 
     def test_api_failure(self):
         self.set_mock_response(status_code=400, raw=b'{"error": "Invalid request"}')
@@ -383,13 +383,13 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         data = self.get_api_call_json()
         self.assertEqual(data["template-id"], "welcome_template")
 
-    def test_merge_data_single_recipient(self):
-        """Test merge_data with single recipient uses /send endpoint."""
+    def test_merge_headers_single_recipient(self):
+        """Test merge_headers with single recipient uses /send endpoint."""
         message = AnymailMessage(
             to=["alice@example.com"],
             subject="Hello",
             template_id="greeting",
-            merge_data={
+            merge_headers={
                 "alice@example.com": {"name": "Alice", "order_no": "12345"},
             },
         )
@@ -397,12 +397,12 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         # Should use /send endpoint for single recipient
         self.assert_esp_called("/send")
         data = self.get_api_call_json()
-        # With single recipient, merge_data goes to root variables
+        # With single recipient, merge_headers goes to root variables
         self.assertEqual(data["variables"]["name"], "Alice")
         self.assertEqual(data["variables"]["order_no"], "12345")
 
-    def test_merge_data_multiple_recipients(self):
-        """Test merge_data with multiple recipients uses /send/bulk/email endpoint."""
+    def test_merge_headers_multiple_recipients(self):
+        """Test merge_headers with multiple recipients uses /send/bulk/email endpoint."""
         self.set_mock_response(
             raw=b"""{
             "channel": "email",
@@ -418,7 +418,7 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
             to=["alice@example.com", "bob@example.com"],
             subject="Hello {{name}}",
             template_id="greeting",
-            merge_data={
+            merge_headers={
                 "alice@example.com": {"name": "Alice", "order_no": "12345"},
                 "bob@example.com": {"name": "Bob", "order_no": "67890"},
             },
@@ -427,7 +427,7 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         # Should use /send/bulk/email endpoint for multiple recipients
         self.assert_esp_called("/send/bulk/email")
         data = self.get_api_call_json()
-        # With multiple recipients, merge_data goes in each recipient's variables
+        # With multiple recipients, merge_headers goes in each recipient's variables
         recipients = {r["email"]: r for r in data["recipients"]}
         self.assertEqual(recipients["alice@example.com"]["variables"]["name"], "Alice")
         self.assertEqual(
@@ -439,7 +439,7 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
         )
 
     def test_multiple_recipients_uses_bulk_endpoint(self):
-        """Test that multiple recipients with merge_data use /send/bulk/email."""
+        """Test that multiple recipients with merge_headers use /send/bulk/email."""
         self.set_mock_response(
             raw=b"""{
             "channel": "email",
@@ -455,7 +455,7 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
             to=["to1@example.com", "to2@example.com"],
             subject="Hello",
             body="Test message",
-            merge_data={
+            merge_headers={
                 "to1@example.com": {"name": "Recipient 1"},
                 "to2@example.com": {"name": "Recipient 2"},
             },
@@ -491,7 +491,7 @@ class SweegoBackendAnymailFeatureTests(SweegoBackendMockAPITestCase):
             to=["alice@example.com", "bob@example.com"],
             template_id="welcome",
             merge_global_data={"company_name": "Acme Inc"},
-            merge_data={
+            merge_headers={
                 "alice@example.com": {"name": "Alice"},
                 "bob@example.com": {"name": "Bob"},
             },
