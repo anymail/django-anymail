@@ -79,7 +79,7 @@ To run the tests locally, use :pypi:`tox`:
         $ python -m pip install -r requirements-dev.txt
 
         ## test a representative combination of Python and Django versions:
-        $ tox -e lint,django60-py314-all,django40-py38-all,docs
+        $ tox -e lint,django60-py314-all,django50-py310-all,docs
 
         ## you can also run just some test cases, e.g.:
         $ tox -e django52-py313-all tests.test_mailgun_backend tests.test_utils
