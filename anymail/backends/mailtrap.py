@@ -2,9 +2,11 @@ import sys
 from urllib.parse import quote
 
 if sys.version_info < (3, 11):
-    from typing_extensions import Any, Dict, List, Literal, NotRequired, TypedDict
+    from typing import Any, Literal
+
+    from typing_extensions import NotRequired, TypedDict
 else:
-    from typing import Any, Dict, List, Literal, NotRequired, TypedDict
+    from typing import Any, Literal, NotRequired, TypedDict
 
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailMessage, AnymailRecipientStatus
@@ -31,29 +33,26 @@ MailtrapData = TypedDict(
         # Although "from" and "subject" are technically required,
         # allow Mailtrap's API to enforce that.
         "from": NotRequired[MailtrapAddress],
-        "to": NotRequired[List[MailtrapAddress]],
-        "cc": NotRequired[List[MailtrapAddress]],
-        "bcc": NotRequired[List[MailtrapAddress]],
+        "to": NotRequired[list[MailtrapAddress]],
+        "cc": NotRequired[list[MailtrapAddress]],
+        "bcc": NotRequired[list[MailtrapAddress]],
         "reply_to": NotRequired[MailtrapAddress],
-        "attachments": NotRequired[List[MailtrapAttachment]],
-        "headers": NotRequired[Dict[str, str]],
-        "custom_variables": NotRequired[Dict[str, str]],
+        "attachments": NotRequired[list[MailtrapAttachment]],
+        "headers": NotRequired[dict[str, str]],
+        "custom_variables": NotRequired[dict[str, str]],
         "subject": NotRequired[str],
         "text": NotRequired[str],
         "html": NotRequired[str],
         "category": NotRequired[str],
         "template_uuid": NotRequired[str],
-        "template_variables": NotRequired[Dict[str, Any]],
+        "template_variables": NotRequired[dict[str, Any]],
     },
 )
 
-MailtrapBatchData = TypedDict(
-    "MailtrapBatchData",
-    {
-        "base": MailtrapData,
-        "requests": List[MailtrapData],
-    },
-)
+
+class MailtrapBatchData(TypedDict):
+    base: MailtrapData
+    requests: list[MailtrapData]
 
 
 class MailtrapPayload(RequestsPayload):
@@ -74,14 +73,14 @@ class MailtrapPayload(RequestsPayload):
         self.backend = backend
 
         # Late bound batch send data
-        self.merge_data: Dict[str, Any] = {}
-        self.merge_metadata: Dict[str, Dict[str, str]] = {}
-        self.merge_headers: Dict[str, Dict[str, str]] = {}
+        self.merge_data = dict[str, Any]()
+        self.merge_metadata = dict[str, dict[str, str]]()
+        self.merge_headers = dict[str, dict[str, str]]()
 
         # needed for backend.parse_recipient_status
-        self.recipients_to: List[str] = []
-        self.recipients_cc: List[str] = []
-        self.recipients_bcc: List[str] = []
+        self.recipients_to = list[str]()
+        self.recipients_cc = list[str]()
+        self.recipients_bcc = list[str]()
 
         super().__init__(
             message, defaults, backend, *args, headers=http_headers, **kwargs
@@ -141,7 +140,7 @@ class MailtrapPayload(RequestsPayload):
         self.data["from"] = email.as_dict(idna_encode=self.backend.idna_encode)
 
     def set_recipients(
-        self, recipient_type: Literal["to", "cc", "bcc"], emails: List[EmailAddress]
+        self, recipient_type: Literal["to", "cc", "bcc"], emails: list[EmailAddress]
     ):
         assert recipient_type in ["to", "cc", "bcc"]
         if emails:
@@ -161,7 +160,7 @@ class MailtrapPayload(RequestsPayload):
             # (must ignore default empty subject for use with template_uuid)
             self.data["subject"] = subject
 
-    def set_reply_to(self, emails: List[EmailAddress]):
+    def set_reply_to(self, emails: list[EmailAddress]):
         if len(emails) == 1:
             # Let Mailtrap handle the header generation (and EAI if needed)
             self.data["reply_to"] = emails[0].as_dict(
@@ -210,7 +209,7 @@ class MailtrapPayload(RequestsPayload):
             att["content_id"] = attachment.cid
         self.data.setdefault("attachments", []).append(att)
 
-    def set_tags(self, tags: List[str]):
+    def set_tags(self, tags: list[str]):
         if len(tags) > 1:
             self.unsupported_feature("multiple tags")
         if len(tags) > 0:
@@ -232,7 +231,7 @@ class MailtrapPayload(RequestsPayload):
         # Late-bound in burst_for_batch
         self.merge_headers = merge_headers
 
-    def set_merge_global_data(self, merge_global_data: Dict[str, Any]):
+    def set_merge_global_data(self, merge_global_data: dict[str, Any]):
         self.data.setdefault("template_variables", {}).update(merge_global_data)
 
     def set_merge_metadata(self, merge_metadata):
@@ -315,7 +314,7 @@ class EmailBackend(AnymailRequestsBackend):
 
             # Merge recipient statuses for each item in the batch.
             # Each API response includes message_ids in the order 'to', 'cc, 'bcc'.
-            recipient_status: Dict[str, AnymailRecipientStatus] = {}
+            recipient_status: dict[str, AnymailRecipientStatus] = {}
             for to, one_response in zip(payload.recipients_to, responses):
                 recipients = [to, *payload.recipients_cc, *payload.recipients_bcc]
                 one_status = self.parse_one_response(
@@ -339,11 +338,11 @@ class EmailBackend(AnymailRequestsBackend):
     def parse_one_response(
         self,
         one_response,
-        recipients: List[str],
+        recipients: list[str],
         raw_response,
         payload: MailtrapPayload,
         message: AnymailMessage,
-    ) -> Dict[str, AnymailRecipientStatus]:
+    ) -> dict[str, AnymailRecipientStatus]:
         """
         Return parsed status for recipients in one_response, which is either
         a top-level send response or an individual 'responses' item for batch send.

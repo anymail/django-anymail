@@ -217,7 +217,7 @@ class MailgunPayload(RequestsPayload):
         if self.merge_metadata:
 
             def vkey(key):  # 'v:key'
-                return "v:{}".format(key)
+                return f"v:{key}"
 
             # all keys used in any recipient's merge_metadata:
             merge_metadata_keys = flatset(
@@ -225,7 +225,7 @@ class MailgunPayload(RequestsPayload):
             )
             # custom_data['key'] = '%recipient.v:key%' indirection:
             custom_data.update(
-                {key: "%recipient.{}%".format(vkey(key)) for key in merge_metadata_keys}
+                {key: f"%recipient.{vkey(key)}%" for key in merge_metadata_keys}
             )
             # defaults for each recipient must cover all keys:
             base_recipient_data = {
@@ -268,14 +268,14 @@ class MailgunPayload(RequestsPayload):
                     )
                 # custom_data['key'] = '%recipient.key%' indirection:
                 custom_data.update(
-                    {key: "%recipient.{}%".format(key) for key in merge_data_keys}
+                    {key: f"%recipient.{key}%" for key in merge_data_keys}
                 )
 
         # (6) merge_headers --> Mailgun recipient_variables via 'h:'-prefixed keys
         if self.merge_headers:
 
             def hkey(field_name):  # 'h:Field-Name'
-                return "h:{}".format(field_name.title())
+                return f"h:{field_name.title()}"
 
             merge_header_fields = flatset(
                 recipient_headers.keys()
@@ -461,4 +461,4 @@ def flatset(iterables):
     >>> flatset([1, 2], [2, 3])
     set(1, 2, 3)
     """
-    return set(item for iterable in iterables for item in iterable)
+    return {item for iterable in iterables for item in iterable}

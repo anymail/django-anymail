@@ -91,7 +91,7 @@ class MailgunBaseWebhookView(AnymailBaseWebhookView):
 
         expected_signature = hmac.new(
             key=self.webhook_signing_key,
-            msg="{}{}".format(timestamp, token).encode("ascii"),
+            msg=f"{timestamp}{token}".encode("ascii"),
             digestmod=hashlib.sha256,
         ).hexdigest()
         if not constant_time_compare(signature, expected_signature):
@@ -165,7 +165,7 @@ class MailgunTrackingWebhookView(MailgunBaseWebhookView):
         except KeyError:
             message_id = None
         if message_id and not message_id.startswith("<"):
-            message_id = "<{}>".format(message_id)
+            message_id = f"<{message_id}>"
 
         metadata = event_data.get("user-variables", {})
         tags = event_data.get("tags", [])
@@ -270,7 +270,7 @@ class MailgunTrackingWebhookView(MailgunBaseWebhookView):
             "message-id", None
         )
         if message_id and not message_id.startswith("<"):
-            message_id = "<{}>".format(message_id)
+            message_id = f"<{message_id}>"
 
         description = esp_event.getfirst("description", None)
         mta_response = esp_event.getfirst("error", None) or esp_event.getfirst(

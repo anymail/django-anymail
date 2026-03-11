@@ -32,7 +32,7 @@ class PostalWebhookSecurityTestCase(WebhookTestCase):
             "/anymail/postal/tracking/",
             content_type="application/json",
             data=json.dumps({"some": "data"}),
-            HTTP_X_POSTAL_SIGNATURE=b64encode("invalid".encode("utf-8")),
+            HTTP_X_POSTAL_SIGNATURE=b64encode(b"invalid"),
         )
         self.assertEqual(response.status_code, 400)
 

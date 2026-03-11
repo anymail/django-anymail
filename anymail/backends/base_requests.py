@@ -150,7 +150,7 @@ class AnymailRequestsBackend(AnymailBaseBackend):
                 method=request.method,
                 url=request.url,
                 headers="".join(
-                    "{header}: {value}\n".format(header=header, value=value)
+                    f"{header}: {value}\n"
                     for (header, value) in request.headers.items()
                 ),
             )
@@ -168,7 +168,7 @@ class AnymailRequestsBackend(AnymailBaseBackend):
                 status=response.status_code,
                 reason=response.reason,
                 headers="".join(
-                    "{header}: {value}\n".format(header=header, value=value)
+                    f"{header}: {value}\n"
                     for (header, value) in response.headers.items()
                 ),
                 body=response.text,  # Let Requests decode body content for us

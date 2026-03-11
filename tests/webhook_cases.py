@@ -42,10 +42,10 @@ class WebhookTestCase(AnymailTestMixin, SimpleTestCase):
 
     def set_basic_auth(self, username="username", password="password"):
         """Set basic auth for all subsequent test client requests"""
-        credentials = base64.b64encode(
-            "{}:{}".format(username, password).encode("utf-8")
-        ).decode("utf-8")
-        self.client.defaults["HTTP_AUTHORIZATION"] = "Basic {}".format(credentials)
+        credentials = base64.b64encode(f"{username}:{password}".encode()).decode(
+            "utf-8"
+        )
+        self.client.defaults["HTTP_AUTHORIZATION"] = f"Basic {credentials}"
 
     def clear_basic_auth(self):
         self.client.defaults.pop("HTTP_AUTHORIZATION", None)

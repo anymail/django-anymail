@@ -21,9 +21,7 @@ def mailgun_signature(timestamp, token, webhook_signing_key):
     # https://documentation.mailgun.com/en/latest/user_manual.html#securing-webhooks
     return hmac.new(
         key=webhook_signing_key.encode("ascii"),
-        msg="{timestamp}{token}".format(timestamp=timestamp, token=token).encode(
-            "ascii"
-        ),
+        msg=f"{timestamp}{token}".encode("ascii"),
         digestmod=hashlib.sha256,
     ).hexdigest()
 

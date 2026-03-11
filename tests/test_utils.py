@@ -1024,10 +1024,10 @@ class RequestUtilsTests(SimpleTestCase):
         """
         Return HTTP_AUTHORIZATION header value for basic auth with username, password
         """
-        credentials = base64.b64encode(
-            "{}:{}".format(username, password).encode("utf-8")
-        ).decode("utf-8")
-        return "Basic {}".format(credentials)
+        credentials = base64.b64encode(f"{username}:{password}".encode()).decode(
+            "utf-8"
+        )
+        return f"Basic {credentials}"
 
     def test_get_request_basic_auth(self):
         # without auth:

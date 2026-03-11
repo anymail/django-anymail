@@ -120,7 +120,7 @@ class SendgridInboundTestCase(WebhookTestCase):
         )
 
     def test_attachments(self):
-        att1 = BytesIO("test attachment".encode("utf-8"))
+        att1 = BytesIO(b"test attachment")
         att1.name = "test.txt"
         image_content = sample_image_content()
         att2 = BytesIO(image_content)

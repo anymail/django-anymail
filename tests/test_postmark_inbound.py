@@ -145,9 +145,7 @@ class PostmarkInboundTestCase(WebhookTestCase):
             "Attachments": [
                 {
                     "Name": "test.txt",
-                    "Content": b64encode("test attachment".encode("utf-8")).decode(
-                        "ascii"
-                    ),
+                    "Content": b64encode(b"test attachment").decode("ascii"),
                     "ContentType": "text/plain",
                     "ContentLength": len("test attachment"),
                 },
@@ -276,9 +274,7 @@ class PostmarkInboundTestCase(WebhookTestCase):
                 # add attachments in one place:
                 {
                     "Name": "no-duplicates.txt",
-                    "Content": b64encode("fake attachment".encode("utf-8")).decode(
-                        "ascii"
-                    ),
+                    "Content": b64encode(b"fake attachment").decode("ascii"),
                     "ContentType": "text/plain",
                     "ContentLength": len("fake attachment"),
                 },

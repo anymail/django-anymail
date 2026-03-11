@@ -435,7 +435,7 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
     def parse_recipient_status(self, response):
         try:
             results = response["BulkEmailEntryResults"]
-            ses_status_set = set(result["Status"] for result in results)
+            ses_status_set = {result["Status"] for result in results}
             anymail_statuses = [
                 AnymailRecipientStatus(
                     message_id=result.get("MessageId", None),
