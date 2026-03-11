@@ -97,7 +97,7 @@ class AmazonSESBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
             )
         if args[0] != service:
             raise AssertionError(
-                "boto3 client created with service %r, not %r" % (args[0], service)
+                f"boto3 client created with service {args[0]!r}, not {service!r}"
             )
         return kwargs
 
@@ -317,14 +317,14 @@ class AmazonSESBackendStandardEmailTests(AmazonSESBackendMockAPITestCase):
         if django.VERSION >= (6, 0):
             att = MIMEPart()
             att.set_content(
-                "Это data".encode("utf8"),
+                "Это data".encode(),
                 maintype="application",
                 subtype="data",
                 cte="8bit",
             )
         else:
             # MIMEBase attachments deprecated in Django 6.0, removed in Django 7.0
-            att = MIMEApplication("Это data".encode("utf8"), "data", encode_7or8bit)
+            att = MIMEApplication("Это data".encode(), "data", encode_7or8bit)
         self.assertEqual(att["Content-Transfer-Encoding"], "8bit")
         self.message.attach(att)
 

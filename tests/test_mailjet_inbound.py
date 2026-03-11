@@ -177,7 +177,7 @@ class MailjetInboundTestCase(WebhookTestCase):
             "Text-part": "Test body plain",
             "Html-part": "<div>Test body html <img src='cid:abc123'></div>",
             "InlineAttachment1": b64encode(image_content).decode("ascii"),
-            "Attachment1": b64encode("test attachment".encode("utf-8")).decode("ascii"),
+            "Attachment1": b64encode(b"test attachment").decode("ascii"),
             "Attachment2": b64encode(email_content).decode("ascii"),
         }
 

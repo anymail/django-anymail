@@ -391,7 +391,7 @@ class BasePayload:
     def unsupported_feature(self, feature):
         if not self.backend.ignore_unsupported_features:
             raise AnymailUnsupportedFeature(
-                "%s does not support %s" % (self.esp_name, feature),
+                f"{self.esp_name} does not support {feature}",
                 email_message=self.message,
                 payload=self,
                 backend=self.backend,
@@ -462,9 +462,7 @@ class BasePayload:
         #   TypeError: can only concatenate list (not "str") to list
         #   TypeError: Can't convert 'list' object to str implicitly
         if isinstance(value, str) or is_lazy(value):
-            raise TypeError(
-                '"{attr}" attribute must be a list or other iterable'.format(attr=attr)
-            )
+            raise TypeError(f'"{attr}" attribute must be a list or other iterable')
 
     #
     # Attribute converters

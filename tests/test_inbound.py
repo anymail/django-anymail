@@ -259,7 +259,7 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
         self.assertEqual(msg.text, "Unicode ✓")  # *not* "Unicode \\u2713"
 
     def test_parse_raw_mime_file_text(self):
-        with open(sample_email_path(), mode="r") as fp:
+        with open(sample_email_path()) as fp:
             msg = AnymailInboundMessage.parse_raw_mime_file(fp)
         self.assertEqual(msg["Subject"], "Test email")
         self.assertEqual(msg.text, "Hi Bob, This is a message. Thanks!\n")

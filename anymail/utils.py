@@ -552,17 +552,12 @@ class Attachment:
                 self.cid = unquote(content_id)  # without the <>
 
     def __repr__(self):
-        details = [
-            self.mimetype,
-            "len={length}".format(length=len(self.content)),
-        ]
+        details = [self.mimetype, f"len={len(self.content)}"]
         if self.name:
-            details.append("name={name!r}".format(name=self.name))
+            details.append(f"name={self.name!r}")
         if self.inline:
             details.insert(0, "inline")
-            details.append(
-                "content_id={content_id!r}".format(content_id=self.content_id)
-            )
+            details.append(f"content_id={self.content_id!r}")
         return "Attachment<{details}>".format(details=", ".join(details))
 
     @property
@@ -644,12 +639,12 @@ def get_anymail_setting(
                 except AttributeError:
                     pass
             if default is UNSET:
-                message = "You must set %s or ANYMAIL = {'%s': ...}" % (
-                    anymail_setting,
-                    setting,
+                message = (
+                    f"You must set {anymail_setting} or ANYMAIL = {{'{setting}': ...}}"
                 )
+
                 if allow_bare:
-                    message += " or %s" % setting
+                    message += f" or {setting}"
                 message += " in your Django settings"
                 raise AnymailConfigurationError(message) from None
             else:

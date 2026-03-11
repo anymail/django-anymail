@@ -84,9 +84,7 @@ class SendGridSignedWebhookMissingCryptographyTestCase(BaseSendGridWebhookTestCa
                 content_type="application/json",
                 data=self.raw_events,
                 HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
-                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(
-                    "invalid".encode("utf-8")
-                ),
+                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(b"invalid"),
             )
 
     @override_settings(ANYMAIL={"WEBHOOK_SECRET": ["cred1:pass1", "cred2:pass2"]})
@@ -99,9 +97,7 @@ class SendGridSignedWebhookMissingCryptographyTestCase(BaseSendGridWebhookTestCa
                     content_type="application/json",
                     data=self.raw_events,
                     HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
-                    HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(
-                        "invalid".encode("utf-8")
-                    ),
+                    HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(b"invalid"),
                 )
 
 
@@ -136,9 +132,7 @@ class SendGridSignedWebhookSecurityTestCase(BaseSendGridSignedWebhookSecurityTes
                 content_type="application/json",
                 data=self.raw_events,
                 HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP="message timestamp",
-                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(
-                    "invalid".encode("utf-8")
-                ),
+                HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE=b64encode(b"invalid"),
             )
         self.assertEqual(response.status_code, 400)
         self.assertIn(

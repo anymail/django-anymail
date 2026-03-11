@@ -117,7 +117,7 @@ class AnymailRecipientStatus:
         try:
             # message_id must be something that can be put in a set
             # (see AnymailStatus.set_recipient_status)
-            set([message_id])
+            {message_id}
         except TypeError:
             raise TypeError("Invalid message_id %r is not scalar type" % message_id)
         if status is not None and status not in ANYMAIL_STATUSES:
@@ -152,11 +152,9 @@ class AnymailStatus:
             else:
                 return repr(o)
 
-        details = ["status={status}".format(status=_repr(self.status))]
+        details = [f"status={_repr(self.status)}"]
         if self.message_id:
-            details.append(
-                "message_id={message_id}".format(message_id=_repr(self.message_id))
-            )
+            details.append(f"message_id={_repr(self.message_id)}")
         if self.recipients:
             details.append(
                 "{num_recipients} recipients".format(
@@ -168,9 +166,7 @@ class AnymailStatus:
     def set_recipient_status(self, recipients):
         self.recipients.update(recipients)
         recipient_statuses = self.recipients.values()
-        self.message_id = set(
-            [recipient.message_id for recipient in recipient_statuses]
-        )
+        self.message_id = {recipient.message_id for recipient in recipient_statuses}
         if len(self.message_id) == 1:
             self.message_id = self.message_id.pop()  # de-set-ify if single message_id
-        self.status = set([recipient.status for recipient in recipient_statuses])
+        self.status = {recipient.status for recipient in recipient_statuses}

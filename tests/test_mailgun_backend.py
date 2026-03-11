@@ -241,7 +241,7 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
         self.assertIn(text_content.encode("iso-8859-1"), request_body)
         # Verify RFC 7578 was used for the non-ASCII filename
         self.assertNotIn(b"filename*=", request_body)  # no RFC 2231 encoding
-        self.assertIn('filename="émoticône.img"'.encode("utf-8"), request_body)
+        self.assertIn('filename="émoticône.img"'.encode(), request_body)
 
     def test_inline_missing_content_id(self):
         # Mailgun silently drops inline images without Content-Id

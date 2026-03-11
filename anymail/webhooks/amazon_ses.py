@@ -208,9 +208,7 @@ class AmazonSESBaseWebhookView(AnymailBaseWebhookView):
                 _resource,
             ) = topic_arn.split(":", maxsplit=6)
         except (TypeError, ValueError):
-            raise ValueError(
-                "Invalid ARN format '{topic_arn!s}'".format(topic_arn=topic_arn)
-            )
+            raise ValueError(f"Invalid ARN format '{topic_arn!s}'")
 
         sns_client = self.get_boto_client("sns", region_name=region)
         try:
