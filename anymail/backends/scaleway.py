@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from urllib.parse import quote
 
 from ..exceptions import AnymailAPIError
@@ -87,7 +89,7 @@ class ScalewayPayload(RequestsPayload):
         http_headers = kwargs.pop("headers", {})
         http_headers["X-Auth-Token"] = backend.secret_key
         http_headers["Content-Type"] = "application/json"
-        super().__init__(
+        super().__init__(  # type: ignore[misc]
             message, defaults, backend, headers=http_headers, *args, **kwargs
         )
 

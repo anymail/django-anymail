@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from urllib.parse import quote
 
@@ -60,7 +62,7 @@ class MailtrapPayload(RequestsPayload):
         self,
         message: AnymailMessage,
         defaults,
-        backend: "EmailBackend",
+        backend: EmailBackend,
         *args,
         **kwargs,
     ):
@@ -82,7 +84,7 @@ class MailtrapPayload(RequestsPayload):
         self.recipients_cc = list[str]()
         self.recipients_bcc = list[str]()
 
-        super().__init__(
+        super().__init__(  # type: ignore[misc]
             message, defaults, backend, *args, headers=http_headers, **kwargs
         )
 

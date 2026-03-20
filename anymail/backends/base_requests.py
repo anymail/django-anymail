@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import cast
 from urllib.parse import urljoin
 
 import requests
@@ -10,6 +13,8 @@ from .base import AnymailBaseBackend, BasePayload
 
 
 class AnymailRequestsBackend(AnymailBaseBackend):
+    session: requests.Session | None
+
     """
     Base Anymail email backend for ESPs that use an HTTP API via requests
     """
@@ -73,7 +78,7 @@ class AnymailRequestsBackend(AnymailBaseBackend):
         session.headers["User-Agent"] = "django-anymail/{version}-{esp} {orig}".format(
             esp=self.esp_name.lower(),
             version=__version__,
-            orig=session.headers.get("User-Agent", ""),
+            orig=cast(str, session.headers.get("User-Agent", "")),
         )
 
         if self.debug_api_requests:
@@ -93,6 +98,7 @@ class AnymailRequestsBackend(AnymailBaseBackend):
         params = payload.get_request_params(self.api_url)
         params.setdefault("timeout", self.timeout)
         try:
+            assert self.session
             response = self.session.request(**params)
         except requests.RequestException as err:
             # raise an exception that is both AnymailRequestsAPIError

@@ -2,6 +2,8 @@
 
 # usage: python runtests.py [tests.test_x tests.test_y.SomeTestCase ...]
 
+from __future__ import annotations
+
 import os
 import re
 import sys

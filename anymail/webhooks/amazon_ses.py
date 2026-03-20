@@ -35,10 +35,10 @@ try:
 except ImportError:
     # This module gets imported by anymail.urls, so don't complain about boto3 missing
     # unless one of the Amazon SES webhook views is actually used and needs it
-    boto3 = _LazyError(
+    boto3 = _LazyError(  # type: ignore[assignment]
         AnymailImproperlyInstalled(missing_package="boto3", install_extra="amazon-ses")
     )
-    ClientError = object
+    ClientError = object  # type: ignore[assignment,misc]
     _get_anymail_boto3_params = _LazyError(
         AnymailImproperlyInstalled(missing_package="boto3", install_extra="amazon-ses")
     )
@@ -158,7 +158,7 @@ class AmazonSESBaseWebhookView(AnymailBaseWebhookView):
             client_params.update(kwargs)
         else:
             client_params = self.client_params
-        return boto3.session.Session(**self.session_params).client(
+        return boto3.session.Session(**self.session_params).client(  # type: ignore[call-overload] # noqa: E501
             service_name, **client_params
         )
 
@@ -460,7 +460,7 @@ class AmazonSESInboundWebhookView(AmazonSESBaseWebhookView):
             s3_client.close()
 
 
-class AnymailBotoClientAPIError(AnymailAPIError, ClientError):
+class AnymailBotoClientAPIError(AnymailAPIError, ClientError):  # type: ignore[misc]
     """An AnymailAPIError that is also a Boto ClientError"""
 
     def __init__(self, *args, client_error):

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.conf import settings
 from django.utils.encoding import force_str
 
@@ -80,7 +82,7 @@ class SparkPostPayload(RequestsPayload):
             http_headers["X-MSYS-SUBACCOUNT"] = backend.subaccount
         self.recipients = []  # all recipients, for backend parse_recipient_status
         self.cc_and_bcc = []  # for _finalize_recipients
-        super().__init__(
+        super().__init__(  # type: ignore[misc]
             message, defaults, backend, headers=http_headers, *args, **kwargs
         )
 

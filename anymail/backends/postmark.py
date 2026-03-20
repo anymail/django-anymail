@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 from requests.structures import CaseInsensitiveDict
@@ -218,7 +220,7 @@ class PostmarkPayload(RequestsPayload):
         self.merge_data = None
         self.merge_metadata = None
         self.merge_headers = {}
-        super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)
+        super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)  # type: ignore[misc] # noqa: E501
 
     def get_api_endpoint(self):
         batch_send = self.is_batch()

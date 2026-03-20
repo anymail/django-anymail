@@ -1,5 +1,7 @@
 # Hatch custom build hook that generates dynamic readme.
 
+from __future__ import annotations
+
 import re
 from pathlib import Path
 

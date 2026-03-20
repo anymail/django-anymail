@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import mimetypes
 
 from ..exceptions import AnymailRequestsAPIError
@@ -92,7 +94,7 @@ class ResendPayload(RequestsPayload):
         headers["Authorization"] = "Bearer %s" % backend.api_key
         headers["Content-Type"] = "application/json"
         headers["Accept"] = "application/json"
-        super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)
+        super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)  # type: ignore[misc] # noqa: E501
 
     def get_api_endpoint(self):
         if self.is_batch():

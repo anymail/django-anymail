@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from datetime import datetime
 
@@ -17,10 +19,10 @@ try:
 except ImportError:
     # Otherwise, validating with basic auth is sufficient
     # (unless settings specify signature validation, which will then raise this error)
-    SvixWebhook = _LazyError(
+    SvixWebhook = _LazyError(  # type: ignore[assignment,misc]
         AnymailImproperlyInstalled(missing_package="svix", install_extra="resend")
     )
-    WebhookVerificationError = object()
+    WebhookVerificationError = object()  # type: ignore[assignment,misc]
 
 
 class SvixWebhookValidationMixin(AnymailCoreWebhookView):

@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import json
 from traceback import format_exception_only
 
 from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
-from requests import HTTPError
+from requests import HTTPError, Response
 
 
 class AnymailError(Exception):
@@ -31,7 +33,7 @@ class AnymailError(Exception):
         )
         if isinstance(self, HTTPError):
             # must leave response in kwargs for HTTPError
-            self.response = kwargs.get("response", None)
+            self.response: Response | None = kwargs.get("response", None)
         else:
             self.response = kwargs.pop("response", None)
         super().__init__(*args, **kwargs)
@@ -51,6 +53,7 @@ class AnymailError(Exception):
 
         # Decode response.reason to text
         # (borrowed from requests.Response.raise_for_status)
+        assert self.response is not None
         reason = self.response.reason
         if isinstance(reason, bytes):
             try:

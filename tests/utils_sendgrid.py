@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from base64 import b64encode
 
@@ -13,14 +15,14 @@ except ImportError:
     HAS_CRYPTOGRAPHY = False
 
 
-def make_key() -> "ec.EllipticCurvePrivateKey":
+def make_key() -> ec.EllipticCurvePrivateKey:
     """Generate RSA public key with short key size, for testing only"""
     return ec.generate_private_key(
         curve=ec.SECP256R1(),
     )
 
 
-def derive_public_webhook_key(private_key: "ec.EllipticCurvePrivateKey") -> str:
+def derive_public_webhook_key(private_key: ec.EllipticCurvePrivateKey) -> str:
     """Derive public"""
     public_key = private_key.public_key()
     public_bytes = public_key.public_bytes(
@@ -32,7 +34,7 @@ def derive_public_webhook_key(private_key: "ec.EllipticCurvePrivateKey") -> str:
 
 
 def sign(
-    private_key: "ec.EllipticCurvePrivateKey", timestamp: str, message: str
+    private_key: ec.EllipticCurvePrivateKey, timestamp: str, message: str
 ) -> bytes:
     """Sign message with private key"""
     return private_key.sign(

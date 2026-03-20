@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import email.charset
 import email.encoders
 import email.policy
+from typing import Any
 
 from requests.structures import CaseInsensitiveDict
 
@@ -165,6 +168,7 @@ class AmazonSESV2SendEmailPayload(AmazonSESBasePayload):
         try:
             for field in address_fields:
                 addresses = getattr(self.message, field)
+                idna_encoded_addresses: str | list[str]
                 idna_encoded_addresses = [
                     address.format(idna_encode=self.backend.idna_encode)
                     for address in parse_address_list(addresses, field)
@@ -364,7 +368,7 @@ class AmazonSESV2SendBulkEmailPayload(AmazonSESBasePayload):
     def init_payload(self):
         super().init_payload()
         # late-bind in finalize_payload:
-        self.recipients = {"to": [], "cc": [], "bcc": []}
+        self.recipients = dict[str, list[Any]](to=[], cc=[], bcc=[])
         self.merge_data = {}
         self.headers = {}
         self.merge_headers = {}

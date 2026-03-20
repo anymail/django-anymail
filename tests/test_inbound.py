@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import quopri
 from base64 import b64encode
 from email.utils import collapse_rfc2231_value
@@ -126,7 +128,7 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
     def test_construct_attachments(self):
         att1 = AnymailInboundMessage.construct_attachment(
             "text/csv",
-            "One,Two\n1,2".encode("iso-8859-1"),
+            b"One,Two\n1,2",
             charset="iso-8859-1",
             filename="test.csv",
         )

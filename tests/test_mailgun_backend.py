@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime
 from email.message import MIMEPart
 from email.mime.image import MIMEImage

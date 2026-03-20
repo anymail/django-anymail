@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import binascii
 import json
 from base64 import b64decode
 from datetime import datetime, timezone
+from typing import cast
 
 from ..exceptions import (
     AnymailConfigurationError,
@@ -27,6 +30,7 @@ try:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 except ImportError:
     # This module gets imported by anymail.urls, so don't complain about cryptography
     # missing unless one of the Postal webhook views is actually used and needs it
@@ -35,11 +39,11 @@ except ImportError:
             missing_package="cryptography", install_extra="postal"
         )
     )
-    serialization = error
-    hashes = error
+    serialization = error  # type: ignore[assignment]
+    hashes = error  # type: ignore[assignment]
     default_backend = error
-    padding = error
-    InvalidSignature = object
+    padding = error  # type: ignore[assignment]
+    InvalidSignature = object  # type:ignore[assignment,misc]
 
 
 class PostalBaseWebhookView(AnymailBaseWebhookView):
@@ -50,7 +54,7 @@ class PostalBaseWebhookView(AnymailBaseWebhookView):
     warn_if_no_basic_auth = False
 
     # These can be set from kwargs in View.as_view, or pulled from settings in init:
-    webhook_key = None
+    webhook_key: str | None = None
 
     def __init__(self, **kwargs):
         self.webhook_key = get_anymail_setting(
@@ -67,6 +71,7 @@ class PostalBaseWebhookView(AnymailBaseWebhookView):
                 "X-Postal-Signature header missing from webhook"
             )
 
+        assert self.webhook_key
         public_key = serialization.load_pem_public_key(
             (
                 "-----BEGIN PUBLIC KEY-----\n"
@@ -77,7 +82,7 @@ class PostalBaseWebhookView(AnymailBaseWebhookView):
         )
 
         try:
-            public_key.verify(
+            cast(RSAPublicKey, public_key).verify(
                 b64decode(signature), request.body, padding.PKCS1v15(), hashes.SHA1()
             )
         except (InvalidSignature, binascii.Error):

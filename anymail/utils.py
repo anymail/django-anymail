@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import base64
 import email.message
 import email.policy
+import enum
 import mimetypes
 from base64 import b64encode
-from collections.abc import Mapping, MutableMapping
+from collections import OrderedDict
+from collections.abc import Mapping, MutableMapping, Sequence
 from copy import copy, deepcopy
 from email.charset import Charset
 from email.errors import HeaderParseError, InvalidHeaderDefect
@@ -11,6 +15,7 @@ from email.header import decode_header
 from email.headerregistry import Address
 from email.mime.base import MIMEBase
 from email.utils import formatdate, getaddresses, parsedate_to_datetime, unquote
+from typing import Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
 import django.core.mail
@@ -24,20 +29,44 @@ try:
     from django.core.mail.message import MIMEMixin
 except ImportError:
     # Django >= 7.0
-    MIMEMixin = None
+    MIMEMixin = None  # type: ignore[assignment,misc]
 
 from .exceptions import AnymailConfigurationError, AnymailInvalidAddress
 
 BASIC_NUMERIC_TYPES = (int, float)
 
 
-UNSET = type("UNSET", (object,), {})  # Used as non-None default value
+class Unset(enum.Enum):
+    """
+    This allows mypy to type check `Literal` properly.
 
+    As per PEP-586 https://www.python.org/dev/peps/pep-0586/#legal-parameters-for-literal-at-type-check-time  # noqa: E501
+    mypy can only type check a small amount of types with `Enum` being one
+    of them.
+
+    UNSET needs to be declared at least::
+
+        UNSET: Literal[Unset.UNSET] = Unset.UNSET
+
+    So that mypy doesn't widen the variable `UNSET` to just the enum
+    `Unset`, but there seems to be a bug [1]_ with mypy that it will not
+    allow `Literal[UNSET]` in a dependant file. In order to work around
+    this export `Literal[UNSET]` as `UnsetType` so that other files may
+    use it directly.
+
+    .. [1] https://github.com/python/mypy/issues/8657
+    """
+
+    UNSET = enum.auto()
+
+
+UnsetType = Literal[Unset.UNSET]
+UNSET: UnsetType = Unset.UNSET  # Used as non-None default value
 
 SMTP7BIT = email.policy.SMTP.clone(cte_type="7bit")
 
 
-def concat_lists(*args):
+def concat_lists(*args: Sequence[Any] | UnsetType | None) -> list[Any] | UnsetType:
     """
     Combines all non-UNSET args, by concatenating lists (or sequence-like types).
     Does not modify any args.
@@ -50,7 +79,7 @@ def concat_lists(*args):
     UNSET
 
     """
-    result = UNSET
+    result: list[Any] | UnsetType = UNSET
     for value in args:
         if value is None:
             # None is a request to suppress any earlier values
@@ -119,7 +148,9 @@ def merge_dicts_deep(*args):
     return result
 
 
-def merge_dicts_one_level(*args):
+def merge_dicts_one_level(
+    *args: Mapping[Any, Any] | UnsetType | None
+) -> dict[Any, Any] | UnsetType:
     """
     Mixture of merge_dicts_deep and merge_dicts_shallow:
     Deep merges first level, shallow merges second level.
@@ -128,7 +159,7 @@ def merge_dicts_one_level(*args):
     (Useful for {"email": {options...}, ...} style dicts,
     like merge_data: shallow merges the options for each email.)
     """
-    result = UNSET
+    result: dict[Any, Any] | UnsetType = UNSET
     for value in args:
         if value is None:
             # None is a request to suppress any earlier values
@@ -436,6 +467,8 @@ class EmailAddress(Address):
 
 
 class Attachment:
+    content: bytes | str
+
     """A normalized EmailMessage.attachments item with additional functionality
 
     Normalized to have these properties:
@@ -466,7 +499,7 @@ class Attachment:
             content_type = attachment["Content-Type"]
             mimetype = attachment.get_content_type()
             charset = attachment.get_content_charset()
-            content = (
+            content: Any = (
                 attachment.get_payload(decode=True)
                 if isinstance(attachment, MIMEBase)
                 else attachment.get_content()
@@ -565,7 +598,7 @@ class Attachment:
         """Content as bytes, using original charset"""
         content = self.content
         if isinstance(content, str):
-            content = content.encode(self.charset)
+            content = content.encode(self.charset or settings.DEFAULT_CHARSET)
         return content
 
     @property
@@ -628,7 +661,7 @@ def get_anymail_setting(
     anymail_setting = "ANYMAIL_%s" % setting
 
     try:
-        return settings.ANYMAIL[setting]
+        return settings.ANYMAIL[setting]  # type: ignore[misc]
     except (AttributeError, KeyError):
         try:
             return getattr(settings, anymail_setting)
@@ -863,6 +896,8 @@ def parse_rfc2822date(s):
 
 
 class CaseInsensitiveCasePreservingDict(CaseInsensitiveDict):
+    _store: OrderedDict
+
     """A dict with case-insensitive keys, which preserves the *first* key set.
 
     >>> cicpd = CaseInsensitiveCasePreservingDict()

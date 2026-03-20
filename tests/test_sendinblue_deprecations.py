@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from unittest.mock import ANY
 
 from django.core.mail import EmailMessage, send_mail

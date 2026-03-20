@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
 from ..utils import get_anymail_setting
@@ -51,7 +53,7 @@ class PostalPayload(RequestsPayload):
         http_headers["X-Server-API-Key"] = backend.api_key
         http_headers["Content-Type"] = "application/json"
         http_headers["Accept"] = "application/json"
-        super().__init__(
+        super().__init__(  # type: ignore[misc]
             message, defaults, backend, headers=http_headers, *args, **kwargs
         )
 

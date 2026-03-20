@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import hmac
 import json
@@ -23,8 +25,8 @@ class MandrillSignatureMixin(AnymailCoreWebhookView):
     """Validates Mandrill webhook signature"""
 
     # These can be set from kwargs in View.as_view, or pulled from settings in init:
-    webhook_key = None  # required
-    webhook_url = None  # optional; defaults to actual url used
+    webhook_key: bytes | None = None  # required
+    webhook_url: str | None = None  # optional; defaults to actual url used
 
     def __init__(self, **kwargs):
         esp_name = self.esp_name
@@ -71,6 +73,7 @@ class MandrillSignatureMixin(AnymailCoreWebhookView):
         for key in sorted(params.keys()):
             signed_data += key + params[key]
 
+        assert self.webhook_key
         expected_signature = b64encode(
             hmac.new(
                 key=self.webhook_key,

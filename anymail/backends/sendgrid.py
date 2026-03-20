@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import uuid
 import warnings
+from collections.abc import Mapping
 from email.message import MIMEPart
 
 from requests.structures import CaseInsensitiveDict
@@ -11,7 +14,7 @@ from ..exceptions import (
     AnymailWarning,
 )
 from ..message import AnymailRecipientStatus
-from ..utils import BASIC_NUMERIC_TYPES, Mapping, get_anymail_setting, update_deep
+from ..utils import BASIC_NUMERIC_TYPES, get_anymail_setting, update_deep
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 
 
@@ -99,7 +102,7 @@ class SendGridPayload(RequestsPayload):
         http_headers["Authorization"] = "Bearer %s" % backend.api_key
         http_headers["Content-Type"] = "application/json"
         http_headers["Accept"] = "application/json"
-        super().__init__(
+        super().__init__(  # type: ignore[misc]
             message, defaults, backend, headers=http_headers, *args, **kwargs
         )
 

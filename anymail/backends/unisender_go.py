@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 import uuid
 from datetime import datetime, timezone
+from typing import Literal
 
 from django.core.mail import EmailMessage
 from requests import Response
@@ -128,13 +129,14 @@ class UnisenderGoPayload(RequestsPayload):
         **kwargs: typing.Any,
     ):
         self.generate_message_id = backend.generate_message_id
-        self.message_ids = CaseInsensitiveDict()  # recipient -> generated message_id
+        # recipient -> generated message_id
+        self.message_ids = CaseInsensitiveDict[str]()
 
         http_headers = kwargs.pop("headers", {})
         http_headers["Content-Type"] = "application/json"
         http_headers["Accept"] = "application/json"
         http_headers["X-API-KEY"] = backend.api_key
-        super().__init__(
+        super().__init__(  # type: ignore[misc]
             message, defaults, backend, headers=http_headers, *args, **kwargs
         )
 
@@ -210,7 +212,7 @@ class UnisenderGoPayload(RequestsPayload):
         properly formats commas and other characters in `to_name` and `from_name`.
         (But see set_reply_to for a related issue.)
         """
-        use_rfc2047 = True
+        use_rfc2047: bool | Literal["force"] = True
         if (
             self.backend.workaround_display_name_bugs
             and not self._display_name_bug_chars.isdisjoint(address.display_name)
@@ -252,7 +254,7 @@ class UnisenderGoPayload(RequestsPayload):
             )
             display_name = reply_to.display_name
             if display_name:
-                use_rfc2047 = False
+                use_rfc2047: bool | Literal["force"] = False
                 if self.backend.workaround_display_name_bugs:
                     # Unisender Go has two bugs with display names in their generated
                     # Reply-To headers:
@@ -316,14 +318,14 @@ class UnisenderGoPayload(RequestsPayload):
         self.data["global_metadata"] = metadata
 
     def set_send_at(self, send_at: datetime | str) -> None:
-        try:
+        if isinstance(send_at, datetime):
             # "Date and time in the format “YYYY-MM-DD hh:mm:ss” in the UTC time zone."
             # If send_at is a datetime, it's guaranteed to be aware, but maybe not UTC.
             # Convert to UTC, then strip tzinfo to avoid isoformat "+00:00" at end.
             send_at_utc = send_at.astimezone(timezone.utc).replace(tzinfo=None)
             send_at_formatted = send_at_utc.isoformat(sep=" ", timespec="seconds")
             assert len(send_at_formatted) == 19
-        except (AttributeError, TypeError):
+        else:
             # Not a datetime - caller is responsible for formatting
             send_at_formatted = send_at
         self.data.setdefault("options", {})["send_at"] = send_at_formatted

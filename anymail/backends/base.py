@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import json
 from datetime import date, datetime, timezone
+from typing import Any
 
 from django.core.mail.backends.base import BaseEmailBackend
 from django.utils.module_loading import import_string
@@ -20,6 +23,7 @@ from ..signals import post_send, pre_send
 from ..utils import (
     UNSET,
     Attachment,
+    UnsetType,
     concat_lists,
     force_non_lazy,
     force_non_lazy_dict,
@@ -334,7 +338,9 @@ class BasePayload:
         self.defaults = defaults
         self.backend = backend
         self.esp_name = backend.esp_name
-        self._batch_attrs_used = {attr: UNSET for attr in self.batch_attrs}
+        self._batch_attrs_used: dict[str, Any | UnsetType] = {
+            attr: UNSET for attr in self.batch_attrs
+        }
 
         self.init_payload()
 
@@ -358,7 +364,7 @@ class BasePayload:
                         converter = getattr(self, converter)
                     if converter in (parse_address_list, parse_single_address):
                         # hack to include field name in error message
-                        value = converter(value, field=attr)
+                        value = converter(value, field=attr)  # type: ignore[call-arg]
                     else:
                         value = converter(value)
             if value is not UNSET:
@@ -663,7 +669,7 @@ class BasePayload:
     # Helpers for concrete implementations
     #
 
-    def serialize_json(self, data):
+    def serialize_json(self, data) -> str:
         """Returns data serialized to json, raising appropriate errors.
 
         Essentially json.dumps with added context in any errors.

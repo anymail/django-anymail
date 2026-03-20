@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ..exceptions import AnymailRequestsAPIError
 from ..message import AnymailRecipientStatus
 from ..utils import get_anymail_setting, update_deep
@@ -96,7 +98,7 @@ class MailjetPayload(RequestsPayload):
         }
         self.recipients = []  # for backend parse_recipient_status
         self.metadata = None
-        super().__init__(
+        super().__init__(  # type: ignore[misc]
             message, defaults, backend, auth=auth, headers=http_headers, *args, **kwargs
         )
 
