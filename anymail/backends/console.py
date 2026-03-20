@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 
 from django.core.mail.backends.console import EmailBackend as DjangoConsoleBackend

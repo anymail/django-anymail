@@ -5,8 +5,10 @@ import binascii
 import json
 import warnings
 from datetime import datetime, timezone
+from email.message import Message
 from email.parser import BytesParser
 from email.policy import default as default_policy
+from typing import cast
 
 from ..exceptions import (
     AnymailImproperlyInstalled,
@@ -30,7 +32,7 @@ try:
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import ec, types
+    from cryptography.hazmat.primitives.asymmetric import ec
 except ImportError:
     # This module gets imported by anymail.urls, so don't complain about cryptography
     # missing unless one of the SendGrid webhook views is actually used and needs it
@@ -39,11 +41,11 @@ except ImportError:
             missing_package="cryptography", install_extra="sendgrid"
         )
     )
-    serialization = error
-    hashes = error
+    serialization = error  # type: ignore[assignment]
+    hashes = error  # type: ignore[assignment]
     default_backend = error
-    ec = error
-    InvalidSignature = Exception
+    ec = error  # type: ignore[assignment]
+    InvalidSignature = Exception  # type: ignore[assignment,misc]
 
 
 class SendGridBaseWebhookView(AnymailBaseWebhookView):
@@ -52,7 +54,7 @@ class SendGridBaseWebhookView(AnymailBaseWebhookView):
     key_setting_name: str
 
     # Loaded from key_setting_name; None -> signature verification is skipped
-    webhook_verification_key: "types.PublicKeyTypes | None" = None
+    webhook_verification_key: ec.EllipticCurvePublicKey | None = None
 
     @classmethod
     def as_view(cls, **initkwargs):
@@ -71,13 +73,16 @@ class SendGridBaseWebhookView(AnymailBaseWebhookView):
             allow_bare=True,
         )
         if verification_key:
-            self.webhook_verification_key = serialization.load_pem_public_key(
-                (
-                    "-----BEGIN PUBLIC KEY-----\n"
-                    + verification_key
-                    + "\n-----END PUBLIC KEY-----"
-                ).encode("utf-8"),
-                backend=default_backend(),
+            self.webhook_verification_key = cast(
+                ec.EllipticCurvePublicKey,
+                serialization.load_pem_public_key(
+                    (
+                        "-----BEGIN PUBLIC KEY-----\n"
+                        + verification_key
+                        + "\n-----END PUBLIC KEY-----"
+                    ).encode("utf-8"),
+                    backend=default_backend(),
+                ),
             )
         if self.webhook_verification_key:
             # If the webhook key is successfully configured, then we don't need to warn about
@@ -378,15 +383,17 @@ class SendGridInboundWebhookView(AnymailBaseWebhookView):
                     request.body,
                 ]
             )
-            parsed_parts = (
-                BytesParser(policy=default_policy).parsebytes(raw_data).get_payload()
+            parsed_parts = cast(
+                list[Message],
+                BytesParser(policy=default_policy).parsebytes(raw_data).get_payload(),
             )
             for part in parsed_parts:
                 name = part.get_param("name", header="content-disposition")
+                payload = cast(bytes, part.get_payload(decode=True))
                 if name == "text":
-                    text = part.get_payload(decode=True).decode(text_charset)
+                    text = payload.decode(text_charset)
                 elif name == "html":
-                    html = part.get_payload(decode=True).decode(html_charset)
+                    html = payload.decode(html_charset)
                 # (subject, from, to, etc. are parsed from raw headers field,
                 # so no need to worry about their separate POST field charsets)
 

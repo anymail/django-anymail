@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.conf import settings
 from django.core import checks
 
@@ -5,7 +7,7 @@ from anymail.utils import get_anymail_setting
 
 
 def check_deprecated_settings(app_configs, **kwargs):
-    errors = []
+    errors = list[checks.Error | checks.Warning]()
 
     anymail_settings = getattr(settings, "ANYMAIL", {})
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import mimetypes
 
 from ..exceptions import AnymailRequestsAPIError, AnymailUnsupportedFeature
@@ -127,7 +129,7 @@ class MailerSendPayload(RequestsPayload):
         self.merge_data = {}  # late bound
         self.merge_global_data = None  # late bound
         self.batch_send_mode = backend.batch_send_mode  # can override in esp_extra
-        super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)
+        super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)  # type: ignore[misc] # noqa: E501
 
     def get_api_endpoint(self):
         if self.is_batch():

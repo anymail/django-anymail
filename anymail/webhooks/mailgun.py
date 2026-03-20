@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import hmac
 import json
@@ -36,7 +38,7 @@ class MailgunBaseWebhookView(AnymailBaseWebhookView):
     warn_if_no_basic_auth = False  # because we validate against signature
 
     # (Declaring class attr allows override by kwargs in View.as_view.)
-    webhook_signing_key = None
+    webhook_signing_key: bytes | None = None
 
     # The `api_key` attribute name is still allowed for compatibility
     # with earlier Anymail releases.
@@ -89,6 +91,7 @@ class MailgunBaseWebhookView(AnymailBaseWebhookView):
                     "Mailgun webhook called without required security fields"
                 ) from err
 
+        assert self.webhook_signing_key
         expected_signature = hmac.new(
             key=self.webhook_signing_key,
             msg=f"{timestamp}{token}".encode("ascii"),

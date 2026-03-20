@@ -126,7 +126,28 @@ max-line-length = 120
 # See .flake8 file in project root
 
 [tool.isort]
+add_imports = "from __future__ import annotations"
 combine_as_imports = true
 known_first_party = "anymail"
 profile = "black"
 py_version = "38"
+
+[tool.django-stubs]
+django_settings_module = "tests.test_settings.settings_5_0"
+
+[tool.mypy]
+check_untyped_defs = true
+exclude = "docs"
+plugins = [
+    "mypy_django_plugin.main",
+]
+pretty = true
+show_error_codes = true
+show_error_context = true
+strict = true
+
+# reduce strictness
+disallow_any_generics = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_untyped_defs = false

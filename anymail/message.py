@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from email.message import MIMEPart
 from email.mime.image import MIMEImage
 from email.utils import make_msgid, unquote
@@ -76,6 +78,7 @@ def attach_inline_image(
     # Content ID per RFC 2045 section 7 (with <...>):
     content_id = make_msgid(idstring, domain)
 
+    image: MIMEImage | MIMEPart
     if django.VERSION >= (6, 0):
         image = MIMEPart()
         if subtype is None:

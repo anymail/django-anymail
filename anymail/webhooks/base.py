@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import warnings
 
+from django.dispatch import Signal
 from django.http import HttpResponse
 from django.utils.crypto import constant_time_compare
 from django.utils.decorators import method_decorator
@@ -13,7 +16,7 @@ try:
     from django.contrib.auth.decorators import login_not_required
 except ImportError:
     # LoginRequiredMiddleware added in Django 5.1
-    def login_not_required(view_func):
+    def login_not_required(view_func):  # type: ignore[misc]
         return view_func
 
 
@@ -37,7 +40,7 @@ class AnymailCoreWebhookView(View):
     # Subclass implementation:
 
     # Where to send events: either ..signals.inbound or ..signals.tracking
-    signal = None
+    signal: Signal | None = None
 
     def validate_request(self, request):
         """Check validity of webhook post, or raise AnymailWebhookValidationFailure.
@@ -89,7 +92,7 @@ class AnymailCoreWebhookView(View):
         events = self.parse_events(request)
         esp_name = self.esp_name
         for event in events:
-            self.signal.send(sender=self.__class__, event=event, esp_name=esp_name)
+            self.signal.send(sender=self.__class__, event=event, esp_name=esp_name)  # type: ignore[union-attr] # noqa: E501
         return HttpResponse()
 
     # Request validation (subclasses shouldn't need to override):

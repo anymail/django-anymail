@@ -1,5 +1,7 @@
 # Tests for the anymail/utils.py module
 # (not to be confused with utilities for testing found in tests/utils.py)
+from __future__ import annotations
+
 import base64
 import copy
 import pickle

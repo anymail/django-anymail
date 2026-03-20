@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any, Literal
+
 from requests.structures import CaseInsensitiveDict
 
 from ..exceptions import AnymailRequestsAPIError
@@ -103,7 +107,7 @@ class BrevoPayload(RequestsPayload):
         http_headers["api-key"] = backend.api_key
         http_headers["Content-Type"] = "application/json"
 
-        super().__init__(
+        super().__init__(  # type: ignore[misc]
             message, defaults, backend, headers=http_headers, *args, **kwargs
         )
 
@@ -125,8 +129,8 @@ class BrevoPayload(RequestsPayload):
             self.data["messageVersions"] = []
             for to in to_list:
                 to_email = to["email"]
-                version = {"to": [to]}
-                headers = CaseInsensitiveDict()
+                version = dict[str, Any](to=[to])
+                headers = CaseInsensitiveDict[str]()
                 if to_email in self.merge_data:
                     version["params"] = self.merge_data[to_email]
                 if to_email in self.merge_metadata:
@@ -158,7 +162,7 @@ class BrevoPayload(RequestsPayload):
 
     def email_object(self, email):
         """Converts EmailAddress to Brevo API object with workarounds"""
-        use_rfc2047 = False
+        use_rfc2047: bool | Literal["force"] = False
         # In from/to/cc/bcc, Brevo silently drops the "name" field if it
         # contains both non-ASCII chars and a comma (or other special).
         # In replyTo, Brevo sends the name as 8-bit (unencoded) utf-8.

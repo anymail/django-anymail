@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import unittest
 from unittest.mock import ANY, create_autospec

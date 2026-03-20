@@ -1,4 +1,6 @@
 # Pre-packaged IDNA_ENCODER options
+from __future__ import annotations
+
 import idna
 
 from anymail.exceptions import AnymailImproperlyInstalled, _LazyError

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # Render a README file (roughly) as it would appear on PyPI
 
+from __future__ import annotations
+
 import argparse
 import sys
 from importlib.metadata import PackageNotFoundError, metadata

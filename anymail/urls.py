@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.urls import path, re_path
 
 from .webhooks.amazon_ses import (

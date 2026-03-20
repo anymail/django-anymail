@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import warnings
 from base64 import b64decode
-from email.message import EmailMessage
+from email.message import EmailMessage, Message
 from email.parser import BytesParser, Parser
 from email.policy import default as default_policy
 from email.utils import unquote
+from typing import cast
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 
@@ -185,7 +188,7 @@ class AnymailInboundMessage(EmailMessage):
             # (Note that self.is_multipart() misleadingly returns True in this case.)
             payload = self.get_payload()
             assert len(payload) == 1  # should be exactly one message
-            return payload[0].as_bytes()
+            return cast(list[Message], payload)[0].as_bytes()
         elif maintype == "multipart":
             # The attachment itself is multipart; the payload is a list of parts,
             # and it's not clear which one is the "content".
@@ -204,7 +207,7 @@ class AnymailInboundMessage(EmailMessage):
             # (Note that self.is_multipart() misleadingly returns True in this case.)
             payload = self.get_payload()
             assert len(payload) == 1  # should be exactly one message
-            return payload[0].as_string()
+            return cast(list[Message], payload)[0].as_string()
         elif maintype == "multipart":
             # The attachment itself is multipart; the payload is a list of parts,
             # and it's not clear which one is the "content".
@@ -218,7 +221,7 @@ class AnymailInboundMessage(EmailMessage):
                 return payload
             charset = charset or self.get_content_charset("US-ASCII")
             errors = errors or "replace"
-            return payload.decode(charset, errors=errors)
+            return cast(bytes, payload).decode(charset, errors=errors)
 
     def as_uploaded_file(self):
         """Return the attachment converted to a Django UploadedFile"""
@@ -227,7 +230,7 @@ class AnymailInboundMessage(EmailMessage):
         name = self.get_filename()
         content_type = self.get_content_type()
         content = self.get_content_bytes()
-        return SimpleUploadedFile(name, content, content_type)
+        return SimpleUploadedFile(name, content, content_type)  # type: ignore[arg-type]
 
     #
     # Construction
@@ -299,7 +302,7 @@ class AnymailInboundMessage(EmailMessage):
                 raw_headers, headersonly=True
             )
             # headersonly forces an empty string payload, which breaks things later:
-            msg.set_payload(None)
+            msg.set_payload(None)  # type: ignore[call-overload]
         else:
             msg = cls()
 

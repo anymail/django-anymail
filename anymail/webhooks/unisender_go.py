@@ -71,10 +71,10 @@ class UnisenderGoTrackingWebhookView(AnymailBaseWebhookView):
         # Unisender Go verifies the webhook with a GET request at configuration time
         return HttpResponse()
 
-    def parse_json_body(self, request: HttpRequest) -> dict | list | None:
+    def parse_json_body(self, request: HttpRequest) -> dict:
         # Cache parsed JSON request.body on the request.
         if hasattr(request, "_parsed_json"):
-            parsed = getattr(request, "_parsed_json")
+            parsed: dict = getattr(request, "_parsed_json")
         else:
             parsed = json.loads(request.body.decode())
             setattr(request, "_parsed_json", parsed)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.dispatch import receiver
 
 from anymail.backends.test import EmailBackend as TestEmailBackend

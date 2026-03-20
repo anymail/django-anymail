@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Any
 from urllib.parse import quote
 
 from ..exceptions import AnymailError, AnymailRequestsAPIError
@@ -120,7 +123,7 @@ class MailgunPayload(RequestsPayload):
         self.merge_headers = {}
         self.to_emails = []
 
-        super().__init__(message, defaults, backend, auth=auth, *args, **kwargs)
+        super().__init__(message, defaults, backend, auth=auth, *args, **kwargs)  # type: ignore[misc] # noqa: E501
 
     def get_api_endpoint(self):
         if self.sender_domain is None:
@@ -207,7 +210,7 @@ class MailgunPayload(RequestsPayload):
         """
         # (numbers refer to detailed explanation above)
         # Mailgun parameters to construct:
-        recipient_variables = {}
+        recipient_variables = dict[Any, dict[str, Any]]()
         custom_data = {}
 
         # (1) metadata --> Mailgun custom_data
@@ -216,7 +219,7 @@ class MailgunPayload(RequestsPayload):
         # (2) merge_metadata --> Mailgun custom_data via recipient_variables
         if self.merge_metadata:
 
-            def vkey(key):  # 'v:key'
+            def vkey(key: str) -> str:  # 'v:key'
                 return f"v:{key}"
 
             # all keys used in any recipient's merge_metadata:
