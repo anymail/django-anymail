@@ -13,7 +13,6 @@ from anymail.webhooks.resend import ResendInboundWebhookView
 from .test_resend_webhooks import ResendWebhookTestCase
 from .utils import sample_email_content, sample_image_content
 
-
 TEST_EMAIL_ID = "56761188-7520-42d8-8898-ff6fc54ce618"
 TEST_API_URL = f"https://api.resend.com/emails/receiving/{TEST_EMAIL_ID}"
 
