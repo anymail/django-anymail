@@ -384,7 +384,12 @@ you can retrieve them in your tracking signal receiver like this:
 Inbound
 -------
 
-Resend does not currently support inbound email.
+Resend supports inbound email. See the document `Resend Receiving Emails`_
+which outlines how to use a `*.app` domain or custom domain to receive emails.
+You need to set up a webhook to handle the `email.received` event.
+
+
+.. _Resend Receiving Emails: https://resend.com/docs/dashboard/receiving/introduction
 
 
 .. _resend-troubleshooting:
