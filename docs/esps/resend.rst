@@ -385,9 +385,43 @@ Inbound
 -------
 
 Resend supports inbound email. See the document `Resend Receiving Emails`_
-which outlines how to use a `*.app` domain or custom domain to receive emails.
-You need to set up a webhook to handle the `email.received` event.
+for more information. You can use a default or custom domain.
 
+To configure Anymail inbound handling for Resend,
+add a new webhook endpoint to your `Resend Webhooks settings`_:
+
+*   For the "Endpoint URL", enter one of these
+    (where *yoursite.example.com* is your Django site).
+
+    If are *not* using Anymail's shared webhook secret:
+
+    :samp:`https://{yoursite.example.com}/anymail/resend/inbound/`
+
+    Or if you *are* using Anymail's :setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>`,
+    include the *random:random* shared secret in the URL:
+
+    :samp:`https://{random}:{random}@{yoursite.example.com}/resend/inbound/`
+
+*   For "Events to listen", select 'email.received'.
+
+*   Click the "Add" button.
+
+Then, if you are using Resend's webhook signature validation (with svix),
+add the webhook signing secret to your Anymail settings:
+
+*   Still on the `Resend Webhooks settings`_ page, click into the
+    webhook endpoint URL you added above,
+    and copy the "signing secret" listed near the top of the page.
+
+*   Add that to your settings.py ``ANYMAIL`` settings as
+    :setting:`RESEND_SIGNING_SECRET <ANYMAIL_RESEND_SIGNING_SECRET>`:
+
+    .. code-block:: python
+
+        ANYMAIL = {
+            # ...
+            "RESEND_SIGNING_SECRET": "whsec_..."
+        }
 
 .. _Resend Receiving Emails: https://resend.com/docs/dashboard/receiving/introduction
 
