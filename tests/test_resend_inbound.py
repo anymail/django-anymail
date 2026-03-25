@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from textwrap import dedent
 from unittest.mock import ANY
 
 import responses
@@ -44,25 +45,27 @@ class ResendInboundTestCase(ResendWebhookTestCase):
         }
 
         # Raw MIME representation of the full email:
-        raw_mime = (
-            "From: Sender Name <from@example.com>\r\n"
-            "To: recipient@example.org\r\n"
-            "Subject: Testing Resend inbound\r\n"
-            "Date: Thu, 22 Feb 2024 23:41:11 +0000\r\n"
-            "Message-ID: <ABCDE12345@mail.example.com>\r\n"
-            "MIME-Version: 1.0\r\n"
-            "Content-Type: multipart/alternative; boundary=boundary\r\n"
-            "\r\n"
-            "--boundary\r\n"
-            "Content-Type: text/plain\r\n"
-            "\r\n"
-            "Hello, world!\r\n"
-            "--boundary\r\n"
-            "Content-Type: text/html\r\n"
-            "\r\n"
-            "<p>Hello, world!</p>\r\n"
-            "--boundary--\r\n"
-        )
+        raw_mime = dedent(
+            """\
+            From: Sender Name <from@example.com>
+            To: recipient@example.org
+            Subject: Testing Resend inbound
+            Date: Thu, 22 Feb 2024 23:41:11 +0000
+            Message-ID: <ABCDE12345@mail.example.com>
+            MIME-Version: 1.0
+            Content-Type: multipart/alternative; boundary=boundary
+
+            --boundary
+            Content-Type: text/plain
+
+            Hello, world!
+            --boundary
+            Content-Type: text/html
+
+            <p>Hello, world!</p>
+            --boundary--
+        """
+        ).replace("\n", "\r\n")
 
         raw_mime_url = "https://cdn.example.com/raw/email.eml?token=abc123"
 
