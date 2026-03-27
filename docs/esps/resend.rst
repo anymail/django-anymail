@@ -414,13 +414,13 @@ add the webhook signing secret to your Anymail settings:
     and copy the "signing secret" listed near the top of the page.
 
 *   Add that to your settings.py ``ANYMAIL`` settings as
-    :setting:`RESEND_SIGNING_SECRET <ANYMAIL_RESEND_SIGNING_SECRET>`:
+    :setting:`RESEND_INBOUND_SECRET <ANYMAIL_RESEND_INBOUND_SECRET>`:
 
     .. code-block:: python
 
         ANYMAIL = {
             # ...
-            "RESEND_SIGNING_SECRET": "whsec_..."
+            "RESEND_INBOUND_SECRET": "whsec_..."
         }
 
 .. _Resend Receiving Emails: https://resend.com/docs/dashboard/receiving/introduction

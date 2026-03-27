@@ -214,6 +214,7 @@ class ResendInboundWebhookView(SvixWebhookValidationMixin, AnymailBaseWebhookVie
 
     esp_name = "Resend"
     signal = inbound
+    _secret_setting_name = "inbound_secret"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
