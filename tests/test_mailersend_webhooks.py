@@ -35,7 +35,10 @@ class MailerSendWebhookTestCase(WebhookTestCase):
         data = json.dumps(json_data).replace("/", "\\/").encode("ascii")
         signature = mailersend_signature(data, secret)
         return self.client.post(
-            url, content_type="application/json", data=data, HTTP_SIGNATURE=signature
+            url,
+            content_type="application/json",
+            data=data,
+            headers={"Signature": signature},
         )
 
 

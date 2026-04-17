@@ -46,7 +46,9 @@ class _ClientWithPostalSignature(ClientWithCsrfChecks):
 
     def post(self, *args, **kwargs):
         signature = b64encode(sign(self.private_key, kwargs["data"].encode("utf-8")))
-        kwargs.setdefault("HTTP_X_POSTAL_SIGNATURE", signature)
+        headers = kwargs.get("headers", {})
+        headers.setdefault("X-Postal-Signature", signature)
+        kwargs["headers"] = headers
 
         webhook_key = derive_public_webhook_key(self.private_key)
         with override_settings(ANYMAIL={"POSTAL_WEBHOOK_KEY": webhook_key}):

@@ -18,8 +18,10 @@ class AmazonSESWebhookTestsMixin(SimpleTestCase):
             path,
             content_type="text/plain; charset=UTF-8",  # SNS posts JSON as text/plain
             data=json.dumps(raw_sns_message),
-            HTTP_X_AMZ_SNS_MESSAGE_ID=raw_sns_message["MessageId"],
-            HTTP_X_AMZ_SNS_MESSAGE_TYPE=raw_sns_message["Type"],
+            headers={
+                "x-amz-sns-message-id": raw_sns_message["MessageId"],
+                "x-amz-sns-message-type": raw_sns_message["Type"],
+            },
             # Anymail doesn't use other x-amz-sns-* headers
             **kwargs,
         )

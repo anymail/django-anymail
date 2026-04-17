@@ -1022,7 +1022,7 @@ class RequestUtilsTests(SimpleTestCase):
     @staticmethod
     def basic_auth(username, password):
         """
-        Return HTTP_AUTHORIZATION header value for basic auth with username, password
+        Return HTTP Authorization header value for basic auth with username, password
         """
         credentials = base64.b64encode(f"{username}:{password}".encode()).decode(
             "utf-8"
@@ -1032,30 +1032,35 @@ class RequestUtilsTests(SimpleTestCase):
     def test_get_request_basic_auth(self):
         # without auth:
         request = self.request_factory.post(
-            "/path/to/?query", HTTP_HOST="www.example.com", HTTP_SCHEME="https"
+            "/path/to/?query",
+            headers={"Host": "www.example.com", "Scheme": "https"},
         )
         self.assertIsNone(get_request_basic_auth(request))
 
         # with basic auth:
         request = self.request_factory.post(
             "/path/to/?query",
-            HTTP_HOST="www.example.com",
-            HTTP_AUTHORIZATION=self.basic_auth("user", "pass"),
+            headers={
+                "Host": "www.example.com",
+                "Authorization": self.basic_auth("user", "pass"),
+            },
         )
         self.assertEqual(get_request_basic_auth(request), "user:pass")
 
         # with some other auth
         request = self.request_factory.post(
             "/path/to/?query",
-            HTTP_HOST="www.example.com",
-            HTTP_AUTHORIZATION="Bearer abcde12345",
+            headers={
+                "Host": "www.example.com",
+                "Authorization": "Bearer abcde12345",
+            },
         )
         self.assertIsNone(get_request_basic_auth(request))
 
     def test_get_request_uri(self):
         # without auth:
         request = self.request_factory.post(
-            "/path/to/?query", secure=True, HTTP_HOST="www.example.com"
+            "/path/to/?query", secure=True, headers={"Host": "www.example.com"}
         )
         self.assertEqual(
             get_request_uri(request), "https://www.example.com/path/to/?query"
@@ -1065,8 +1070,10 @@ class RequestUtilsTests(SimpleTestCase):
         request = self.request_factory.post(
             "/path/to/?query",
             secure=True,
-            HTTP_HOST="www.example.com",
-            HTTP_AUTHORIZATION=self.basic_auth("user", "pass"),
+            headers={
+                "Host": "www.example.com",
+                "Authorization": self.basic_auth("user", "pass"),
+            },
         )
         self.assertEqual(
             get_request_uri(request), "https://user:pass@www.example.com/path/to/?query"
@@ -1080,10 +1087,12 @@ class RequestUtilsTests(SimpleTestCase):
         request = self.request_factory.post(
             "/path/to/?query",
             secure=False,
-            HTTP_HOST="web1.internal",
-            HTTP_X_FORWARDED_PROTO="https",
-            HTTP_X_FORWARDED_HOST="secret.example.com:8989",
-            HTTP_AUTHORIZATION=self.basic_auth("user", "pass"),
+            headers={
+                "Host": "web1.internal",
+                "X-Forwarded-Proto": "https",
+                "X-Forwarded-Host": "secret.example.com:8989",
+                "Authorization": self.basic_auth("user", "pass"),
+            },
         )
         self.assertEqual(
             get_request_uri(request),

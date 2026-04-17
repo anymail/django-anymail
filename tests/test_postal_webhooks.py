@@ -32,7 +32,7 @@ class PostalWebhookSecurityTestCase(WebhookTestCase):
             "/anymail/postal/tracking/",
             content_type="application/json",
             data=json.dumps({"some": "data"}),
-            HTTP_X_POSTAL_SIGNATURE=b64encode(b"invalid"),
+            headers={"X-Postal-Signature": b64encode(b"invalid")},
         )
         self.assertEqual(response.status_code, 400)
 
@@ -40,7 +40,7 @@ class PostalWebhookSecurityTestCase(WebhookTestCase):
             "/anymail/postal/tracking/",
             content_type="application/json",
             data=json.dumps({"some": "data"}),
-            HTTP_X_POSTAL_SIGNATURE="garbage",
+            headers={"X-Postal-Signature": "garbage"},
         )
         self.assertEqual(response.status_code, 400)
 
@@ -48,7 +48,7 @@ class PostalWebhookSecurityTestCase(WebhookTestCase):
             "/anymail/postal/tracking/",
             content_type="application/json",
             data=json.dumps({"some": "data"}),
-            HTTP_X_POSTAL_SIGNATURE="",
+            headers={"X-Postal-Signature": ""},
         )
         self.assertEqual(response.status_code, 400)
 

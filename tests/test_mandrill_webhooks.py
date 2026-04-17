@@ -52,7 +52,7 @@ def mandrill_args(
     return {
         "path": test_client_path,
         "data": {"mandrill_events": mandrill_events},
-        "HTTP_X_MANDRILL_SIGNATURE": signature,
+        "headers": {"X-Mandrill-Signature": signature},
     }
 
 

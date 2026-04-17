@@ -56,12 +56,7 @@ class ResendWebhookTestCase(WebhookTestCase):
             url,
             content_type="application/json",
             data=data.encode("utf-8"),
-            # Django 4.2+ test Client allows headers=headers;
-            # before that, must convert to HTTP_ args:
-            **{
-                f"HTTP_{header.upper().replace('-', '_')}": value
-                for header, value in headers.items()
-            },
+            headers=headers,
         )
 
 
