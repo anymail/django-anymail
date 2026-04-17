@@ -51,18 +51,19 @@ class SvixWebhookValidationMixin(AnymailCoreWebhookView):
         return super().as_view(**initkwargs)
 
     def __init__(self, **kwargs):
-        self.signing_secret = get_anymail_setting(
+        secret = get_anymail_setting(
             self._secret_setting_name,
             esp_name=self.esp_name,
             default=None,
             kwargs=kwargs,
         )
-        if self.signing_secret is None:
+        setattr(self, self._secret_setting_name, secret)
+        if secret is None:
             self._svix_webhook = None
             self.warn_if_no_basic_auth = True
         else:
             # This will raise an import error if svix isn't installed
-            self._svix_webhook = SvixWebhook(self.signing_secret)
+            self._svix_webhook = SvixWebhook(secret)
             # Basic auth is not required if validating signature
             self.warn_if_no_basic_auth = False
         super().__init__(**kwargs)
@@ -257,7 +258,10 @@ class ResendInboundWebhookView(SvixWebhookValidationMixin, AnymailBaseWebhookVie
             timestamp = None
 
         email_id = esp_event.get("data", {}).get("email_id")
-        message = self._fetch_inbound_email(email_id)
+        if email_id:
+            message = self._fetch_inbound_email(email_id)
+        else:
+            message = None
 
         return AnymailInboundEvent(
             event_type=EventType.INBOUND,

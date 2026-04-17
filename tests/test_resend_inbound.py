@@ -1,21 +1,28 @@
 from datetime import datetime, timezone
 from textwrap import dedent
+from unittest import skipIf, skipUnless
 from unittest.mock import ANY
 
 import responses
 from django.test import override_settings, tag
 from responses.matchers import header_matcher
 
-from anymail.exceptions import AnymailConfigurationError
+from anymail.exceptions import (
+    AnymailConfigurationError,
+    AnymailImproperlyInstalled,
+    AnymailInsecureWebhookWarning,
+)
 from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent
 from anymail.webhooks.resend import ResendInboundWebhookView
 
-from .test_resend_webhooks import ResendWebhookTestCase
+from .test_resend_webhooks import SVIX_INSTALLED, ResendWebhookTestCase, svix_secret
 from .utils import sample_email_content, sample_image_content
+from .webhook_cases import WebhookBasicAuthTestCase
 
 TEST_EMAIL_ID = "56761188-7520-42d8-8898-ff6fc54ce618"
 TEST_API_URL = f"https://api.resend.com/emails/receiving/{TEST_EMAIL_ID}"
+TEST_INBOUND_SECRET = svix_secret("TEST_INBOUND_SECRET") if SVIX_INSTALLED else None
 
 
 @tag("resend")
@@ -382,3 +389,93 @@ class ResendInboundTestCase(ResendWebhookTestCase):
                 "/anymail/resend/inbound/",
                 {"type": "email.sent", "data": {}},
             )
+
+
+@tag("resend")
+@override_settings(
+    ANYMAIL={},  # clear WEBHOOK_SECRET from base class
+    ANYMAIL_RESEND_API_KEY="test-api-key",
+)
+class ResendInboundSettingsTestCase(ResendWebhookTestCase):
+    @skipIf(SVIX_INSTALLED, "test covers behavior when 'svix' package missing")
+    @override_settings(ANYMAIL_RESEND_INBOUND_SECRET=svix_secret("settings secret"))
+    def test_secret_requires_svix_installed(self):
+        """If webhook secret is specified, error if svix not available to verify"""
+        with self.assertRaisesMessage(AnymailImproperlyInstalled, "svix"):
+            self.client_post_signed(
+                "/anymail/resend/inbound/", {"type": "email.received"}
+            )
+
+    # Test with and without SVIX_INSTALLED
+    def test_basic_auth_required_without_secret(self):
+        with self.assertWarns(AnymailInsecureWebhookWarning):
+            self.client_post_signed(
+                "/anymail/resend/inbound/", {"type": "email.received"}
+            )
+
+    # Test with and without SVIX_INSTALLED
+    @override_settings(ANYMAIL={"WEBHOOK_SECRET": "username:password"})
+    def test_signing_secret_optional_with_basic_auth(self):
+        """Secret verification is optional if using basic auth"""
+        response = self.client_post_signed(
+            "/anymail/resend/inbound/", {"type": "email.received"}
+        )
+        self.assertEqual(response.status_code, 200)
+
+    @skipUnless(SVIX_INSTALLED, "secret verification requires 'svix' package")
+    @override_settings(ANYMAIL_RESEND_INBOUND_SECRET=svix_secret("settings secret"))
+    def test_signing_secret_view_params(self):
+        """Webhook inbound secret can be provided as a view param"""
+        view_secret = svix_secret("view-level secret")
+        view = ResendInboundWebhookView.as_view(inbound_secret=view_secret)
+        view_instance = view.view_class(**view.view_initkwargs)
+        self.assertEqual(view_instance.inbound_secret, view_secret)
+
+
+@tag("resend")
+@override_settings(
+    ANYMAIL_RESEND_API_KEY="test-api-key",
+    ANYMAIL_RESEND_INBOUND_SECRET=TEST_INBOUND_SECRET,
+)
+class ResendInboundSecurityTestCase(ResendWebhookTestCase, WebhookBasicAuthTestCase):
+    should_warn_if_no_auth = TEST_INBOUND_SECRET is None
+
+    def call_webhook(self):
+        return self.client_post_signed(
+            "/anymail/resend/inbound/",
+            {"type": "email.received"},
+            secret=TEST_INBOUND_SECRET,
+        )
+
+    # Additional tests are in WebhookBasicAuthTestCase
+
+    @skipUnless(SVIX_INSTALLED, "signature verification requires 'svix' package")
+    def test_verifies_correct_signature(self):
+        response = self.client_post_signed(
+            "/anymail/resend/inbound/",
+            {"type": "email.received"},
+            secret=TEST_INBOUND_SECRET,
+        )
+        self.assertEqual(response.status_code, 200)
+
+    @skipUnless(SVIX_INSTALLED, "signature verification requires 'svix' package")
+    def test_verifies_missing_signature(self):
+        response = self.client.post(
+            "/anymail/resend/inbound/",
+            content_type="application/json",
+            data={"type": "email.received"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    @skipUnless(SVIX_INSTALLED, "signature verification requires 'svix' package")
+    def test_verifies_bad_signature(self):
+        # This also verifies that the error log references the correct setting to check.
+        with self.assertLogs() as logs:
+            response = self.client_post_signed(
+                "/anymail/resend/inbound/",
+                {"type": "email.received"},
+                secret=svix_secret("wrong signing key"),
+            )
+        # SuspiciousOperation causes 400 response (even in test client):
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("check Anymail RESEND_INBOUND_SECRET", logs.output[0])
