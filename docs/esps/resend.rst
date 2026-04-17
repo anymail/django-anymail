@@ -72,10 +72,12 @@ nor ``ANYMAIL_RESEND_API_KEY`` is set.
 
 .. rubric:: RESEND_SIGNING_SECRET
 
-The Resend webhook signing secret used to verify webhook posts.
+The Resend webhook signing secret used to verify *tracking* webhook posts.
 Recommended if you are using activity tracking, otherwise not necessary.
 (This is separate from Anymail's
-:setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>` setting.)
+:setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>` setting and the
+:setting:`RESEND_INBOUND_SECRET <ANYMAIL_RESEND_INBOUND_SECRET>` used for
+securing *inbound* ``email.received`` webhook posts.)
 
 Find this in your Resend `Webhooks settings`_: after adding
 a webhook, click into its management page and look for "signing secret"
@@ -86,6 +88,30 @@ near the top.
       ANYMAIL = {
           ...
           "RESEND_SIGNING_SECRET": "whsec_...",
+      }
+
+If you provide this setting, the svix package is required.
+See :ref:`resend-installation` above.
+
+
+.. setting:: ANYMAIL_RESEND_INBOUND_SECRET
+
+.. rubric:: RESEND_INBOUND_SECRET
+
+The Resend webhook signing secret used to verify *inbound* ``email.received``
+webhook posts. Recommended if you are using inbound email, otherwise not
+necessary. (This is separate from Anymail's :setting:`WEBHOOK_SECRET
+<ANYMAIL_WEBHOOK_SECRET>` setting.)
+
+Find this in your Resend `Webhooks settings`_: after adding an inbound
+webhook, click into its management page and look for "signing secret"
+near the top.
+
+  .. code-block:: python
+
+      ANYMAIL = {
+          ...
+          "RESEND_INBOUND_SECRET": "whsec_...",
       }
 
 If you provide this setting, the svix package is required.
@@ -384,7 +410,50 @@ you can retrieve them in your tracking signal receiver like this:
 Inbound
 -------
 
-Resend does not currently support inbound email.
+Resend supports inbound email. See the document `Resend Receiving Emails`_
+for more information. You can use a default or custom domain.
+
+To configure Anymail inbound handling for Resend,
+add a new webhook endpoint to your `Resend Webhooks settings`_:
+
+*   For the "Endpoint URL", enter one of these
+    (where *yoursite.example.com* is your Django site).
+
+    If are *not* using Anymail's shared webhook secret:
+
+    :samp:`https://{yoursite.example.com}/anymail/resend/inbound/`
+
+    Or if you *are* using Anymail's :setting:`WEBHOOK_SECRET <ANYMAIL_WEBHOOK_SECRET>`,
+    include the *random:random* shared secret in the URL:
+
+    :samp:`https://{random}:{random}@{yoursite.example.com}/resend/inbound/`
+
+*   For "Events to listen", select ``email.received``.
+
+*   Click the "Add" button.
+
+Then, if you are using Resend's webhook signature validation (with svix),
+add the inbound webhook signing secret to your Anymail settings:
+
+*   Still on the `Resend Webhooks settings`_ page, click into the
+    webhook endpoint URL you added above,
+    and copy the "signing secret" listed near the top of the page.
+
+*   Add that to your settings.py ``ANYMAIL`` settings as
+    :setting:`RESEND_INBOUND_SECRET <ANYMAIL_RESEND_INBOUND_SECRET>`:
+
+    .. code-block:: python
+
+        ANYMAIL = {
+            # ...
+            "RESEND_INBOUND_SECRET": "whsec_..."
+        }
+
+If you are using both inbound ``email.received`` and analytics tracking
+webhooks, note that they use different signing secrets, so have different
+Anymail settings. Don't mix up the two.
+
+.. _Resend Receiving Emails: https://resend.com/docs/dashboard/receiving/introduction
 
 
 .. _resend-troubleshooting:

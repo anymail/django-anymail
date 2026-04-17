@@ -15,7 +15,7 @@ from .webhooks.mailtrap import MailtrapTrackingWebhookView
 from .webhooks.mandrill import MandrillCombinedWebhookView
 from .webhooks.postal import PostalInboundWebhookView, PostalTrackingWebhookView
 from .webhooks.postmark import PostmarkInboundWebhookView, PostmarkTrackingWebhookView
-from .webhooks.resend import ResendTrackingWebhookView
+from .webhooks.resend import ResendInboundWebhookView, ResendTrackingWebhookView
 from .webhooks.sendgrid import SendGridInboundWebhookView, SendGridTrackingWebhookView
 from .webhooks.sendinblue import (
     SendinBlueInboundWebhookView,
@@ -123,6 +123,11 @@ urlpatterns = [
         "postmark/tracking/",
         PostmarkTrackingWebhookView.as_view(),
         name="postmark_tracking_webhook",
+    ),
+    path(
+        "resend/inbound/",
+        ResendInboundWebhookView.as_view(),
+        name="resend_inbound_webhook",
     ),
     path(
         "resend/tracking/",

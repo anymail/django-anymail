@@ -18,4 +18,4 @@ Anymail support status [#support-status]_,Full,Full,Full,Full,Full,Full,Limited,
 :attr:`~AnymailMessage.anymail_status`,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes
 :class:`~anymail.signals.AnymailTrackingEvent` from webhooks,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Not yet,Yes,Yes,Yes
 .. rubric:: :ref:`Inbound handling <inbound>`,,,,,,,,,,,,,,
-:class:`~anymail.signals.AnymailInboundEvent` from webhooks,Yes,Yes,Yes,Yes,Yes,No,Yes,Yes,Yes,No,No,Yes,Yes,No
+:class:`~anymail.signals.AnymailInboundEvent` from webhooks,Yes,Yes,Yes,Yes,Yes,No,Yes,Yes,Yes,Yes,No,Yes,Yes,No

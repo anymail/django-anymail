@@ -1,13 +1,25 @@
 import json
 from datetime import datetime
+from urllib.parse import urljoin
+
+import requests
 
 from ..exceptions import (
+    AnymailConfigurationError,
     AnymailImproperlyInstalled,
     AnymailInvalidAddress,
     AnymailWebhookValidationFailure,
     _LazyError,
 )
-from ..signals import AnymailTrackingEvent, EventType, RejectReason, tracking
+from ..inbound import AnymailInboundMessage
+from ..signals import (
+    AnymailInboundEvent,
+    AnymailTrackingEvent,
+    EventType,
+    RejectReason,
+    inbound,
+    tracking,
+)
 from ..utils import get_anymail_setting, parse_single_address
 from .base import AnymailBaseWebhookView, AnymailCoreWebhookView
 
@@ -39,18 +51,19 @@ class SvixWebhookValidationMixin(AnymailCoreWebhookView):
         return super().as_view(**initkwargs)
 
     def __init__(self, **kwargs):
-        self.signing_secret = get_anymail_setting(
+        secret = get_anymail_setting(
             self._secret_setting_name,
             esp_name=self.esp_name,
             default=None,
             kwargs=kwargs,
         )
-        if self.signing_secret is None:
+        setattr(self, self._secret_setting_name, secret)
+        if secret is None:
             self._svix_webhook = None
             self.warn_if_no_basic_auth = True
         else:
             # This will raise an import error if svix isn't installed
-            self._svix_webhook = SvixWebhook(self.signing_secret)
+            self._svix_webhook = SvixWebhook(secret)
             # Basic auth is not required if validating signature
             self.warn_if_no_basic_auth = False
         super().__init__(**kwargs)
@@ -192,4 +205,137 @@ class ResendTrackingWebhookView(SvixWebhookValidationMixin, AnymailBaseWebhookVi
             click_url=click_url,
             user_agent=user_agent,
             esp_event=esp_event,
+        )
+
+
+class ResendInboundWebhookView(SvixWebhookValidationMixin, AnymailBaseWebhookView):
+    """Handler for Resend.com inbound email webhooks"""
+
+    # https://resend.com/docs/webhooks/emails/received
+
+    esp_name = "Resend"
+    signal = inbound
+    _secret_setting_name = "inbound_secret"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.api_key = get_anymail_setting(
+            "api_key",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            allow_bare=True,
+        )
+        self.api_url = get_anymail_setting(
+            "api_url",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            default="https://api.resend.com/",
+        )
+        if not self.api_url.endswith("/"):
+            self.api_url += "/"
+
+    def parse_events(self, request):
+        esp_event = json.loads(request.body.decode("utf-8"))
+        if esp_event.get("type") != "email.received":
+            raise AnymailConfigurationError(
+                f"You seem to have set Resend's"
+                f" *{esp_event.get('type', 'tracking')}* webhook"
+                f" to Anymail's Resend *inbound* webhook URL."
+            )
+        return [self.esp_to_anymail_event(esp_event, request)]
+
+    def esp_to_anymail_event(self, esp_event, request):
+        try:
+            event_id = request.headers["svix-id"]
+        except KeyError:
+            event_id = None
+
+        try:
+            timestamp = datetime.fromisoformat(
+                esp_event["created_at"].replace("Z", "+00:00")
+            )
+        except (KeyError, ValueError):
+            timestamp = None
+
+        email_id = esp_event.get("data", {}).get("email_id")
+        if email_id:
+            message = self._fetch_inbound_email(email_id)
+        else:
+            message = None
+
+        return AnymailInboundEvent(
+            event_type=EventType.INBOUND,
+            timestamp=timestamp,
+            event_id=event_id,
+            esp_event=esp_event,
+            message=message,
+        )
+
+    def _fetch_inbound_email(self, email_id):
+        """Fetch full email content from Resend API and return AnymailInboundMessage."""
+        url = urljoin(self.api_url, f"emails/receiving/{email_id}")
+        response = requests.get(
+            url, headers={"Authorization": f"Bearer {self.api_key}"}
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        # Prefer raw MIME when available (more complete representation)
+        raw = data.get("raw") or {}
+        raw_url = raw.get("download_url")
+        if raw_url:
+            raw_response = requests.get(raw_url)
+            raw_response.raise_for_status()
+            return AnymailInboundMessage.parse_raw_mime_bytes(raw_response.content)
+
+        # Fall back to constructing from parsed fields
+        headers = []
+        esp_headers = data.get("headers") or {}
+        if isinstance(esp_headers, dict):
+            for name, value in esp_headers.items():
+                if isinstance(value, list):
+                    for v in value:
+                        headers.append((name, v))
+                else:
+                    headers.append((name, value))
+        elif isinstance(esp_headers, list):
+            # Handle list-of-dicts format (e.g., [{"name": ..., "value": ...}])
+            headers = [(h["name"], h["value"]) for h in esp_headers]
+
+        attachments = [
+            self._fetch_attachment(att) for att in data.get("attachments") or []
+        ]
+
+        message = AnymailInboundMessage.construct(
+            from_email=data.get("from"),
+            to=", ".join(data.get("to") or []) or None,
+            cc=", ".join(data.get("cc") or []) or None,
+            bcc=", ".join(data.get("bcc") or []) or None,
+            subject=data.get("subject"),
+            headers=headers,
+            text=data.get("text"),
+            html=data.get("html"),
+            attachments=attachments,
+        )
+
+        if data.get("reply_to") and "Reply-To" not in message:
+            message["Reply-To"] = ", ".join(data["reply_to"])
+        if data.get("message_id") and "Message-ID" not in message:
+            message["Message-ID"] = data["message_id"]
+
+        return message
+
+    def _fetch_attachment(self, attachment):
+        """Download attachment content and return as AnymailInboundMessage attachment."""
+        url = attachment["download_url"]
+        response = requests.get(url)
+        response.raise_for_status()
+        content_type = response.headers.get("Content-Type") or attachment.get(
+            "content_type", "application/octet-stream"
+        )
+        return AnymailInboundMessage.construct_attachment(
+            content_type=content_type,
+            content=response.content,
+            filename=attachment.get("filename"),
+            content_id=attachment.get("content_id"),
         )
