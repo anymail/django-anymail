@@ -36,6 +36,11 @@ Breaking changes
 * Require **Django 5.0 or later** and Python 3.10 or later.
   (Thanks to `@terencehonles`_.)
 
+Features
+~~~~~~~~
+
+* **Resend:** Add support for inbound email. (Thanks to `@btimby`_.)
+
 
 v14.0
 -----
@@ -1953,6 +1958,7 @@ Features
 .. _@Arondit: https://github.com/Arondit
 .. _@b0d0nne11: https://github.com/b0d0nne11
 .. _@blag: https://github.com/blag
+.. _@btimby: https://github.com/btimby
 .. _@cahna: https://github.com/cahna
 .. _@calvin: https://github.com/calvin
 .. _@carrerasrodrigo: https://github.com/carrerasrodrigo
