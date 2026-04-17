@@ -25,6 +25,18 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes on next branch*
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+* Require **Django 5.0 or later** and Python 3.10 or later.
+  (Thanks to `@terencehonles`_.)
+
+
 v14.0
 -----
 
@@ -1993,6 +2005,7 @@ Features
 .. _@swrobel: https://github.com/swrobel
 .. _@tcourtqtm: https://github.com/tcourtqtm
 .. _@technolingo: https://github.com/technolingo
+.. _@terencehonles: https://github.com/terencehonles
 .. _@Thorbenl: https://github.com/Thorbenl
 .. _@tiltec:  https://github.com/tiltec
 .. _@tim-schilling: https://github.com/tim-schilling

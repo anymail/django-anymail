@@ -42,20 +42,16 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: BSD License",
     "Topic :: Communications :: Email",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Intended Audience :: Developers",
     "Framework :: Django",
-    "Framework :: Django :: 4.0",
-    "Framework :: Django :: 4.1",
-    "Framework :: Django :: 4.2",
     "Framework :: Django :: 5.0",
     "Framework :: Django :: 5.1",
     "Framework :: Django :: 5.2",
@@ -63,9 +59,9 @@ classifiers = [
     "Environment :: Web Environment",
 ]
 
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
-    "django>=4.0",
+    "django>=5.0",
     "idna",
     "requests>=2.4.3",
     "urllib3>=1.25.0",  # requests dependency: fixes RFC 7578 header encoding
@@ -83,23 +79,11 @@ mailgun = []
 mailjet = []
 mailtrap = []
 mandrill = []
-postal = [
-    # Postal requires cryptography for verifying webhooks.
-    # Cryptography's wheels are broken on darwin-arm64 before Python 3.9,
-    # and unbuildable on PyPy 3.8 due to PyO3 limitations. Since cpython 3.8
-    # has also passed EOL, just require Python 3.9+ with Postal.
-    "cryptography; python_version >= '3.9'"
-]
+postal = ["cryptography"]
 postmark = []
 resend = ["svix"]
 scaleway = []
-sendgrid = [
-    # SendGrid optionally uses cryptography for verifying webhook signatures.
-    # Cryptography's wheels are broken on darwin-arm64 before Python 3.9,
-    # and unbuildable on PyPy 3.8 due to PyO3 limitations. Since cpython 3.8
-    # has also passed EOL, just require Python 3.9+ with SendGrid.
-    "cryptography; python_version >= '3.9'"
-]
+sendgrid = ["cryptography"]
 sendinblue = []
 sparkpost = []
 unisender-go = []
