@@ -25,10 +25,10 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
-vNext
+v15.0
 -----
 
-*Unreleased changes on next branch*
+*2026-04-18*
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
