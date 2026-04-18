@@ -16,3 +16,4 @@ Pipfile.lock
 
 # Use pyenv-virtualenv to manage a venv for local development
 .python-version
+deps.json
