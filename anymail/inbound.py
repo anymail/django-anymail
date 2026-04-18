@@ -1,3 +1,4 @@
+import re
 import warnings
 from base64 import b64decode
 from email.message import EmailMessage
@@ -393,6 +394,8 @@ class AnymailInboundMessage(EmailMessage):
         )
 
         if filename is not None:
+            # Replace CR/NL sequences with a space. See issue #465.
+            filename = re.sub(r"[\r\n]+", " ", filename)
             part.set_param("name", filename, header="Content-Type")
             part.set_param("filename", filename, header="Content-Disposition")
 

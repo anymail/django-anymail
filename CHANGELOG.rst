@@ -41,6 +41,14 @@ Features
 
 * **Resend:** Add support for inbound email. (Thanks to `@btimby`_.)
 
+Fixes
+~~~~~
+
+* **Inbound:** Convert carriage return and line feed characters in attachment
+  filenames to spaces for ESPs that parse them from invalid headers (e.g.,
+  Postmark). (Thanks to `@BHSPitMonkey`_ for reporting the issue and providing
+  an example.)
+
 
 v14.0
 -----
@@ -1959,6 +1967,7 @@ Features
 .. _@b0d0nne11: https://github.com/b0d0nne11
 .. _@blag: https://github.com/blag
 .. _@btimby: https://github.com/btimby
+.. _@BHSPitMonkey: https://github.com/BHSPitMonkey
 .. _@cahna: https://github.com/cahna
 .. _@calvin: https://github.com/calvin
 .. _@carrerasrodrigo: https://github.com/carrerasrodrigo

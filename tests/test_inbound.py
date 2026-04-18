@@ -203,6 +203,20 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
         self.assertTrue(att.is_inline())
         self.assertEqual(att.get_content_text(), "Unicode ✓")
 
+    def test_construct_attachment_crnl_in_filename(self):
+        # Issue #465: Postmark (at least) decodes newlines out of this header:
+        #   Content-Disposition: inline;
+        #    filename="=?iso-8859-1?Q?Outlook-Icon=0A=0ADesc.png?="
+        # leading to the ValueError "Header values may not contain linefeed or
+        # carriage return characters" when Anymail tries to use that filename
+        # in Python's EmailMessage.
+        att = AnymailInboundMessage.construct_attachment(
+            content_type="text/plain",
+            content="content",
+            filename="Outlook-Icon\n\nDec.png",
+        )
+        self.assertEqual(att.get_filename(), "Outlook-Icon Dec.png")
+
     def test_parse_raw_mime(self):
         # (we're not trying to exhaustively test email.parser MIME handling here;
         # just that AnymailInboundMessage.parse_raw_mime calls it correctly)
