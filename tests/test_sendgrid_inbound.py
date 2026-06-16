@@ -32,8 +32,7 @@ class SendgridInboundTestCase(WebhookTestCase):
 
     def test_inbound_basics(self):
         raw_event = {
-            "headers": dedent(
-                """\
+            "headers": dedent("""\
                 Received: from mail.example.org by mx987654321.sendgrid.net ...
                 Received: by mail.example.org for <test@inbound.example.com> ...
                 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.org; ...
@@ -46,8 +45,7 @@ class SendgridInboundTestCase(WebhookTestCase):
                 To: "Test Inbound" <test@inbound.example.com>, other@example.com
                 Cc: cc@example.com
                 Content-Type: multipart/mixed; boundary="94eb2c115edcf35387055b61f849"
-                """
-            ),
+                """),
             "from": "Displayed From <from+test@example.org>",
             "to": "Test Inbound <test@inbound.example.com>, other@example.com",
             "subject": "Test subject",
@@ -244,8 +242,7 @@ class SendgridInboundTestCase(WebhookTestCase):
     def test_inbound_mime(self):
         # SendGrid has an option to send the full, raw MIME message
         raw_event = {
-            "email": dedent(
-                """\
+            "email": dedent("""\
                 From: A tester <test@example.org>
                 Date: Thu, 12 Oct 2017 18:03:30 -0700
                 Message-ID: <CAEPk3RKEx@mail.example.org>
@@ -267,8 +264,7 @@ class SendgridInboundTestCase(WebhookTestCase):
                 <div dir=3D"ltr">It's a body=E2=80=A6</div>
 
                 --94eb2c05e174adb140055b6339c5--
-                """  # NOQA: E501
-            ),
+                """),  # NOQA: E501
             "from": "A tester <test@example.org>",
             "to": "test@inbound.example.com",
             "subject": "Raw MIME test",
@@ -307,8 +303,7 @@ class SendgridInboundTestCase(WebhookTestCase):
     def test_inbound_charsets(self):
         # Captured (sanitized) from actual SendGrid inbound webhook payload 7/2020,
         # using a test message constructed with a variety of charsets:
-        raw_post = dedent_bytes(
-            b"""\
+        raw_post = dedent_bytes(b"""\
             --xYzZY
             Content-Disposition: form-data; name="headers"
 
@@ -342,8 +337,7 @@ class SendgridInboundTestCase(WebhookTestCase):
 
             {"to":"UTF-8","cc":"UTF-8","html":"iso-8859-1","subject":"cp850","from":"UTF-8","text":"windows-1252"}
             --xYzZY--
-            """
-        ).replace(b"\n", b"\r\n")
+            """).replace(b"\n", b"\r\n")
 
         response = self.client.post(
             "/anymail/sendgrid/inbound/",

@@ -19,8 +19,7 @@ class MandrillInboundTestCase(WebhookTestCase):
             "event": "inbound",
             "ts": 1507856722,
             "msg": {
-                "raw_msg": dedent(
-                    """\
+                "raw_msg": dedent("""\
                     From: A tester <test@example.org>
                     Date: Thu, 12 Oct 2017 18:03:30 -0700
                     Message-ID: <CAEPk3RKEx@mail.example.org>
@@ -42,8 +41,7 @@ class MandrillInboundTestCase(WebhookTestCase):
                     <div dir=3D"ltr">It's a body=E2=80=A6</div>
 
                     --94eb2c05e174adb140055b6339c5--
-                    """  # NOQA: E501
-                ),
+                    """),  # NOQA: E501
                 "email": "delivered-to@example.com",
                 # Mandrill populates "sender" only for outbound message events
                 "sender": None,

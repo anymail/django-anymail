@@ -24,8 +24,7 @@ class SparkpostInboundTestCase(WebhookTestCase):
                 # Anymail just parses the raw rfc822 email.
                 # SparkPost's other content fields are ignored.
                 "email_rfc822_is_base64": False,
-                "email_rfc822": dedent(
-                    """\
+                "email_rfc822": dedent("""\
                     Received: from mail.example.org by c.mta1vsmtp.cc.prd.sparkpost ...
                     Received: by mail.example.org for <test@inbound.example.com> ...
                     DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.org; ...
@@ -52,8 +51,7 @@ class SparkpostInboundTestCase(WebhookTestCase):
                     <div dir=3D"ltr">It's a body=E2=80=A6</div>
 
                     --94eb2c05e174adb140055b6339c5--
-                    """  # NOQA: E501
-                ),
+                    """),  # NOQA: E501
             },
         }
         raw_event = {"msys": {"relay_message": event}}
@@ -118,8 +116,7 @@ class SparkpostInboundTestCase(WebhookTestCase):
     def test_attachments(self):
         image_content = sample_image_content()
         email_content = sample_email_content()
-        raw_mime = dedent(
-            """\
+        raw_mime = dedent("""\
             MIME-Version: 1.0
             From: from@example.org
             Subject: Attachments
@@ -154,8 +151,7 @@ class SparkpostInboundTestCase(WebhookTestCase):
 
             {email_content}
             --boundary0--
-            """  # NOQA: E501
-        ).format(
+            """).format(  # NOQA: E501
             image_content_base64=b64encode(image_content).decode("ascii"),
             email_content=email_content.decode("ascii"),
         )

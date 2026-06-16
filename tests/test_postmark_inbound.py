@@ -200,8 +200,7 @@ class PostmarkInboundTestCase(WebhookTestCase):
         # With "Include raw email content in JSON payload"
         raw_event = {
             # (Postmark's "RawEmail" actually uses \n rather than \r\n)
-            "RawEmail": dedent(
-                """\
+            "RawEmail": dedent("""\
                 Received: from mail.example.org by inbound.postmarkapp.com ...
                 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07)
                 \ton p-pm-smtp-inbound01b-aws-useast2b
@@ -243,8 +242,7 @@ class PostmarkInboundTestCase(WebhookTestCase):
                 --bOuNdArY2--
 
                 --BoUnDaRy1--
-                """
-            ),
+                """),
             "BccFull": [
                 # Postmark provides Bcc if delivered-to address is not in To field
                 # (but not in RawEmail)

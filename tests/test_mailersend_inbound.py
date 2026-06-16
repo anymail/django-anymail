@@ -160,8 +160,7 @@ class MailerSendInboundTestCase(MailerSendWebhookTestCase):
                     "<p>This is a <b>test</b>!</p>"
                     '<img src="cid:ii_letc8ro50" alt="sample_image.png">'
                 ),
-                "raw": dedent(
-                    """\
+                "raw": dedent("""\
                     X-Envelope-From: <envelope-sender@example.org>
                     Received: from example.org (mail.example.org [10.10.10.10])
                      by inbound.mailersend.net with ESMTPS id ...
@@ -223,8 +222,7 @@ class MailerSendInboundTestCase(MailerSendWebhookTestCase):
 
                     Product,Price
                     Widget,33.20
-                    --000000000000e5575c05f609bab6--"""
-                ).replace("\n", "\r\n"),
+                    --000000000000e5575c05f609bab6--""").replace("\n", "\r\n"),
                 "attachments": [
                     {
                         "file_name": "sample_image.png",

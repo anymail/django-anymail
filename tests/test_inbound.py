@@ -71,8 +71,7 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
     def test_construct_headers_from_raw(self):
         # (note header "folding" in second Received header)
         msg = AnymailInboundMessage.construct(
-            raw_headers=dedent(
-                """\
+            raw_headers=dedent("""\
                 Reply-To: reply@example.com
                 Subject: raw subject
                 Content-Type: x-custom/custom
@@ -80,8 +79,7 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
                 Received: from mail.example.com (mail.example.com. [10.10.1.9])
                  by mx.example.com with SMTPS id 93s8iok for <to@example.com>;
                  Sun, 22 Oct 2017 00:23:21 -0700 (PDT)
-                """  # NOQA: E501
-            ),
+                """),  # NOQA: E501
             subject="Explicit subject overrides raw",
         )
         self.assertEqual(msg["Reply-To"], "reply@example.com")
@@ -220,14 +218,12 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
     def test_parse_raw_mime(self):
         # (we're not trying to exhaustively test email.parser MIME handling here;
         # just that AnymailInboundMessage.parse_raw_mime calls it correctly)
-        raw = dedent(
-            """\
+        raw = dedent("""\
             Content-Type: text/plain
             Subject: This is a test message
 
             This is a test body.
-            """
-        )
+            """)
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         self.assertEqual(msg["Subject"], "This is a test message")
         self.assertEqual(msg.get_content_text(), "This is a test body.\n")
@@ -242,12 +238,12 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
             b"Content-Transfer-Encoding: 8bit\r\n"
             b"Subject: Test bytes\r\n"
             b"\r\n"
-            b"\xD8i estas retpo\xFEto.\r\n"
+            b"\xd8i estas retpo\xfeto.\r\n"
         )
         msg = AnymailInboundMessage.parse_raw_mime_bytes(raw)
         self.assertEqual(msg["Subject"], "Test bytes")
         self.assertEqual(msg.get_content_text(), "Ĝi estas retpoŝto.\r\n")
-        self.assertEqual(msg.get_content_bytes(), b"\xD8i estas retpo\xFEto.\r\n")
+        self.assertEqual(msg.get_content_bytes(), b"\xd8i estas retpo\xfeto.\r\n")
         self.assertEqual(msg.defects, [])
 
     def test_parse_raw_mime_8bit_utf8(self):
@@ -375,8 +371,7 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
     def test_body_props_charsets(self):
         text_8859_10 = "Detta är det vanliga innehållet".encode("ISO-8859-10")
         html_8859_8 = "<p>HTML זהו תוכן</p>".encode("ISO-8859-8")
-        raw = dedent(
-            """\
+        raw = dedent("""\
             MIME-Version: 1.0
             Subject: Charset test
             Content-Type: multipart/alternative; boundary="this_is_a_boundary"
@@ -392,8 +387,7 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
 
             {html}
             --this_is_a_boundary--
-            """
-        ).format(
+            """).format(
             text=quopri.encodestring(text_8859_10).decode("ASCII"),
             html=quopri.encodestring(html_8859_8).decode("ASCII"),
         )
@@ -414,15 +408,13 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
         """
         get_content_text has options for handling missing/invalid charset declarations
         """
-        raw = dedent(
-            """\
+        raw = dedent("""\
             Subject: Oops, missing charset declaration
             Content-Type: text/plain
             Content-Transfer-Encoding: quoted-printable
 
             Algunos programas de correo electr=f3nico est=e1n rotos
-            """
-        )
+            """)
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         self.assertEqual(msg.defects, [])
 
@@ -492,8 +484,7 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
         self.assertEqual(AnymailInboundMessage().content_id_map, {})
 
     def test_inlines_prop(self):
-        raw = dedent(
-            """\
+        raw = dedent("""\
             MIME-Version: 1.0
             Subject: Message with inline parts
             Content-Type: multipart/mixed; boundary="boundary-orig"
@@ -519,8 +510,9 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
             {image_content_base64}
 
             --boundary-orig--
-            """
-        ).format(image_content_base64=b64encode(SAMPLE_IMAGE_CONTENT).decode("ascii"))
+            """).format(
+            image_content_base64=b64encode(SAMPLE_IMAGE_CONTENT).decode("ascii")
+        )
 
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         inlines = msg.inlines
@@ -539,8 +531,7 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
         self.assertIn("abc123", msg.content_id_map)
 
     def test_attachment_as_uploaded_file(self):
-        raw = dedent(
-            """\
+        raw = dedent("""\
             MIME-Version: 1.0
             Subject: Attachment test
             Content-Type: multipart/mixed; boundary="this_is_a_boundary"
@@ -567,8 +558,7 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
             4j9/yYxupaQbXPJLNqsGFgeZ6qwpLP1b4AV4AV5AoKfjpR5OwR6VKwULCAC+AQV4W9Ps4uZQAAAA
             AElFTkSuQmCC
             --this_is_a_boundary--
-            """
-        )
+            """)
 
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         attachment = msg.attachments[0]
@@ -581,8 +571,7 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
     def test_attachment_as_uploaded_file_security(self):
         # Raw attachment filenames can be malicious; we want to make sure that
         # our Django file converter sanitizes them (as much as any uploaded filename)
-        raw = dedent(
-            """\
+        raw = dedent("""\
             MIME-Version: 1.0
             Subject: Attachment test
             Content-Type: multipart/mixed; boundary="this_is_a_boundary"
@@ -604,8 +593,7 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
 
             <body>Hey, did I overwrite your site?</body>
             --this_is_a_boundary--
-            """
-        )
+            """)
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         attachments = msg.attachments
 
@@ -622,8 +610,7 @@ class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
 class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
     # message/rfc822 attachments should get parsed recursively
 
-    original_raw_message = dedent(
-        """\
+    original_raw_message = dedent("""\
         MIME-Version: 1.0
         From: sender@example.com
         Subject: Original message
@@ -643,13 +630,13 @@ class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
 
         {image_content_base64}
         --boundary-orig--
-        """
-    ).format(image_content_base64=b64encode(SAMPLE_IMAGE_CONTENT).decode("ascii"))
+        """).format(
+        image_content_base64=b64encode(SAMPLE_IMAGE_CONTENT).decode("ascii")
+    )
 
     def test_parse_rfc822_attachment_from_raw_mime(self):
         # message/rfc822 attachments should be parsed recursively
-        raw = dedent(
-            """\
+        raw = dedent("""\
             MIME-Version: 1.0
             From: mailer-demon@example.org
             Subject: Undeliverable
@@ -668,8 +655,7 @@ class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
 
             {original_raw_message}
             --boundary-bounce--
-            """
-        ).format(original_raw_message=self.original_raw_message)
+            """).format(original_raw_message=self.original_raw_message)
 
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         self.assertIsInstance(msg, AnymailInboundMessage)
@@ -721,8 +707,7 @@ class EmailParserBehaviorTests(SimpleTestCase):
     # in older, broken versions of the EmailParser.)
 
     def test_parse_folded_headers(self):
-        raw = dedent(
-            """\
+        raw = dedent("""\
             Content-Type: text/plain
             Subject: This subject uses
              header folding
@@ -732,8 +717,7 @@ class EmailParserBehaviorTests(SimpleTestCase):
 
             Not-A-Header: This is the body.
              It is not folded.
-            """
-        )
+            """)
         for end in ("\n", "\r", "\r\n"):  # check NL, CR, and CRNL line-endings
             msg = AnymailInboundMessage.parse_raw_mime(raw.replace("\n", end))
             self.assertEqual(msg["Subject"], "This subject uses header folding")
@@ -751,8 +735,7 @@ class EmailParserBehaviorTests(SimpleTestCase):
 
     def test_parse_encoded_headers(self):
         # RFC2047 header encoding
-        raw = dedent(
-            """\
+        raw = dedent("""\
             Content-Type: text/plain
             From: =?US-ASCII?Q?Keith_Moore?= <moore@example.com>
             To: =?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld@example.com>,
@@ -763,8 +746,7 @@ class EmailParserBehaviorTests(SimpleTestCase):
             X-Broken: =?utf-8?q?Not_a_char:_=88.?=
 
             Some examples adapted from http://dogmamix.com/MimeHeadersDecoder/
-            """
-        )
+            """)
         msg = AnymailInboundMessage.parse_raw_mime(raw)
 
         self.assertEqual(msg["From"], "Keith Moore <moore@example.com>")
@@ -798,8 +780,7 @@ class EmailParserBehaviorTests(SimpleTestCase):
         self.assertEqual(msg["X-Broken"], "Not a char: \N{REPLACEMENT CHARACTER}.")
 
     def test_parse_encoded_params(self):
-        raw = dedent(
-            """\
+        raw = dedent("""\
             MIME-Version: 1.0
             Content-Type: multipart/mixed; boundary="this_is_a_boundary"
 
@@ -815,8 +796,7 @@ class EmailParserBehaviorTests(SimpleTestCase):
 
             This is an attachment
             --this_is_a_boundary--
-            """
-        )
+            """)
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         att = msg.attachments[0]
         self.assertTrue(att.is_attachment())

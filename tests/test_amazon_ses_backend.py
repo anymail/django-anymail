@@ -76,7 +76,7 @@ class AmazonSESBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
     def get_session_params(self):
         if self.mock_session.call_args is None:
             raise AssertionError("boto3 Session was not created")
-        (args, kwargs) = self.mock_session.call_args
+        args, kwargs = self.mock_session.call_args
         if args:
             raise AssertionError(
                 "boto3 Session created with unexpected positional args %r" % args
@@ -90,7 +90,7 @@ class AmazonSESBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
         """
         if self.mock_client.call_args is None:
             raise AssertionError("boto3 client was not created")
-        (args, kwargs) = self.mock_client.call_args
+        args, kwargs = self.mock_client.call_args
         if len(args) != 1:
             raise AssertionError(
                 "boto3 client created with unexpected positional args %r" % args
@@ -110,7 +110,7 @@ class AmazonSESBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
         mock_operation = getattr(self.mock_client_instance, operation_name)
         if mock_operation.call_args is None:
             raise AssertionError("API was not called")
-        (args, kwargs) = mock_operation.call_args
+        args, kwargs = mock_operation.call_args
         return kwargs
 
     def get_sent_message(self):

@@ -37,8 +37,7 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         self.mock_s3 = self.mock_client.return_value
         self.mock_s3.download_fileobj.side_effect = mock_download_fileobj
 
-    TEST_MIME_MESSAGE = dedent(
-        """\
+    TEST_MIME_MESSAGE = dedent("""\
         Return-Path: <bounce-handler@mail.example.org>
         Received: from mail.example.org by inbound-smtp.us-east-1.amazonaws.com...
         MIME-Version: 1.0
@@ -63,8 +62,7 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         <div dir=3D"ltr">It's a body=E2=80=A6</div>
 
         --94eb2c05e174adb140055b6339c5--
-        """
-    ).replace("\n", "\r\n")
+        """).replace("\n", "\r\n")
 
     def test_inbound_sns_utf8(self):
         raw_ses_event = {

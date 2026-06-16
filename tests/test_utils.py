@@ -722,16 +722,14 @@ class NormalizedAttachmentTests(SimpleTestCase):
 
     def test_modern_email_message(self):
         # Content can be an email.message.EmailMessage
-        raw_content = dedent(
-            """\
+        raw_content = dedent("""\
             From: sender@example.com
             To: someone@example.net
             Subject: subject
             Content-Type: text/plain; charset="us-ascii"
 
             This is a test message.
-            """
-        ).encode()
+            """).encode()
         forwarded_message = message_from_bytes(raw_content, policy=policy.default)
         self.assertIsInstance(forwarded_message, PyEmailMessage)
 
@@ -746,16 +744,14 @@ class NormalizedAttachmentTests(SimpleTestCase):
 
     def test_legacy_email_message(self):
         # Content can be an email.message.Message
-        raw_content = dedent(
-            """\
+        raw_content = dedent("""\
             From: sender@example.com
             To: someone@example.net
             Subject: subject
             Content-Type: text/plain; charset="us-ascii"
 
             This is a test message.
-            """
-        ).encode()
+            """).encode()
         forwarded_message = message_from_bytes(raw_content, policy=policy.compat32)
         self.assertIsInstance(forwarded_message, PyMessage)
 
@@ -961,9 +957,9 @@ class LazyCoercionTests(SimpleTestCase):
         self.assertEqual(result, "text")
 
     def test_force_bytes(self):
-        result = force_non_lazy(b"bytes \xFE")
+        result = force_non_lazy(b"bytes \xfe")
         self.assertIsInstance(result, bytes)
-        self.assertEqual(result, b"bytes \xFE")
+        self.assertEqual(result, b"bytes \xfe")
 
     def test_force_none(self):
         result = force_non_lazy(None)

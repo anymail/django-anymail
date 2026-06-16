@@ -52,8 +52,7 @@ class ResendInboundTestCase(ResendWebhookTestCase):
         }
 
         # Raw MIME representation of the full email:
-        raw_mime = dedent(
-            """\
+        raw_mime = dedent("""\
             From: Sender Name <from@example.com>
             To: recipient@example.org
             Subject: Testing Resend inbound
@@ -71,8 +70,7 @@ class ResendInboundTestCase(ResendWebhookTestCase):
 
             <p>Hello, world!</p>
             --boundary--
-        """
-        ).replace("\n", "\r\n")
+        """).replace("\n", "\r\n")
 
         raw_mime_url = "https://cdn.example.com/raw/email.eml?token=abc123"
 

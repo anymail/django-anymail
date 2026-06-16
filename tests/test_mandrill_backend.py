@@ -745,22 +745,18 @@ class MandrillBackendRecipientsRefusedTests(MandrillBackendMockAPITestCase):
             "from@example.com",
             ["invalid@localhost", "reject@test.mandrillapp.com"],
         )
-        self.set_mock_response(
-            raw=b"""[
+        self.set_mock_response(raw=b"""[
             {"email": "invalid@localhost", "status": "invalid"},
             {"email": "reject@test.mandrillapp.com", "status": "rejected"}
-        ]"""
-        )
+        ]""")
         with self.assertRaises(AnymailRecipientsRefused):
             msg.send()
 
     def test_fail_silently(self):
-        self.set_mock_response(
-            raw=b"""[
+        self.set_mock_response(raw=b"""[
             {"email": "invalid@localhost", "status": "invalid"},
             {"email": "reject@test.mandrillapp.com", "status": "rejected"}
-        ]"""
-        )
+        ]""")
         sent = mail.send_mail(
             "Subject",
             "Body",
@@ -783,14 +779,12 @@ class MandrillBackendRecipientsRefusedTests(MandrillBackendMockAPITestCase):
                 "also.valid@example.com",
             ],
         )
-        self.set_mock_response(
-            raw=b"""[
+        self.set_mock_response(raw=b"""[
             {"email": "invalid@localhost", "status": "invalid"},
             {"email": "valid@example.com", "status": "sent"},
             {"email": "reject@test.mandrillapp.com", "status": "rejected"},
             {"email": "also.valid@example.com", "status": "queued"}
-        ]"""
-        )
+        ]""")
         sent = msg.send()
         # one message sent, successfully, to 2 of 4 recipients:
         self.assertEqual(sent, 1)
@@ -805,12 +799,10 @@ class MandrillBackendRecipientsRefusedTests(MandrillBackendMockAPITestCase):
     @override_settings(ANYMAIL_IGNORE_RECIPIENT_STATUS=True)
     def test_settings_override(self):
         """No exception with ignore setting"""
-        self.set_mock_response(
-            raw=b"""[
+        self.set_mock_response(raw=b"""[
             {"email": "invalid@localhost", "status": "invalid"},
             {"email": "reject@test.mandrillapp.com", "status": "rejected"}
-        ]"""
-        )
+        ]""")
         sent = mail.send_mail(
             "Subject",
             "Body",

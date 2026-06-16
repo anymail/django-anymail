@@ -29,7 +29,7 @@ def find_test_settings():
 
     for settings_path in Path("tests/test_settings").glob("settings_*.py"):
         try:
-            (major, minor) = re.match(
+            major, minor = re.match(
                 r"settings_(\d+)_(\d+)\.py", settings_path.name
             ).groups()
             settings_version = (int(major), int(minor))

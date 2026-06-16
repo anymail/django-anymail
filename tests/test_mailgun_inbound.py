@@ -281,8 +281,7 @@ class MailgunInboundTestCase(WebhookTestCase):
                 "timestamp": "1461261330",
                 "recipient": "test@inbound.example.com",
                 "sender": "envelope-from@example.org",
-                "body-mime": dedent(
-                    """\
+                "body-mime": dedent("""\
                 From: A tester <test@example.org>
                 Date: Thu, 12 Oct 2017 18:03:30 -0700
                 Message-ID: <CAEPk3RKEx@mail.example.org>
@@ -304,8 +303,7 @@ class MailgunInboundTestCase(WebhookTestCase):
                 <div dir=3D"ltr">It's a body=E2=80=A6</div>
 
                 --94eb2c05e174adb140055b6339c5--
-                """  # NOQA: E501
-                ),
+                """),  # NOQA: E501
             }
         )
 

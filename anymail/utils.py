@@ -479,7 +479,7 @@ class Attachment:
             )
             content_id = attachment["Content-ID"]
         else:
-            (_filename, _content, mimetype) = attachment
+            _filename, _content, mimetype = attachment
             filename = force_non_lazy(_filename)
             content = force_non_lazy(_content)
             charset = None

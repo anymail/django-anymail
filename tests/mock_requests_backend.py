@@ -119,7 +119,7 @@ class RequestsBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
         """
         if self.mock_request.call_args is None:
             raise AssertionError("API was not called")
-        (args, kwargs) = self.mock_request.call_args
+        args, kwargs = self.mock_request.call_args
         try:
             return kwargs[kwarg]
         except KeyError:
@@ -185,7 +185,7 @@ class RequestsBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
 
     def get_api_prepared_request(self):
         """Returns the PreparedRequest that would have been sent"""
-        (args, kwargs) = self.mock_request.call_args
+        args, kwargs = self.mock_request.call_args
         kwargs.pop("timeout", None)  # Session-only param
         request = requests.Request(**kwargs)
         return request.prepare()
