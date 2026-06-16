@@ -1,5 +1,0 @@
-# Requirements for developing (not just using) the package
-
-hatch
-pre-commit
-tox<4

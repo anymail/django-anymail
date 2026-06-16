@@ -92,6 +92,23 @@ unisender-go = []
 # Optional dependencies for IDNA encoding.
 uts46 = ["uts46"]
 
+[dependency-groups]
+dev = [
+    "hatch",
+    "pre-commit",
+    "tox<4",
+]
+docs = [
+    "Pygments~=2.20.0",
+    "readme-renderer~=45.0",
+    "sphinx~=9.1",
+    "sphinx-rtd-theme~=3.1.0",
+    "sphinxcontrib-googleanalytics~=0.4",
+]
+tests = [
+    "responses",
+]
+
 [project.urls]
 Homepage = "https://github.com/anymail/django-anymail"
 Documentation = "https://anymail.dev/en/stable/"

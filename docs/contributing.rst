@@ -76,7 +76,7 @@ To run the tests locally, use :pypi:`tox`:
     .. code-block:: console
 
         ## install tox and other development requirements:
-        $ python -m pip install -r requirements-dev.txt
+        $ python -m pip install --group dev
 
         ## test a representative combination of Python and Django versions:
         $ tox -e lint,django60-py314-all,django50-py310-all,docs
@@ -96,7 +96,7 @@ the tests in your current Python environment:
     .. code-block:: console
 
         ## install the testing requirements:
-        $ python -m pip install -r tests/requirements.txt
+        $ python -m pip install --group tests
 
         ## run the tests:
         $ python runtests.py
@@ -147,7 +147,7 @@ It's easiest to build Anymail's docs using tox:
 
     .. code-block:: console
 
-        $ python -m pip install -r requirements-dev.txt
+        $ python -m pip install --group dev
         $ tox -e docs  # build the docs using Sphinx
 
 You can run Python's simple HTTP server to view them:

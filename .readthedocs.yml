@@ -4,10 +4,14 @@
 version: 2
 
 build:
-  os: ubuntu-22.04
+  os: ubuntu-24.04
   tools:
     # "last stable CPython version":
     python: "3"
+  jobs:
+    install:
+      - pip install --upgrade pip
+      - pip install --group docs .
 
 sphinx:
   configuration: docs/conf.py
@@ -15,9 +19,3 @@ sphinx:
 
 # Additional formats to build:
 formats: all
-
-python:
-  install:
-    - path: .
-      method: pip
-    - requirements: docs/requirements.txt
