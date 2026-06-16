@@ -5,7 +5,8 @@ build-backend = "hatchling.build"
 [project]
 name = "django-anymail"
 dynamic = ["readme", "version"]
-license = {file = "LICENSE"}
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 
 authors = [
     {name = "Mike Edmunds", email = "medmunds@gmail.com"},
