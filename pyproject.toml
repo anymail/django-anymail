@@ -134,7 +134,7 @@ path = "anymail/_version.py"
 
 [tool.black]
 force-exclude = '^/tests/test_settings/settings_.*\.py'
-target-version = ["py38"]
+target-version = ["py310"]
 
 [tool.doc8]
 # for now, Anymail allows longer lines in docs source:
@@ -147,4 +147,4 @@ max-line-length = 120
 combine_as_imports = true
 known_first_party = "anymail"
 profile = "black"
-py_version = "38"
+py_version = "310"
