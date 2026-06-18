@@ -31,7 +31,7 @@ class MailjetTrackingWebhookView(AnymailBaseWebhookView):
             esp_events = [esp_events]  # nope, it's a single, bare event
         return [self.esp_to_anymail_event(esp_event) for esp_event in esp_events]
 
-    # https://dev.mailjet.com/guides/#events
+    # https://dev.mailjet.com/email/guides/webhooks/
     event_types = {
         # Map Mailjet event: Anymail normalized type
         "sent": EventType.DELIVERED,  # accepted by receiving MTA

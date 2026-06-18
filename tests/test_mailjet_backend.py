@@ -411,7 +411,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
 
     def test_metadata(self):
         # Mailjet expects the payload to be a single string
-        # https://dev.mailjet.com/guides/#tagging-email-messages
+        # https://dev.mailjet.com/email/guides/send-api-v31/#tag-email-messages
         self.message.metadata = {"user_id": "12345", "items": 6}
         self.message.send()
         data = self.get_api_call_json()

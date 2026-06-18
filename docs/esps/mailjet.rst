@@ -14,8 +14,8 @@ Anymail integrates with the `Mailjet`_ email service, using their transactional 
 
 
 .. _Mailjet: https://www.mailjet.com/
-.. _Send API v3.1: https://dev.mailjet.com/guides/#send-api-v3-1
-.. _Send API v3: https://dev.mailjet.com/guides/#send-api-v3
+.. _Send API v3.1: https://dev.mailjet.com/email/guides/send-api-v31/
+.. _Send API v3: https://dev.mailjet.com/email/guides/send-api-V3/
 
 
 Settings
@@ -127,7 +127,7 @@ Limitations and quirks
   if you've enabled :setting:`ANYMAIL_IGNORE_UNSUPPORTED_FEATURES`,
   Anymail will use only the first tag.
 
-.. _campaign: https://dev.mailjet.com/guides/#grouping-into-a-campaign
+.. _campaign: https://dev.mailjet.com/email/guides/send-api-v31/#group-into-a-campaign
 
 **No delayed sending**
   Mailjet does not support :attr:`~anymail.message.AnymailMessage.send_at`.
@@ -253,9 +253,9 @@ See Mailjet's `template documentation`_ and `template language`_ docs
 for more information.
 
 .. _transactional templates: https://app.mailjet.com/templates/transactional
-.. _"personalization": https://dev.mailjet.com/guides/#personalisation
+.. _"personalization": https://dev.mailjet.com/email/guides/send-api-v31/#personalization
 .. _template documentation: https://www.mailjet.com/docs/template_builder_transactional
-.. _template language: https://dev.mailjet.com/template-language/
+.. _template language: https://dev.mailjet.com/email/template-language/
 
 
 .. _mailjet-webhooks:
@@ -284,7 +284,7 @@ webhooks with batches of events, Anymail will invoke your signal receiver separa
 for each event in the batch.)
 
 .. _Event tracking (triggers): https://app.mailjet.com/account/triggers
-.. _Mailjet event: https://dev.mailjet.com/guides/#events
+.. _Mailjet event: https://dev.mailjet.com/email/guides/webhooks/
 
 
 .. _mailjet-inbound:
@@ -307,4 +307,4 @@ ahead to the "use your own domain" section of their guide. (Anymail normalizes t
 event for you, so you won't need to worry about Mailjet's event and attachment formats.)
 
 .. _Parse API inbound emails:
-    https://dev.mailjet.com/guides/#parse-api-inbound-emails
+    https://dev.mailjet.com/email/guides/parse-api/
