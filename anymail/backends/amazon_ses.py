@@ -33,7 +33,6 @@ class EmailBackend(AnymailBaseBackend):
 
     def __init__(self, **kwargs):
         """Init options from Django settings"""
-        super().__init__(**kwargs)
         # AMAZON_SES_CLIENT_PARAMS is optional
         # (boto3 can find credentials several other ways)
         self.session_params, self.client_params = _get_anymail_boto3_params(
@@ -53,7 +52,7 @@ class EmailBackend(AnymailBaseBackend):
             allow_bare=False,
             default=None,
         )
-
+        super().__init__(**kwargs)
         self.client = None
 
     def open(self):

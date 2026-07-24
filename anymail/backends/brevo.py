@@ -30,7 +30,6 @@ class EmailBackend(AnymailRequestsBackend):
         )
         if not api_url.endswith("/"):
             api_url += "/"
-        super().__init__(api_url, **kwargs)
 
         # Undocumented setting to control workaround for Brevo display-name bug.
         # If/when Brevo improves their API, you can disable Anymail's workaround
@@ -55,6 +54,8 @@ class EmailBackend(AnymailRequestsBackend):
             kwargs=kwargs,
             default=True,
         )
+
+        super().__init__(api_url, **kwargs)
 
     def build_message_payload(self, message, defaults):
         return BrevoPayload(message, defaults, self)

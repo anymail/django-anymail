@@ -30,6 +30,12 @@ vNext
 
 *Unreleased changes*
 
+Fixes
+~~~~~
+
+* **Amazon SES, Brevo:** Fix ``InvalidMailer`` error about "Unknown options"
+  when used with Django 6.1 ``MAILERS`` setting.
+
 Other
 ~~~~~
 
