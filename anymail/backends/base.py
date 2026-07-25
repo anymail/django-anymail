@@ -1,4 +1,5 @@
 import json
+import warnings
 from datetime import date, datetime, timezone
 
 from django.core.mail.backends.base import BaseEmailBackend
@@ -89,6 +90,11 @@ class AnymailBaseBackend(BaseEmailBackend):
                     raise AnymailConfigurationError(msg) from error
 
         super().__init__(**kwargs)
+        if fail_silently:
+            warnings.warn(
+                "Anymail will drop support for fail_silently after Django 6.2.",
+                DeprecationWarning,
+            )
         self.fail_silently = fail_silently
 
     def open(self):

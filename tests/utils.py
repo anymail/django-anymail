@@ -80,14 +80,21 @@ def get_default_mailer():
 
 
 def ignore_fail_silently_warning():
+    anymail_message = r"Anymail will drop support for fail_silently after Django 6.2."
     if RemovedInDjango70Warning is not None:
+        # Get lowest common superclass of RemovedInDjango70Warning, DeprecationWarning
+        # (which will vary by Django release, and might be Warning).
+        category = next(
+            cls
+            for cls in RemovedInDjango70Warning.__mro__
+            if cls in DeprecationWarning.__mro__
+        )
         return ignore_warnings(
-            category=RemovedInDjango70Warning,
-            message="The 'fail_silently' argument is deprecated.",
+            category=category,
+            message=rf"{anymail_message}|The 'fail_silently' argument is deprecated.",
         )
     else:
-        # Noop decorator
-        return lambda f: f
+        return ignore_warnings(category=DeprecationWarning, message=anymail_message)
 
 
 def ignore_connection_warnings():

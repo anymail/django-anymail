@@ -41,6 +41,18 @@ Other
 
 * Test against prerelease versions of Django 6.1.
 
+Deprecations
+~~~~~~~~~~~~
+
+* Support for ``fail_silently`` in Anymail's email backends is being phased out,
+  matching Django's deprecation of the feature. Anymail will issue a deprecation
+  warning when ``fail_silently`` is used. Support for it will be dropped in a
+  future release when Django 6.2 support is discontinued.
+
+  See `Replacing fail_silently
+  <https://docs.djangoproject.com/en/6.1/howto/mailers-migration/#migrating-to-mailers-fail-silently>`_
+  in Django's documentation for recommendations.
+
 
 v15.0
 -----

@@ -95,7 +95,11 @@ class RequestsBackendBaseTestCase(RequestsBackendMockAPITestCase):
         # If create_session fails and fail_silently is True,
         # make sure _send doesn't raise a misleading error.
         mock_create_session.side_effect = ValueError("couldn't create session")
-        sent = self.message.send(fail_silently=True)
+        with self.assertWarnsMessage(
+            DeprecationWarning,
+            "Anymail will drop support for fail_silently after Django 6.2.",
+        ):
+            sent = self.message.send(fail_silently=True)
         self.assertEqual(sent, 0)
 
 
