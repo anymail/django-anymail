@@ -623,6 +623,39 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
             "e2ecbbfc-fe12-463d-b933-9fe22915106d",
         )
 
+    def test_merge_data_without_template_unsupported(self):
+        # Postmark's batch send API ignores TemplateModel, so merge_data
+        # content can't be applied without an ESP template. (#470)
+        message = AnymailMessage(
+            from_email="from@example.com",
+            to=["alice@example.com", "Bob <bob@example.com>"],
+            subject="Test batch send",
+            body="Hello {{name}}",
+            merge_data={
+                "alice@example.com": {"name": "Alice"},
+                "bob@example.com": {"name": "Bob"},
+            },
+        )
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "merge_data without template_id"
+        ):
+            message.send()
+
+    def test_merge_global_data_without_template_unsupported(self):
+        # Postmark ignores TemplateModel unless a template API is used, so
+        # merge_global_data can't be applied without an ESP template. (#470)
+        message = AnymailMessage(
+            from_email="from@example.com",
+            to=["alice@example.com"],
+            subject="Test",
+            body="Hello {{name}}",
+            merge_global_data={"name": "Alice"},
+        )
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "merge_global_data without template_id"
+        ):
+            message.send()
+
     def test_merge_metadata(self):
         self.set_mock_response(raw=self._mock_batch_response)
         self.message.to = ["alice@example.com", "Bob <bob@example.com>"]

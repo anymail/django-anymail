@@ -222,11 +222,7 @@ class PostmarkPayload(RequestsPayload):
 
     def get_api_endpoint(self):
         batch_send = self.is_batch()
-        if (
-            "TemplateAlias" in self.data
-            or "TemplateId" in self.data
-            or "TemplateModel" in self.data
-        ):
+        if "TemplateAlias" in self.data or "TemplateId" in self.data:
             if batch_send:
                 return "email/batchWithTemplates"
             else:
@@ -234,6 +230,11 @@ class PostmarkPayload(RequestsPayload):
                 # (Typo?)
                 return "email/withTemplate/"
         else:
+            # Postmark ignores TemplateModel unless using a template API.
+            if "TemplateModel" in self.data:
+                self.unsupported_feature("merge_global_data without template_id")
+            if self.merge_data:
+                self.unsupported_feature("merge_data without template_id")
             if batch_send:
                 return "email/batch"
             else:
