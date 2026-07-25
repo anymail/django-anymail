@@ -36,6 +36,12 @@ Fixes
 * **Amazon SES, Brevo:** Fix ``InvalidMailer`` error about "Unknown options"
   when used with Django 6.1 ``MAILERS`` setting.
 
+* **Postmark:** Raise an unsupported feature error when ``merge_data`` or
+  ``merge_global_data`` is used without a ``template_id``. Anymail passes that
+  data to Postmark in its ``TemplateModel`` field, which is silently ignored
+  when sending through a non-template API. (Thanks to `@slinkymanbyday`_ for
+  reporting the issue and `@Sanjays2402`_ for the fix.)
+
 Other
 ~~~~~
 
@@ -2040,6 +2046,7 @@ Features
 .. _@puru02: https://github.com/puru02
 .. _@RignonNoel: https://github.com/RignonNoel
 .. _@rodrigondec: https://github.com/rodrigondec
+.. _@Sanjays2402: https://github.com/Sanjays2402
 .. _@sblondon: https://github.com/sblondon
 .. _@scur-iolus: https://github.com/scur-iolus
 .. _@sdarwin: https://github.com/sdarwin

@@ -208,6 +208,13 @@ duplicated for *every* to-recipient.)
 If you want to use batch sending with a regular message (without a template), set
 merge data to an empty dict: `message.merge_data = {}`.
 
+Postmark only applies merge data through its template APIs, so non-empty
+:attr:`~anymail.message.AnymailMessage.merge_data` or
+:attr:`~anymail.message.AnymailMessage.merge_global_data` requires a
+:attr:`~anymail.message.AnymailMessage.template_id`. Anymail raises an
+:exc:`~anymail.exceptions.AnymailUnsupportedFeature` error otherwise, rather
+than sending a message where the merge data would be silently ignored.
+
 See this `Postmark blog post on templates`_ for more information.
 
 .. _Postmark blog post on templates:
