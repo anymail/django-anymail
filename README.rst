@@ -112,7 +112,7 @@ or SparkPost or any other supported ESP where you see "mailgun":
    Mailgun doesn't have any, but some other ESPs do.)
 
 
-2. Edit your project's ``settings.py``:
+2. Edit your project's ``settings.py``. In Django 6.1 or later:
 
    .. code-block:: python
 
@@ -122,14 +122,30 @@ or SparkPost or any other supported ESP where you see "mailgun":
             # ...
         ]
 
-        ANYMAIL = {
-            # (exact settings here depend on your ESP...)
-            "MAILGUN_API_KEY": "<your Mailgun key>",
-            "MAILGUN_SENDER_DOMAIN": 'mg.example.com',  # your Mailgun domain, if needed
+        MAILERS = {
+            "default": {
+                # Change "mailgun" to "amazon_ses" or "mailtrap" or another ESP
+                "BACKEND": "anymail.backends.mailgun.EmailBackend",
+                "OPTIONS": {
+                    # The exact options here depend on your ESP...
+                    "api_key": "<your Mailgun key>",
+                    "sender_domain": "mg.example.com",  # your Mailgun domain, if needed
+                },
+            },
         }
-        EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"  # or amazon_ses.EmailBackend, or...
         DEFAULT_FROM_EMAIL = "you@example.com"  # if you don't already have this in settings
         SERVER_EMAIL = "your-server@example.com"  # ditto (default from-email for Django errors)
+
+   In Django 6.0 or earlier, replace ``MAILERS`` with ``EMAIL_BACKEND`` and ``ANYMAIL``:
+
+   .. code-block:: python
+
+        # Instead of MAILERS:
+        EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
+        ANYMAIL = {
+            "MAILGUN_API_KEY": "<your Mailgun key>",
+            "MAILGUN_SENDER_DOMAIN": 'mg.example.com',
+        }
 
 
 3. Now the regular `Django email functions <https://docs.djangoproject.com/en/stable/topics/email/>`_
