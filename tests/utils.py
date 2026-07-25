@@ -12,7 +12,93 @@ from pathlib import Path
 from unittest import TestCase
 from unittest.util import safe_repr
 
+import django.core.mail
 import django.test.client
+from django.test import ignore_warnings, override_settings as _override_settings
+from django.utils.module_loading import import_string
+
+from anymail.exceptions import AnymailImproperlyInstalled
+
+try:
+    from django.utils.deprecation import RemovedInDjango70Warning
+except ImportError:
+    RemovedInDjango70Warning = None
+
+
+def override_settings(**kwargs):
+    """
+    Wraps django.test.override_settings to translate MAILERS in older Django.
+
+    If the current Django version doesn't support the MAILERS setting (< 6.1),
+    convert MAILERS["default"] to EMAIL_BACKEND and ANYMAIL settings.
+    """
+    if "MAILERS" in kwargs and not hasattr(django.core.mail, "mailers"):
+        if "EMAIL_BACKEND" in kwargs:
+            raise ValueError("Cannot set both EMAIL_BACKEND and MAILERS")
+        mailers = kwargs.pop("MAILERS")
+        if set(mailers) != {"default"}:
+            raise ValueError("Don't know how to handle non-default MAILERS configs")
+        default = mailers["default"]
+        backend = default["BACKEND"]
+        kwargs["EMAIL_BACKEND"] = backend
+        if "OPTIONS" in default:
+            # Translate options to ANYMAIL = { "<ESP_NAME>_<OPTION_NAME>": value }
+            try:
+                backend_class = import_string(backend)
+            except AnymailImproperlyInstalled:
+                # Can occur during TestRunner init on test classes that will be skipped
+                # by tag filtering (e.g., AmazonSESBackendIntegrationTests in a tox
+                # *-mailgun env, when boto3 isn't installed). Restore original settings.
+                del kwargs["EMAIL_BACKEND"]
+                kwargs["MAILERS"] = mailers
+            else:
+                try:
+                    esp_name = backend_class.esp_name.replace(" ", "_")
+                except AttributeError:
+                    raise ValueError(
+                        f"Cannot determine ESP name for {backend!r}"
+                    ) from None
+                kwargs.setdefault("ANYMAIL", {}).update(
+                    {
+                        f"{esp_name}_{option}".upper(): value
+                        for option, value in default["OPTIONS"].items()
+                    }
+                )
+        else:
+            # Must clear any ANYMAIL from earlier override_settings calls.
+            kwargs.setdefault("ANYMAIL", {})
+    return _override_settings(**kwargs)
+
+
+# This helper can be replaced with `django.core.mail.mailers.default`
+# once the minimum supported version is Django 7.0.
+def get_default_mailer():
+    if hasattr(django.core.mail, "mailers"):
+        return django.core.mail.mailers.default
+    else:
+        return django.core.mail.get_connection()
+
+
+def ignore_fail_silently_warning():
+    if RemovedInDjango70Warning is not None:
+        return ignore_warnings(
+            category=RemovedInDjango70Warning,
+            message="The 'fail_silently' argument is deprecated.",
+        )
+    else:
+        # Noop decorator
+        return lambda f: f
+
+
+def ignore_connection_warnings():
+    if RemovedInDjango70Warning is not None:
+        return ignore_warnings(
+            category=RemovedInDjango70Warning,
+            message=r"(get_connection\(\)|The 'connection' argument) is deprecated.",
+        )
+    else:
+        # Noop decorator
+        return lambda f: f
 
 
 def decode_att(att):

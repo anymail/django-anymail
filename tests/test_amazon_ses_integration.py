@@ -2,12 +2,12 @@ import os
 import unittest
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path
+from .utils import AnymailTestMixin, override_settings, sample_image_path
 
 ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID = os.getenv(
     "ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID"
@@ -30,21 +30,25 @@ ANYMAIL_TEST_AMAZON_SES_DOMAIN = os.getenv("ANYMAIL_TEST_AMAZON_SES_DOMAIN")
     " environment variables to run Amazon SES integration tests",
 )
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.amazon_ses.EmailBackend",
-    ANYMAIL={
-        "AMAZON_SES_CLIENT_PARAMS": {
-            # This setting provides Anymail-specific AWS credentials to boto3.client(),
-            # overriding any credentials in the environment or boto config. It's often
-            # *not* the best approach. See the Anymail and boto3 docs for other options.
-            "aws_access_key_id": ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID,
-            "aws_secret_access_key": ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY,
-            "region_name": ANYMAIL_TEST_AMAZON_SES_REGION_NAME,
-            # Can supply any other boto3.client params,
-            # including botocore.config.Config as dict
-            "config": {"retries": {"max_attempts": 2}},
-        },
-        # actual config set in Anymail test account:
-        "AMAZON_SES_CONFIGURATION_SET_NAME": "TestConfigurationSet",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.amazon_ses.EmailBackend",
+            "OPTIONS": {
+                "client_params": {
+                    # This option provides Anymail-specific AWS credentials to boto3.client(),
+                    # overriding any credentials in the environment or boto config. It's often
+                    # *not* the best approach. See the Anymail and boto3 docs for other options.
+                    "aws_access_key_id": ANYMAIL_TEST_AMAZON_SES_ACCESS_KEY_ID,
+                    "aws_secret_access_key": ANYMAIL_TEST_AMAZON_SES_SECRET_ACCESS_KEY,
+                    "region_name": ANYMAIL_TEST_AMAZON_SES_REGION_NAME,
+                    # Can supply any other boto3.client params,
+                    # including botocore.config.Config as dict
+                    "config": {"retries": {"max_attempts": 2}},
+                },
+                # actual config set in Anymail test account:
+                "configuration_set_name": "TestConfigurationSet",
+            },
+        }
     },
 )
 @tag("amazon_ses", "live")
@@ -197,11 +201,16 @@ class AmazonSESBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         )
 
     @override_settings(
-        ANYMAIL={
-            "AMAZON_SES_CLIENT_PARAMS": {
-                "aws_access_key_id": "test-invalid-access-key-id",
-                "aws_secret_access_key": "test-invalid-secret-access-key",
-                "region_name": ANYMAIL_TEST_AMAZON_SES_REGION_NAME,
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.amazon_ses.EmailBackend",
+                "OPTIONS": {
+                    "client_params": {
+                        "aws_access_key_id": "test-invalid-access-key-id",
+                        "aws_secret_access_key": "test-invalid-secret-access-key",
+                        "region_name": ANYMAIL_TEST_AMAZON_SES_REGION_NAME,
+                    }
+                },
             }
         }
     )

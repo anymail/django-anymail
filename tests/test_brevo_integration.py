@@ -3,12 +3,12 @@ import unittest
 from datetime import datetime, timedelta
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin
+from .utils import AnymailTestMixin, override_settings
 
 ANYMAIL_TEST_BREVO_API_KEY = os.getenv("ANYMAIL_TEST_BREVO_API_KEY")
 ANYMAIL_TEST_BREVO_DOMAIN = os.getenv("ANYMAIL_TEST_BREVO_DOMAIN")
@@ -21,9 +21,14 @@ ANYMAIL_TEST_BREVO_DOMAIN = os.getenv("ANYMAIL_TEST_BREVO_DOMAIN")
     "environment variables to run Brevo integration tests",
 )
 @override_settings(
-    ANYMAIL_BREVO_API_KEY=ANYMAIL_TEST_BREVO_API_KEY,
-    ANYMAIL_BREVO_SEND_DEFAULTS=dict(),
-    EMAIL_BACKEND="anymail.backends.brevo.EmailBackend",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.brevo.EmailBackend",
+            "OPTIONS": {
+                "api_key": ANYMAIL_TEST_BREVO_API_KEY,
+            },
+        },
+    },
 )
 class BrevoBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Brevo v3 API integration tests
@@ -147,7 +152,16 @@ class BrevoBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             recipient_status["test+to2@anymail.dev"].message_id,
         )
 
-    @override_settings(ANYMAIL_BREVO_API_KEY="Hey, that's not an API key!")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.brevo.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "Hey, that's not an API key!",
+                },
+            },
+        },
+    )
     def test_invalid_api_key(self):
         with self.assertRaises(AnymailAPIError) as cm:
             self.message.send()

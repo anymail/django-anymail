@@ -1,12 +1,12 @@
 import os
 import unittest
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin
+from .utils import AnymailTestMixin, override_settings
 
 ANYMAIL_TEST_SCALEWAY_SECRET_KEY = os.getenv("ANYMAIL_TEST_SCALEWAY_SECRET_KEY")
 ANYMAIL_TEST_SCALEWAY_PROJECT_ID = os.getenv("ANYMAIL_TEST_SCALEWAY_PROJECT_ID")
@@ -22,11 +22,15 @@ ANYMAIL_TEST_SCALEWAY_DOMAIN = os.getenv("ANYMAIL_TEST_SCALEWAY_DOMAIN")
     "ANYMAIL_TEST_SCALEWAY_DOMAIN environment variables to run Scaleway integration tests",
 )
 @override_settings(
-    ANYMAIL={
-        "SCALEWAY_SECRET_KEY": ANYMAIL_TEST_SCALEWAY_SECRET_KEY,
-        "SCALEWAY_PROJECT_ID": ANYMAIL_TEST_SCALEWAY_PROJECT_ID,
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.scaleway.EmailBackend",
+            "OPTIONS": {
+                "secret_key": ANYMAIL_TEST_SCALEWAY_SECRET_KEY,
+                "project_id": ANYMAIL_TEST_SCALEWAY_PROJECT_ID,
+            },
+        },
     },
-    EMAIL_BACKEND="anymail.backends.scaleway.EmailBackend",
 )
 class ScalewayIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Scaleway API integration tests
@@ -87,10 +91,15 @@ class ScalewayIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertIn("Invalid email from address", str(err))
 
     @override_settings(
-        ANYMAIL={
-            "SCALEWAY_SECRET_KEY": "Hey, that's not a secret key",
-            "SCALEWAY_PROJECT_ID": "not-a-project-id",
-        }
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.scaleway.EmailBackend",
+                "OPTIONS": {
+                    "secret_key": "Hey, that's not a secret key",
+                    "project_id": "not-a-project-id",
+                },
+            },
+        },
     )
     def test_invalid_secret_key(self):
         with self.assertRaises(AnymailAPIError) as cm:

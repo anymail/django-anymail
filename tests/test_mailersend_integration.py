@@ -3,12 +3,12 @@ import unittest
 from datetime import datetime, timedelta
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path
+from .utils import AnymailTestMixin, override_settings, sample_image_path
 
 ANYMAIL_TEST_MAILERSEND_API_TOKEN = os.getenv("ANYMAIL_TEST_MAILERSEND_API_TOKEN")
 ANYMAIL_TEST_MAILERSEND_DOMAIN = os.getenv("ANYMAIL_TEST_MAILERSEND_DOMAIN")
@@ -21,10 +21,14 @@ ANYMAIL_TEST_MAILERSEND_DOMAIN = os.getenv("ANYMAIL_TEST_MAILERSEND_DOMAIN")
     " environment variables to run MailerSend integration tests",
 )
 @override_settings(
-    ANYMAIL={
-        "MAILERSEND_API_TOKEN": ANYMAIL_TEST_MAILERSEND_API_TOKEN,
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mailersend.EmailBackend",
+            "OPTIONS": {
+                "api_token": ANYMAIL_TEST_MAILERSEND_API_TOKEN,
+            },
+        },
     },
-    EMAIL_BACKEND="anymail.backends.mailersend.EmailBackend",
 )
 class MailerSendBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """MailerSend API integration tests
@@ -180,9 +184,12 @@ class MailerSendBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         )
 
     @override_settings(
-        ANYMAIL={
-            "MAILERSEND_API_TOKEN": "Hey, that's not an API token",
-        }
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailersend.EmailBackend",
+                "OPTIONS": {"api_token": "Hey, that's not an API token"},
+            },
+        },
     )
     def test_invalid_api_key(self):
         with self.assertRaisesMessage(AnymailAPIError, "Unauthenticated"):

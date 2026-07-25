@@ -4,6 +4,14 @@ from traceback import format_exception_only
 from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
 from requests import HTTPError
 
+try:
+    from django.core.mail import InvalidMailer
+except ImportError:
+    # Django < 6.1
+    class InvalidMailer(ImproperlyConfigured):
+        def __init__(self, *args, alias=None):
+            super().__init__(*args)
+
 
 class AnymailError(Exception):
     """Base class for exceptions raised by Anymail
@@ -166,6 +174,10 @@ class AnymailConfigurationError(ImproperlyConfigured):
 
     # This deliberately doesn't inherit from AnymailError,
     # because we don't want it to be swallowed by backend fail_silently
+
+
+class AnymailInvalidMailer(AnymailConfigurationError, InvalidMailer):
+    """Exception for invalid MAILERS configuration"""
 
 
 class AnymailImproperlyInstalled(AnymailConfigurationError, ImportError):

@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from django.core import mail
-from django.test import override_settings, tag
+from django.test import tag
 from django.utils.timezone import (
     get_fixed_timezone,
     override as override_current_timezone,
@@ -19,13 +19,24 @@ from anymail.exceptions import (
 from anymail.message import attach_inline_image
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase
-from .utils import create_text_attachment, decode_att, sample_image_content
+from .utils import (
+    create_text_attachment,
+    decode_att,
+    ignore_connection_warnings,
+    ignore_fail_silently_warning,
+    override_settings,
+    sample_image_content,
+)
 
 
 @tag("mailersend")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.mailersend.EmailBackend",
-    ANYMAIL={"MAILERSEND_API_TOKEN": "test_api_token"},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mailersend.EmailBackend",
+            "OPTIONS": {"api_token": "test_api_token"},
+        },
+    },
 )
 class MailerSendBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     """TestCase that uses MailerSend EmailBackend with a mocked API"""
@@ -82,7 +93,6 @@ class MailerSendBackendStandardEmailTests(MailerSendBackendMockAPITestCase):
             "Here is the message.",
             "from@example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
 
         self.assert_esp_called("/v1/email")
@@ -289,6 +299,7 @@ class MailerSendBackendStandardEmailTests(MailerSendBackendMockAPITestCase):
         with self.assertRaises(AnymailUnsupportedFeature):
             self.message.send()
 
+    @ignore_fail_silently_warning()
     def test_alternatives_fail_silently(self):
         # Make sure fail_silently is respected
         self.message.attach_alternative("{'not': 'allowed'}", "application/json")
@@ -323,6 +334,7 @@ class MailerSendBackendStandardEmailTests(MailerSendBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "Helpful ESP explanation"):
             self.message.send()
 
+    @ignore_fail_silently_warning()
     def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=422)
@@ -420,7 +432,17 @@ class MailerSendBackendAnymailFeatureTests(MailerSendBackendMockAPITestCase):
         # For "tags", MailerSend uses the param value if provided, otherwise
         # the template default if any. (It does not attempt to combine them.)
 
-    @override_settings(ANYMAIL_MAILERSEND_BATCH_SEND_MODE="expose-to-list")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailersend.EmailBackend",
+                "OPTIONS": {
+                    "api_token": "test_api_token",
+                    "batch_send_mode": "expose-to-list",
+                },
+            },
+        },
+    )
     def test_merge_data_expose_to_list(self):
         self.message.to = ["alice@example.com", "Bob <bob@example.com>"]
         self.message.cc = ["cc@example.com"]
@@ -457,7 +479,17 @@ class MailerSendBackendAnymailFeatureTests(MailerSendBackendMockAPITestCase):
             ],
         )
 
-    @override_settings(ANYMAIL_MAILERSEND_BATCH_SEND_MODE="use-bulk-email")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailersend.EmailBackend",
+                "OPTIONS": {
+                    "api_token": "test_api_token",
+                    "batch_send_mode": "use-bulk-email",
+                },
+            },
+        },
+    )
     def test_merge_data_use_bulk_email(self):
         self.set_mock_response(
             json_data={
@@ -700,7 +732,17 @@ class MailerSendBackendAnymailFeatureTests(MailerSendBackendMockAPITestCase):
         self.assertEqual(recipients["to2@example.com"].message_id, "12345abcde")
 
     # noinspection PyUnresolvedReferences
-    @override_settings(ANYMAIL_MAILERSEND_BATCH_SEND_MODE="use-bulk-email")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailersend.EmailBackend",
+                "OPTIONS": {
+                    "api_token": "test_api_token",
+                    "batch_send_mode": "use-bulk-email",
+                },
+            },
+        },
+    )
     def test_bulk_send_response(self):
         self.set_mock_response(
             json_data={
@@ -716,6 +758,7 @@ class MailerSendBackendAnymailFeatureTests(MailerSendBackendMockAPITestCase):
         self.assertEqual(self.message.anymail_status.message_id, "bulk:12345abcde")
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=400)
@@ -776,6 +819,7 @@ class MailerSendBackendRecipientsRefusedTests(MailerSendBackendMockAPITestCase):
         with self.assertRaises(AnymailRecipientsRefused):
             msg.send()
 
+    @ignore_fail_silently_warning()
     def test_fail_silently(self):
         self.set_mock_rejected(
             {
@@ -844,28 +888,34 @@ class MailerSendBackendConfigurationTests(MailerSendBackendMockAPITestCase):
     """Test various MailerSend client options"""
 
     @override_settings(
-        # clear MAILERSEND_API_TOKEN from MailerSendBackendMockAPITestCase:
-        ANYMAIL={}
+        MAILERS={
+            "default": {"BACKEND": "anymail.backends.mailersend.EmailBackend"},
+        },
     )
     def test_missing_api_token(self):
-        with self.assertRaises(AnymailConfigurationError) as cm:
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'api_token'|\bMAILERSEND_API_TOKEN.*ANYMAIL_MAILERSEND_API_TOKEN",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
-        errmsg = str(cm.exception)
-        # Make sure the error mentions the different places to set the key
-        self.assertRegex(errmsg, r"\bMAILERSEND_API_TOKEN\b")
-        self.assertRegex(errmsg, r"\bANYMAIL_MAILERSEND_API_TOKEN\b")
 
     @override_settings(
-        ANYMAIL={
-            "MAILERSEND_API_URL": "https://api.dev.mailersend.com/v2",
-            "MAILERSEND_API_TOKEN": "test_api_key",
-        }
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailersend.EmailBackend",
+                "OPTIONS": {
+                    "api_url": "https://api.dev.mailersend.com/v2",
+                    "api_token": "test_api_key",
+                },
+            }
+        },
     )
     def test_mailersend_api_url(self):
         mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
         self.assert_esp_called("https://api.dev.mailersend.com/v2/email")
 
-        # can also override on individual connection
+    @ignore_connection_warnings()
+    def test_mailersend_api_url_get_connection_override(self):
         connection = mail.get_connection(api_url="https://api.mailersend.com/vNext")
         mail.send_mail(
             "Subject",
@@ -876,7 +926,14 @@ class MailerSendBackendConfigurationTests(MailerSendBackendMockAPITestCase):
         )
         self.assert_esp_called("https://api.mailersend.com/vNext/email")
 
-    @override_settings(ANYMAIL={"MAILERSEND_API_TOKEN": "bad_token"})
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailersend.EmailBackend",
+                "OPTIONS": {"api_token": "bad_token"},
+            },
+        },
+    )
     def test_invalid_api_key(self):
         self.set_mock_response(
             status_code=401,

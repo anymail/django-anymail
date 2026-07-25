@@ -3,12 +3,12 @@ import unittest
 from datetime import datetime, timedelta
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path
+from .utils import AnymailTestMixin, override_settings, sample_image_path
 
 ANYMAIL_TEST_SPARKPOST_API_KEY = os.getenv("ANYMAIL_TEST_SPARKPOST_API_KEY")
 ANYMAIL_TEST_SPARKPOST_DOMAIN = os.getenv("ANYMAIL_TEST_SPARKPOST_DOMAIN")
@@ -21,8 +21,12 @@ ANYMAIL_TEST_SPARKPOST_DOMAIN = os.getenv("ANYMAIL_TEST_SPARKPOST_DOMAIN")
     "environment variables to run SparkPost integration tests",
 )
 @override_settings(
-    ANYMAIL_SPARKPOST_API_KEY=ANYMAIL_TEST_SPARKPOST_API_KEY,
-    EMAIL_BACKEND="anymail.backends.sparkpost.EmailBackend",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.sparkpost.EmailBackend",
+            "OPTIONS": {"api_key": ANYMAIL_TEST_SPARKPOST_API_KEY},
+        },
+    },
 )
 class SparkPostBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """SparkPost API integration tests
@@ -160,7 +164,14 @@ class SparkPostBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             recipient_status["to1@test.sink.sparkpostmail.com"].status, "queued"
         )
 
-    @override_settings(ANYMAIL_SPARKPOST_API_KEY="Hey, that's not an API key!")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.sparkpost.EmailBackend",
+                "OPTIONS": {"api_key": "Hey, that's not an API key!"},
+            },
+        },
+    )
     def test_invalid_api_key(self):
         with self.assertRaises(AnymailAPIError) as cm:
             self.message.send()

@@ -26,7 +26,11 @@ except ImportError:
     # Django >= 7.0
     MIMEMixin = None
 
-from .exceptions import AnymailConfigurationError, AnymailInvalidAddress
+from .exceptions import (
+    AnymailConfigurationError,
+    AnymailInvalidAddress,
+    AnymailInvalidMailer,
+)
 
 BASIC_NUMERIC_TYPES = (int, float)
 
@@ -639,13 +643,18 @@ def get_anymail_setting(
                 except AttributeError:
                     pass
             if default is UNSET:
-                message = (
-                    f"You must set {anymail_setting} or ANYMAIL = {{'{setting}': ...}}"
-                )
+                if "alias" in kwargs:
+                    # When initializing from MAILERS, don't bother listing
+                    # other settings options.
+                    raise AnymailInvalidMailer(
+                        f"OPTIONS must define '{name}'", alias=kwargs["alias"]
+                    ) from None
 
-                if allow_bare:
-                    message += f" or {setting}"
-                message += " in your Django settings"
+                or_bare_setting = f" or {setting}" if allow_bare else ""
+                message = (
+                    f"You must set ANYMAIL = {{'{setting}': ...}} or {anymail_setting}"
+                    f"{or_bare_setting} in your Django settings"
+                )
                 raise AnymailConfigurationError(message) from None
             else:
                 return default

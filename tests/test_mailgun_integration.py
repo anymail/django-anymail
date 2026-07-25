@@ -6,12 +6,12 @@ from email.utils import formataddr
 from time import sleep
 
 import requests
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path
+from .utils import AnymailTestMixin, override_settings, sample_image_path
 
 ANYMAIL_TEST_MAILGUN_API_KEY = os.getenv("ANYMAIL_TEST_MAILGUN_API_KEY")
 ANYMAIL_TEST_MAILGUN_DOMAIN = os.getenv("ANYMAIL_TEST_MAILGUN_DOMAIN")
@@ -24,12 +24,16 @@ ANYMAIL_TEST_MAILGUN_DOMAIN = os.getenv("ANYMAIL_TEST_MAILGUN_DOMAIN")
     " variables to run Mailgun integration tests",
 )
 @override_settings(
-    ANYMAIL={
-        "MAILGUN_API_KEY": ANYMAIL_TEST_MAILGUN_API_KEY,
-        "MAILGUN_SENDER_DOMAIN": ANYMAIL_TEST_MAILGUN_DOMAIN,
-        "MAILGUN_SEND_DEFAULTS": {"esp_extra": {"o:testmode": "yes"}},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mailgun.EmailBackend",
+            "OPTIONS": {
+                "api_key": ANYMAIL_TEST_MAILGUN_API_KEY,
+                "sender_domain": ANYMAIL_TEST_MAILGUN_DOMAIN,
+                "send_defaults": {"esp_extra": {"o:testmode": "yes"}},
+            },
+        },
     },
-    EMAIL_BACKEND="anymail.backends.mailgun.EmailBackend",
 )
 class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Mailgun API integration tests
@@ -267,11 +271,16 @@ class MailgunBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     #     self.assertIn("'from' parameter is not a valid address", str(err))
 
     @override_settings(
-        ANYMAIL={
-            "MAILGUN_API_KEY": "Hey, that's not an API key",
-            "MAILGUN_SENDER_DOMAIN": ANYMAIL_TEST_MAILGUN_DOMAIN,
-            "MAILGUN_SEND_DEFAULTS": {"esp_extra": {"o:testmode": "yes"}},
-        }
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailgun.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "Hey, that's not an API key",
+                    "sender_domain": ANYMAIL_TEST_MAILGUN_DOMAIN,
+                    "send_defaults": {"esp_extra": {"o:testmode": "yes"}},
+                },
+            },
+        },
     )
     def test_invalid_api_key(self):
         with self.assertRaises(AnymailAPIError) as cm:

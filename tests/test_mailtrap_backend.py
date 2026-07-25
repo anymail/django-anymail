@@ -4,12 +4,12 @@ from datetime import datetime
 from decimal import Decimal
 
 from django.core import mail
-from django.core.exceptions import ImproperlyConfigured
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 from django.utils.timezone import timezone
 
 from anymail.exceptions import (
     AnymailAPIError,
+    AnymailConfigurationError,
     AnymailSerializationError,
     AnymailUnsupportedFeature,
 )
@@ -23,14 +23,22 @@ from .utils import (
     AnymailTestMixin,
     create_text_attachment,
     decode_att,
+    ignore_fail_silently_warning,
+    override_settings,
     sample_image_content,
 )
 
 
 @tag("mailtrap")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.mailtrap.EmailBackend",
-    ANYMAIL={"MAILTRAP_API_TOKEN": "test_api_token"},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+            "OPTIONS": {
+                "api_token": "test_api_token",
+            },
+        },
+    },
 )
 class MailtrapBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     DEFAULT_RAW_RESPONSE = b"""{
@@ -68,7 +76,6 @@ class MailtrapBackendStandardEmailTests(MailtrapBackendMockAPITestCase):
             "Here is the message.",
             "from@sender.example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         # Uses transactional API
         self.assert_esp_called("https://send.api.mailtrap.io/api/send")
@@ -296,6 +303,7 @@ class MailtrapBackendStandardEmailTests(MailtrapBackendMockAPITestCase):
         ):
             self.message.send()
 
+    @ignore_fail_silently_warning()
     def test_alternatives_fail_silently(self):
         # Make sure fail_silently is respected
         self.message.attach_alternative("{'not': 'allowed'}", "application/json")
@@ -322,6 +330,7 @@ class MailtrapBackendStandardEmailTests(MailtrapBackendMockAPITestCase):
         # Error message includes response details:
         self.assertIn("helpful error message", str(cm.exception))
 
+    @ignore_fail_silently_warning()
     def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=500)
@@ -801,7 +810,15 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
 
     # noinspection PyUnresolvedReferences
     @override_settings(
-        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+                "OPTIONS": {
+                    "api_token": "test-token",
+                    "sandbox_id": 12345,
+                },
+            },
+        },
     )
     def test_sandbox_send(self):
         self.set_mock_response_message_ids(["sandbox-single-id"])
@@ -824,7 +841,15 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         )
 
     @override_settings(
-        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": ""}
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+                "OPTIONS": {
+                    "api_token": "test-token",
+                    "sandbox_id": "",
+                },
+            },
+        },
     )
     def test_sandbox_id_empty_string(self):
         """Use transactional API when MAILTRAP_SANDBOX_ID is an empty string."""
@@ -832,7 +857,15 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         self.assert_esp_called("https://send.api.mailtrap.io/api/send")
 
     @override_settings(
-        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+                "OPTIONS": {
+                    "api_token": "test-token",
+                    "sandbox_id": 12345,
+                },
+            },
+        },
     )
     def test_sandbox_batch_send(self):
         self.set_mock_response(
@@ -876,7 +909,15 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
         )
 
     @override_settings(
-        ANYMAIL={"MAILTRAP_API_TOKEN": "test-token", "MAILTRAP_SANDBOX_ID": 12345}
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+                "OPTIONS": {
+                    "api_token": "test-token",
+                    "sandbox_id": 12345,
+                },
+            },
+        },
     )
     def test_wrong_message_id_count_sandbox(self):
         self.set_mock_response_message_ids(2)
@@ -885,6 +926,7 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
             self.message.send()
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=500)
@@ -949,10 +991,15 @@ class MailtrapBackendAnymailFeatureTests(MailtrapBackendMockAPITestCase):
             self.message.send()
 
     @override_settings(
-        ANYMAIL={
-            "MAILTRAP_API_TOKEN": "test-token",
-            "MAILTRAP_API_URL": "https://bulk.api.mailtrap.io/api",
-        }
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+                "OPTIONS": {
+                    "api_token": "test-token",
+                    "api_url": "https://bulk.api.mailtrap.io/api",
+                },
+            },
+        },
     )
     def test_override_api_url(self):
         self.message.send()
@@ -969,13 +1016,15 @@ class MailtrapBackendSessionSharingTestCase(
 
 
 @tag("mailtrap")
-@override_settings(EMAIL_BACKEND="anymail.backends.mailtrap.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.mailtrap.EmailBackend"}}
+)
 class MailtrapBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
     """Test ESP backend without required settings in place"""
 
     def test_missing_api_token(self):
-        with self.assertRaises(ImproperlyConfigured) as cm:
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'api_token'|\bMAILTRAP_API_TOKEN.*ANYMAIL_MAILTRAP_API_TOKEN",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
-        errmsg = str(cm.exception)
-        self.assertRegex(errmsg, r"\bMAILTRAP_API_TOKEN\b")
-        self.assertRegex(errmsg, r"\bANYMAIL_MAILTRAP_API_TOKEN\b")

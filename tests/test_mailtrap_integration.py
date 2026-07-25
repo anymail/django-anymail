@@ -2,12 +2,12 @@ import os
 import unittest
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path
+from .utils import AnymailTestMixin, override_settings, sample_image_path
 
 # Environment variables to run these live integration tests...
 # API token for both sets of tests:
@@ -27,10 +27,12 @@ ANYMAIL_TEST_MAILTRAP_TEMPLATE_UUID = os.getenv("ANYMAIL_TEST_MAILTRAP_TEMPLATE_
     " environment variables to run Mailtrap transactional integration tests",
 )
 @override_settings(
-    ANYMAIL={
-        "MAILTRAP_API_TOKEN": ANYMAIL_TEST_MAILTRAP_API_TOKEN,
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+            "OPTIONS": {"api_token": ANYMAIL_TEST_MAILTRAP_API_TOKEN},
+        },
     },
-    EMAIL_BACKEND="anymail.backends.mailtrap.EmailBackend",
 )
 class MailtrapBackendTransactionalIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """
@@ -148,7 +150,14 @@ class MailtrapBackendTransactionalIntegrationTests(AnymailTestMixin, SimpleTestC
         message.send()
         self.assertEqual(message.anymail_status.status, {"queued"})
 
-    @override_settings(ANYMAIL={"MAILTRAP_API_TOKEN": "Hey, that's not an API token!"})
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+                "OPTIONS": {"api_token": "Hey, that's not an API token!"},
+            },
+        },
+    )
     def test_invalid_api_token(self):
         # Invalid API key generates same error as unvalidated from address
         with self.assertRaisesMessage(AnymailAPIError, "Unauthorized"):
@@ -162,11 +171,15 @@ class MailtrapBackendTransactionalIntegrationTests(AnymailTestMixin, SimpleTestC
     " environment variables to run Mailtrap sandbox integration tests",
 )
 @override_settings(
-    ANYMAIL={
-        "MAILTRAP_API_TOKEN": ANYMAIL_TEST_MAILTRAP_API_TOKEN,
-        "MAILTRAP_SANDBOX_ID": ANYMAIL_TEST_MAILTRAP_SANDBOX_ID,
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+            "OPTIONS": {
+                "api_token": ANYMAIL_TEST_MAILTRAP_API_TOKEN,
+                "sandbox_id": ANYMAIL_TEST_MAILTRAP_SANDBOX_ID,
+            },
+        },
     },
-    EMAIL_BACKEND="anymail.backends.mailtrap.EmailBackend",
 )
 class MailtrapBackendSandboxIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """
@@ -277,10 +290,15 @@ class MailtrapBackendSandboxIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(message.anymail_status.status, {"queued"})
 
     @override_settings(
-        ANYMAIL={
-            "MAILTRAP_API_TOKEN": "Hey, that's not an API token!",
-            "MAILTRAP_SANDBOX_ID": ANYMAIL_TEST_MAILTRAP_SANDBOX_ID,
-        }
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailtrap.EmailBackend",
+                "OPTIONS": {
+                    "api_token": "Hey, that's not an API token!",
+                    "sandbox_id": ANYMAIL_TEST_MAILTRAP_SANDBOX_ID,
+                },
+            },
+        },
     )
     def test_invalid_api_token(self):
         with self.assertRaises(AnymailAPIError) as cm:

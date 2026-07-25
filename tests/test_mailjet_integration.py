@@ -2,12 +2,12 @@ import os
 import unittest
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_content
+from .utils import AnymailTestMixin, override_settings, sample_image_content
 
 ANYMAIL_TEST_MAILJET_API_KEY = os.getenv("ANYMAIL_TEST_MAILJET_API_KEY")
 ANYMAIL_TEST_MAILJET_SECRET_KEY = os.getenv("ANYMAIL_TEST_MAILJET_SECRET_KEY")
@@ -25,14 +25,17 @@ ANYMAIL_TEST_MAILJET_TEMPLATE_ID = os.getenv("ANYMAIL_TEST_MAILJET_TEMPLATE_ID")
     " integration tests",
 )
 @override_settings(
-    ANYMAIL={
-        "MAILJET_API_KEY": ANYMAIL_TEST_MAILJET_API_KEY,
-        "MAILJET_SECRET_KEY": ANYMAIL_TEST_MAILJET_SECRET_KEY,
-        "MAILJET_SEND_DEFAULTS": {
-            "esp_extra": {"SandboxMode": True}  # don't actually send mail
-        },
-    },
-    EMAIL_BACKEND="anymail.backends.mailjet.EmailBackend",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mailjet.EmailBackend",
+            "OPTIONS": {
+                "api_key": ANYMAIL_TEST_MAILJET_API_KEY,
+                "secret_key": ANYMAIL_TEST_MAILJET_SECRET_KEY,
+                # don't actually send mail
+                "send_defaults": {"esp_extra": {"SandboxMode": True}},
+            },
+        }
+    }
 )
 class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """
@@ -162,10 +165,15 @@ class MailjetBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         self.assertEqual(recipient_status["test+to1@anymail.dev"].status, "sent")
 
     @override_settings(
-        ANYMAIL={
-            "MAILJET_API_KEY": "Hey, that's not an API key!",
-            "MAILJET_SECRET_KEY": "and this isn't the secret for it",
-        }
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailjet.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "Hey, that's not an API key!",
+                    "secret_key": "and this isn't the secret for it",
+                },
+            },
+        },
     )
     def test_invalid_api_key(self):
         with self.assertRaises(AnymailAPIError) as cm:

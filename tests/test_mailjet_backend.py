@@ -3,10 +3,11 @@ from decimal import Decimal
 
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import (
     AnymailAPIError,
+    AnymailConfigurationError,
     AnymailRequestsAPIError,
     AnymailSerializationError,
     AnymailUnsupportedFeature,
@@ -21,16 +22,22 @@ from .utils import (
     AnymailTestMixin,
     create_text_attachment,
     decode_att,
+    ignore_fail_silently_warning,
+    override_settings,
     sample_image_content,
 )
 
 
 @tag("mailjet")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.mailjet.EmailBackend",
-    ANYMAIL={
-        "MAILJET_API_KEY": "API KEY HERE",
-        "MAILJET_SECRET_KEY": "SECRET KEY HERE",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mailjet.EmailBackend",
+            "OPTIONS": {
+                "api_key": "API KEY HERE",
+                "secret_key": "SECRET KEY HERE",
+            },
+        },
     },
 )
 class MailjetBackendMockAPITestCase(RequestsBackendMockAPITestCase):
@@ -65,7 +72,6 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
             "Here is the message.",
             "from@sender.example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         self.assert_esp_called("/v3.1/send")
 
@@ -320,6 +326,7 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         with self.assertRaises(AnymailUnsupportedFeature):
             self.message.send()
 
+    @ignore_fail_silently_warning()
     def test_alternatives_fail_silently(self):
         # Make sure fail_silently is respected
         self.message.attach_alternative("{'not': 'allowed'}", "application/json")
@@ -349,6 +356,8 @@ class MailjetBackendStandardEmailTests(MailjetBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "Mailjet API response 500"):
             mail.send_mail("Subject", "Body", "from@example.com", ["to@example.com"])
 
+    @ignore_fail_silently_warning()
+    def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=500)
         sent = mail.send_mail(
@@ -706,6 +715,7 @@ class MailjetBackendAnymailFeatureTests(MailjetBackendMockAPITestCase):
         self.assertEqual(msg.anymail_status.esp_response.json(), response_data)
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=500)
@@ -779,19 +789,30 @@ class MailjetBackendSessionSharingTestCase(
 
 
 @tag("mailjet")
-@override_settings(EMAIL_BACKEND="anymail.backends.mailjet.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.mailjet.EmailBackend"}},
+)
 class MailjetBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
     """Test ESP backend without required settings in place"""
 
     def test_missing_api_key(self):
-        with self.assertRaises(ImproperlyConfigured) as cm:
+        with self.assertRaisesRegex(
+            ImproperlyConfigured,
+            r"'api_key'|\bMAILJET_API_KEY.*ANYMAIL_MAILJET_API_KEY",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
-        errmsg = str(cm.exception)
-        self.assertRegex(errmsg, r"\bMAILJET_API_KEY\b")
 
-    @override_settings(ANYMAIL={"MAILJET_API_KEY": "dummy"})
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailjet.EmailBackend",
+                "OPTIONS": {"api_key": "test-api-key"},
+            }
+        },
+    )
     def test_missing_secret_key(self):
-        with self.assertRaises(ImproperlyConfigured) as cm:
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'secret_key'|\bMAILJET_SECRET_KEY.*ANYMAIL_MAILJET_SECRET_KEY",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
-        errmsg = str(cm.exception)
-        self.assertRegex(errmsg, r"\bMAILJET_SECRET_KEY\b")

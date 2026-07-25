@@ -11,6 +11,7 @@ from ..exceptions import (
     AnymailConfigurationError,
     AnymailError,
     AnymailInvalidAddress,
+    AnymailInvalidMailer,
     AnymailRecipientsRefused,
     AnymailSerializationError,
     AnymailUnsupportedFeature,
@@ -42,9 +43,7 @@ class AnymailBaseBackend(BaseEmailBackend):
     Base Anymail email backend
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    def __init__(self, fail_silently=False, **kwargs):
         self.ignore_unsupported_features = get_anymail_setting(
             "ignore_unsupported_features", kwargs=kwargs, default=False
         )
@@ -83,9 +82,14 @@ class AnymailBaseBackend(BaseEmailBackend):
                 )
                 self._idna_encoder = import_string(dotted_path)
             except (ImportError, TypeError) as error:
-                raise AnymailConfigurationError(
-                    f"cannot resolve IDNA_ENCODER={self.idna_encoder!r}"
-                ) from error
+                msg = f"Cannot resolve IDNA_ENCODER={self.idna_encoder!r}"
+                if "alias" in kwargs:
+                    raise AnymailInvalidMailer(msg, alias=kwargs["alias"]) from error
+                else:
+                    raise AnymailConfigurationError(msg) from error
+
+        super().__init__(**kwargs)
+        self.fail_silently = fail_silently
 
     def open(self):
         """

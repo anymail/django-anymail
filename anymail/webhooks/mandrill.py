@@ -54,7 +54,9 @@ class MandrillSignatureMixin(AnymailCoreWebhookView):
         if self.webhook_key is None:
             # issue deferred "missing setting" error
             # (re-call get-setting without a default)
-            get_anymail_setting("webhook_key", esp_name=self.esp_name, allow_bare=True)
+            get_anymail_setting(
+                "webhook_key", esp_name=self.esp_name, allow_bare=True, kwargs={}
+            )
 
         try:
             signature = request.META["HTTP_X_MANDRILL_SIGNATURE"]

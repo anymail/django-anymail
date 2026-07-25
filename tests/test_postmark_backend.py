@@ -2,11 +2,11 @@ import json
 from decimal import Decimal
 
 from django.core import mail
-from django.core.exceptions import ImproperlyConfigured
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import (
     AnymailAPIError,
+    AnymailConfigurationError,
     AnymailInvalidAddress,
     AnymailRecipientsRefused,
     AnymailSerializationError,
@@ -22,14 +22,20 @@ from .utils import (
     AnymailTestMixin,
     create_text_attachment,
     decode_att,
+    ignore_fail_silently_warning,
+    override_settings,
     sample_image_content,
 )
 
 
 @tag("postmark")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.postmark.EmailBackend",
-    ANYMAIL={"POSTMARK_SERVER_TOKEN": "test_server_token"},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.postmark.EmailBackend",
+            "OPTIONS": {"server_token": "test_server_token"},
+        },
+    },
 )
 class PostmarkBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     DEFAULT_RAW_RESPONSE = b"""{
@@ -59,7 +65,6 @@ class PostmarkBackendStandardEmailTests(PostmarkBackendMockAPITestCase):
             "Here is the message.",
             "from@sender.example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         self.assert_esp_called("/email")
         headers = self.get_api_call_headers()
@@ -274,6 +279,7 @@ class PostmarkBackendStandardEmailTests(PostmarkBackendMockAPITestCase):
         with self.assertRaises(AnymailUnsupportedFeature):
             self.message.send()
 
+    @ignore_fail_silently_warning()
     def test_alternatives_fail_silently(self):
         # Make sure fail_silently is respected
         self.message.attach_alternative("{'not': 'allowed'}", "application/json")
@@ -318,6 +324,8 @@ class PostmarkBackendStandardEmailTests(PostmarkBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "Postmark API response 500"):
             mail.send_mail("Subject", "Body", "from@example.com", ["to@example.com"])
 
+    @ignore_fail_silently_warning()
+    def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=500)
         sent = mail.send_mail(
@@ -802,6 +810,7 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
         self.assertEqual(msg.anymail_status.esp_response.content, response_content)
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=500)
@@ -951,6 +960,7 @@ class PostmarkBackendRecipientsRefusedTests(PostmarkBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "Invalid metadata content"):
             msg.send()
 
+    @ignore_fail_silently_warning()
     def test_fail_silently(self):
         self.set_mock_response(
             status_code=422,
@@ -1053,13 +1063,15 @@ class PostmarkBackendSessionSharingTestCase(
 
 
 @tag("postmark")
-@override_settings(EMAIL_BACKEND="anymail.backends.postmark.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.postmark.EmailBackend"}},
+)
 class PostmarkBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
     """Test ESP backend without required settings in place"""
 
     def test_missing_api_key(self):
-        with self.assertRaises(ImproperlyConfigured) as cm:
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'server_token'|\bPOSTMARK_SERVER_TOKEN.*ANYMAIL_POSTMARK_SERVER_TOKEN",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
-        errmsg = str(cm.exception)
-        self.assertRegex(errmsg, r"\bPOSTMARK_SERVER_TOKEN\b")
-        self.assertRegex(errmsg, r"\bANYMAIL_POSTMARK_SERVER_TOKEN\b")

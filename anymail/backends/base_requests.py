@@ -17,8 +17,9 @@ class AnymailRequestsBackend(AnymailBaseBackend):
     def __init__(self, api_url, **kwargs):
         """Init options from Django settings"""
         self.api_url = api_url
-        self.timeout = get_anymail_setting(
-            "requests_timeout", kwargs=kwargs, default=30
+        self.timeout = kwargs.pop(
+            "timeout",
+            get_anymail_setting("requests_timeout", kwargs=kwargs, default=30),
         )
         super().__init__(**kwargs)
         self.session = None

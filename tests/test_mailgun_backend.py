@@ -4,15 +4,16 @@ from email.mime.image import MIMEImage
 
 import django
 from django.core import mail
-from django.core.exceptions import ImproperlyConfigured
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 from django.utils.timezone import (
     get_fixed_timezone,
     override as override_current_timezone,
 )
+from requests.exceptions import SSLError
 
 from anymail.exceptions import (
     AnymailAPIError,
+    AnymailConfigurationError,
     AnymailError,
     AnymailInvalidAddress,
     AnymailRequestsAPIError,
@@ -24,13 +25,23 @@ from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
-from .utils import AnymailTestMixin, create_text_attachment, sample_image_content
+from .utils import (
+    AnymailTestMixin,
+    create_text_attachment,
+    ignore_fail_silently_warning,
+    override_settings,
+    sample_image_content,
+)
 
 
 @tag("mailgun")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.mailgun.EmailBackend",
-    ANYMAIL={"MAILGUN_API_KEY": "test_api_key"},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mailgun.EmailBackend",
+            "OPTIONS": {"api_key": "test_api_key"},
+        },
+    },
 )
 class MailgunBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     DEFAULT_RAW_RESPONSE = b"""{
@@ -57,7 +68,6 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
             "Here is the message.",
             "from@example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         self.assert_esp_called("/example.com/messages")
         auth = self.get_api_call_auth()
@@ -286,6 +296,7 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
         self.assertEqual(data["html"], "<p>HTML</p>")
         self.assertEqual(data["amp-html"], "<p>And AMP HTML</p>")
 
+    @ignore_fail_silently_warning()
     def test_alternatives_fail_silently(self):
         # Make sure fail_silently is respected
         self.message.attach_alternative("{'not': 'allowed'}", "application/json")
@@ -328,6 +339,8 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "Mailgun API response 400"):
             mail.send_mail("Subject", "Body", "from@example.com", ["to@example.com"])
 
+    @ignore_fail_silently_warning()
+    def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=400)
         sent = mail.send_mail(
@@ -362,7 +375,6 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
     def test_requests_exception(self):
         """Exception during API call should be AnymailAPIError"""
         # (The post itself raises an error--different from returning a failure response)
-        from requests.exceptions import SSLError  # a low-level requests exception
 
         self.mock_request.side_effect = SSLError("Something bad")
         with self.assertRaisesMessage(AnymailRequestsAPIError, "Something bad") as cm:
@@ -370,6 +382,8 @@ class MailgunBackendStandardEmailTests(MailgunBackendMockAPITestCase):
         # also retains specific requests exception class:
         self.assertIsInstance(cm.exception, SSLError)
 
+    @ignore_fail_silently_warning()
+    def test_requests_exception_fail_silently(self):
         # Make sure fail_silently is respected
         self.mock_request.side_effect = SSLError("Something bad")
         sent = mail.send_mail(
@@ -766,7 +780,17 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
         self.message.send()
         self.assert_esp_called("/esp-extra.example.com/messages")
 
-    @override_settings(ANYMAIL_MAILGUN_SENDER_DOMAIN="mg.example.com")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailgun.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "test_api_key",
+                    "sender_domain": "mg.example.com",
+                },
+            },
+        },
+    )
     def test_sender_domain_setting(self):
         # setting overrides from_email
         self.message.send()
@@ -782,7 +806,17 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
         ):
             self.message.send()
 
-    @override_settings(ANYMAIL_MAILGUN_SENDER_DOMAIN="example.com%2Finvalid")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailgun.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "test_api_key",
+                    "sender_domain": "example.com%2Finvalid",
+                },
+            },
+        },
+    )
     def test_invalid_sender_domain_setting(self):
         # See previous test. Also, note that Mailgun unquotes % encoding *before*
         # extracting the sender domain (so %2f is just as bad as '/')
@@ -791,7 +825,17 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
         ):
             self.message.send()
 
-    @override_settings(ANYMAIL_MAILGUN_SENDER_DOMAIN="example.com # oops")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailgun.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "test_api_key",
+                    "sender_domain": "example.com # oops",
+                },
+            },
+        },
+    )
     def test_encode_sender_domain(self):
         # See previous tests. For anything other than slashes, we let Mailgun detect
         # the problem (but must properly encode the domain in the API URL)
@@ -815,8 +859,16 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
             self.message.send()
 
     @override_settings(
-        # This is *not* a valid MAILGUN_API_URL setting (it should end at "...v3/"):
-        ANYMAIL_MAILGUN_API_URL="https://api.mailgun.net/v3/example.com/messages"
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mailgun.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "test_api_key",
+                    # This is *not* a valid api_url (it should end at "...v3/"):
+                    "api_url": "https://api.mailgun.net/v3/example.com/messages",
+                },
+            },
+        },
     )
     def test_magnificent_api(self):
         # (Wouldn't a truly "magnificent API" just provide a helpful error message?)
@@ -874,6 +926,7 @@ class MailgunBackendAnymailFeatureTests(MailgunBackendMockAPITestCase):
         self.assertEqual(msg.anymail_status.esp_response.content, response_content)
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=500)
@@ -932,6 +985,7 @@ class MailgunBackendRecipientsRefusedTests(MailgunBackendMockAPITestCase):
         with self.assertRaises(AnymailAPIError):
             msg.send()
 
+    @ignore_fail_silently_warning()
     def test_fail_silently(self):
         self.set_mock_response(status_code=400, raw=self.INVALID_TO_RESPONSE)
         sent = mail.send_mail(
@@ -954,14 +1008,15 @@ class MailgunBackendSessionSharingTestCase(
 
 
 @tag("mailgun")
-@override_settings(EMAIL_BACKEND="anymail.backends.mailgun.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.mailgun.EmailBackend"}}
+)
 class MailgunBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
     """Test ESP backend without required settings in place"""
 
     def test_missing_api_key(self):
-        with self.assertRaises(ImproperlyConfigured) as cm:
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'api_key'|\bMAILGUN_API_KEY.*ANYMAIL_MAILGUN_API_KEY",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
-        errmsg = str(cm.exception)
-        # Make sure the error mentions MAILGUN_API_KEY and ANYMAIL_MAILGUN_API_KEY
-        self.assertRegex(errmsg, r"\bMAILGUN_API_KEY\b")
-        self.assertRegex(errmsg, r"\bANYMAIL_MAILGUN_API_KEY\b")

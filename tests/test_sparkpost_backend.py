@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from django.core import mail
-from django.test import override_settings, tag
+from django.test import tag
 from django.utils.timezone import (
     get_fixed_timezone,
     override as override_current_timezone,
@@ -19,13 +19,24 @@ from anymail.exceptions import (
 from anymail.message import AnymailMessage, attach_inline_image
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase
-from .utils import create_text_attachment, decode_att, sample_image_content
+from .utils import (
+    create_text_attachment,
+    decode_att,
+    ignore_connection_warnings,
+    ignore_fail_silently_warning,
+    override_settings,
+    sample_image_content,
+)
 
 
 @tag("sparkpost")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.sparkpost.EmailBackend",
-    ANYMAIL={"SPARKPOST_API_KEY": "test_api_key"},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.sparkpost.EmailBackend",
+            "OPTIONS": {"api_key": "test_api_key"},
+        },
+    },
 )
 class SparkPostBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     """TestCase that uses SparkPostEmailBackend with a mocked transmissions.send API"""
@@ -71,7 +82,6 @@ class SparkPostBackendStandardEmailTests(SparkPostBackendMockAPITestCase):
             "Here is the message.",
             "from@example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
 
         self.assert_esp_called("/api/v1/transmissions/")
@@ -332,6 +342,7 @@ class SparkPostBackendStandardEmailTests(SparkPostBackendMockAPITestCase):
         with self.assertRaises(AnymailUnsupportedFeature):
             self.message.send()
 
+    @ignore_fail_silently_warning()
     def test_alternatives_fail_silently(self):
         # Make sure fail_silently is respected
         self.message.attach_alternative("{'not': 'allowed'}", "application/json")
@@ -370,6 +381,7 @@ class SparkPostBackendStandardEmailTests(SparkPostBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "SparkPost API response 400"):
             self.message.send()
 
+    @ignore_fail_silently_warning()
     def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=400)
@@ -782,6 +794,7 @@ class SparkPostBackendAnymailFeatureTests(SparkPostBackendMockAPITestCase):
         )
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=400)
@@ -840,6 +853,7 @@ class SparkPostBackendRecipientsRefusedTests(SparkPostBackendMockAPITestCase):
         with self.assertRaises(AnymailRecipientsRefused):
             msg.send()
 
+    @ignore_fail_silently_warning()
     def test_fail_silently(self):
         self.set_mock_result(accepted=0, rejected=2)
         sent = mail.send_mail(
@@ -893,27 +907,34 @@ class SparkPostBackendConfigurationTests(SparkPostBackendMockAPITestCase):
     """Test various SparkPost client options"""
 
     @override_settings(
-        # clear SPARKPOST_API_KEY from SparkPostBackendMockAPITestCase:
-        ANYMAIL={}
+        MAILERS={
+            "default": {"BACKEND": "anymail.backends.sparkpost.EmailBackend"},
+        },
     )
     def test_missing_api_key(self):
-        with self.assertRaises(AnymailConfigurationError) as cm:
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'api_key'|\bSPARKPOST_API_KEY.*ANYMAIL_SPARKPOST_API_KEY",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
-        errmsg = str(cm.exception)
-        # Make sure the error mentions the different places to set the key
-        self.assertRegex(errmsg, r"\bSPARKPOST_API_KEY\b")
-        self.assertRegex(errmsg, r"\bANYMAIL_SPARKPOST_API_KEY\b")
 
     @override_settings(
-        ANYMAIL={
-            "SPARKPOST_API_URL": "https://api.eu.sparkpost.com/api/v1",
-            "SPARKPOST_API_KEY": "test_api_key",
-        }
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.sparkpost.EmailBackend",
+                "OPTIONS": {
+                    "api_url": "https://api.eu.sparkpost.com/api/v1",
+                    "api_key": "test_api_key",
+                },
+            },
+        },
     )
     def test_sparkpost_api_url(self):
         mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
         self.assert_esp_called("https://api.eu.sparkpost.com/api/v1/transmissions/")
 
+    @ignore_connection_warnings()
+    def test_sparkpost_api_url_get_connection_override(self):
         # can also override on individual connection
         # (and even use non-versioned labs endpoint)
         connection = mail.get_connection(api_url="https://api.sparkpost.com/api/labs")
@@ -926,6 +947,7 @@ class SparkPostBackendConfigurationTests(SparkPostBackendMockAPITestCase):
         )
         self.assert_esp_called("https://api.sparkpost.com/api/labs/transmissions/")
 
+    @ignore_connection_warnings()
     def test_subaccount(self):
         # A likely use case is supplying subaccount for a particular message.
         # (For all messages, just set SPARKPOST_SUBACCOUNT in ANYMAIL settings.)

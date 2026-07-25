@@ -3,12 +3,12 @@ import unittest
 from datetime import datetime, timedelta
 from email.headerregistry import Address
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin
+from .utils import AnymailTestMixin, override_settings
 
 ANYMAIL_TEST_UNISENDER_GO_API_KEY = os.getenv("ANYMAIL_TEST_UNISENDER_GO_API_KEY")
 ANYMAIL_TEST_UNISENDER_GO_API_URL = os.getenv("ANYMAIL_TEST_UNISENDER_GO_API_URL")
@@ -28,9 +28,15 @@ ANYMAIL_TEST_UNISENDER_GO_TEMPLATE_ID = os.getenv(
     " integration tests",
 )
 @override_settings(
-    ANYMAIL_UNISENDER_GO_API_KEY=ANYMAIL_TEST_UNISENDER_GO_API_KEY,
-    ANYMAIL_UNISENDER_GO_API_URL=ANYMAIL_TEST_UNISENDER_GO_API_URL,
-    EMAIL_BACKEND="anymail.backends.unisender_go.EmailBackend",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.unisender_go.EmailBackend",
+            "OPTIONS": {
+                "api_key": ANYMAIL_TEST_UNISENDER_GO_API_KEY,
+                "api_url": ANYMAIL_TEST_UNISENDER_GO_API_URL,
+            },
+        },
+    },
 )
 class UnisenderGoBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """
@@ -177,7 +183,17 @@ class UnisenderGoBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             recipient_status["test+to2@anymail.dev"].message_id,
         )
 
-    @override_settings(ANYMAIL_UNISENDER_GO_API_KEY="Hey, that's not an API key!")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.unisender_go.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "Hey, that's not an API key!",
+                    "api_url": ANYMAIL_TEST_UNISENDER_GO_API_URL,
+                },
+            },
+        },
+    )
     def test_invalid_api_key(self):
         # Make sure the exception message includes Unisender Go's response:
         with self.assertRaisesMessage(AnymailAPIError, "Can not decode key"):

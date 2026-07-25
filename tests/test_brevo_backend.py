@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from django.core import mail
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 from django.utils.timezone import (
     get_fixed_timezone,
     override as override_current_timezone,
@@ -25,14 +25,20 @@ from .utils import (
     AnymailTestMixin,
     create_text_attachment,
     decode_att,
+    ignore_fail_silently_warning,
+    override_settings,
     sample_image_content,
 )
 
 
 @tag("brevo")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.brevo.EmailBackend",
-    ANYMAIL={"BREVO_API_KEY": "test_api_key"},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.brevo.EmailBackend",
+            "OPTIONS": {"api_key": "test_api_key"},
+        }
+    }
 )
 class BrevoBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     DEFAULT_RAW_RESPONSE = (
@@ -59,7 +65,6 @@ class BrevoBackendStandardEmailTests(BrevoBackendMockAPITestCase):
             "Here is the message.",
             "from@sender.example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         self.assert_esp_called("https://api.brevo.com/v3/smtp/email")
         http_headers = self.get_api_call_headers()
@@ -360,6 +365,8 @@ class BrevoBackendStandardEmailTests(BrevoBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "Brevo API response 400"):
             mail.send_mail("Subject", "Body", "from@example.com", ["to@example.com"])
 
+    @ignore_fail_silently_warning()
+    def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=400)
         sent = mail.send_mail(
@@ -721,6 +728,7 @@ class BrevoBackendAnymailFeatureTests(BrevoBackendMockAPITestCase):
         )
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=500)
@@ -765,10 +773,15 @@ class BrevoBackendSessionSharingTestCase(
 
 
 @tag("brevo")
-@override_settings(EMAIL_BACKEND="anymail.backends.brevo.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.brevo.EmailBackend"}}
+)
 class BrevoBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
     """Test ESP backend without required settings in place"""
 
     def test_missing_auth(self):
-        with self.assertRaisesRegex(AnymailConfigurationError, r"\bBREVO_API_KEY\b"):
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'api_key'|\bBREVO_API_KEY.*ANYMAIL_BREVO_API_KEY",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])

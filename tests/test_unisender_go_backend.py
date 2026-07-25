@@ -4,7 +4,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.core import mail
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 from django.utils.timezone import (
     get_fixed_timezone,
     override as override_current_timezone,
@@ -27,16 +27,22 @@ from .utils import (
     AnymailTestMixin,
     create_text_attachment,
     decode_att,
+    ignore_fail_silently_warning,
+    override_settings,
     sample_image_content,
 )
 
 
 @tag("unisender_go")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.unisender_go.EmailBackend",
-    ANYMAIL={
-        "UNISENDER_GO_API_KEY": "test_api_key",
-        "UNISENDER_GO_API_URL": "https://go1.unisender.ru/ru/transactional/api/v1",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.unisender_go.EmailBackend",
+            "OPTIONS": {
+                "api_key": "test_api_key",
+                "api_url": "https://go1.unisender.ru/ru/transactional/api/v1",
+            },
+        },
     },
 )
 class UnisenderGoBackendMockAPITestCase(RequestsBackendMockAPITestCase):
@@ -104,7 +110,6 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
             "Here is the message.",
             "from@sender.example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         self.assert_esp_called(
             "https://go1.unisender.ru/ru/transactional/api/v1/email/send.json"
@@ -371,6 +376,8 @@ class UnisenderGoBackendStandardEmailTests(UnisenderGoBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "Unisender Go API response 400"):
             mail.send_mail("Subject", "Body", "from@example.com", ["to@example.com"])
 
+    @ignore_fail_silently_warning()
+    def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=400)
         sent = mail.send_mail(
@@ -774,7 +781,18 @@ class UnisenderGoBackendAnymailFeatureTests(UnisenderGoBackendMockAPITestCase):
         self.assertEqual(recipient_status["spam-report@example.com"].status, "rejected")
         self.assertIsNone(recipient_status["spam-report@example.com"].message_id)
 
-    @override_settings(ANYMAIL_UNISENDER_GO_GENERATE_MESSAGE_ID=False)
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.unisender_go.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "test_api_key",
+                    "api_url": "https://go1.unisender.ru/ru/transactional/api/v1",
+                    "generate_message_id": False,
+                },
+            },
+        },
+    )
     def test_disable_generate_message_id(self):
         """
         When not generating per-recipient message_id,
@@ -796,6 +814,7 @@ class UnisenderGoBackendAnymailFeatureTests(UnisenderGoBackendMockAPITestCase):
         )
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=500)
@@ -836,6 +855,7 @@ class UnisenderGoBackendRecipientsRefusedTests(UnisenderGoBackendMockAPITestCase
         with self.assertRaises(AnymailRecipientsRefused):
             self.message.send()
 
+    @ignore_fail_silently_warning()
     def test_fail_silently(self):
         self.message.to = ["invalid@localhost", "reject@example.com"]
         self.set_mock_response(
@@ -895,12 +915,15 @@ class UnisenderGoBackendSessionSharingTestCase(
 
 
 @tag("unisender_go")
-@override_settings(EMAIL_BACKEND="anymail.backends.unisender_go.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.unisender_go.EmailBackend"}},
+)
 class UnisenderGoBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
     """Test ESP backend without required settings in place"""
 
     def test_missing_auth(self):
         with self.assertRaisesRegex(
-            AnymailConfigurationError, r"\bUNISENDER_GO_API_KEY\b"
+            AnymailConfigurationError,
+            r"'api_key'|\bUNISENDER_GO_API_KEY.*ANYMAIL_UNISENDER_GO_API_KEY",
         ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])

@@ -1,12 +1,13 @@
-from unittest import mock
+from unittest import mock, skipIf
 
-from django.test import SimpleTestCase, override_settings, tag
+import django.core.mail
+from django.test import SimpleTestCase, tag
 
 from anymail.backends.base_requests import AnymailRequestsBackend, RequestsPayload
 from anymail.message import AnymailMessage, AnymailRecipientStatus
-from tests.utils import AnymailTestMixin
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase
+from .utils import AnymailTestMixin, ignore_fail_silently_warning, override_settings
 
 
 class MinimalRequestsBackend(AnymailRequestsBackend):
@@ -43,7 +44,9 @@ class MinimalRequestsPayload(RequestsPayload):
     add_attachment = _noop
 
 
-@override_settings(EMAIL_BACKEND="tests.test_base_backends.MinimalRequestsBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "tests.test_base_backends.MinimalRequestsBackend"}}
+)
 class RequestsBackendBaseTestCase(RequestsBackendMockAPITestCase):
     """Test common functionality in AnymailRequestsBackend"""
 
@@ -71,6 +74,22 @@ class RequestsBackendBaseTestCase(RequestsBackendMockAPITestCase):
         timeout = self.get_api_call_arg("timeout")
         self.assertEqual(timeout, 5)
 
+    @skipIf(not hasattr(django.core.mail, "mailers"), "timeout is MAILERS OPTIONS only")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "tests.test_base_backends.MinimalRequestsBackend",
+                "OPTIONS": {"timeout": 5},
+            }
+        }
+    )
+    def test_timeout_option(self):
+        """You can use the timeout option to override the default"""
+        self.message.send()
+        timeout = self.get_api_call_arg("timeout")
+        self.assertEqual(timeout, 5)
+
+    @ignore_fail_silently_warning()
     @mock.patch(f"{__name__}.MinimalRequestsBackend.create_session")
     def test_create_session_error_fail_silently(self, mock_create_session):
         # If create_session fails and fail_silently is True,
@@ -81,7 +100,9 @@ class RequestsBackendBaseTestCase(RequestsBackendMockAPITestCase):
 
 
 @tag("live")
-@override_settings(EMAIL_BACKEND="tests.test_base_backends.MinimalRequestsBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "tests.test_base_backends.MinimalRequestsBackend"}},
+)
 class RequestsBackendLiveTestCase(AnymailTestMixin, SimpleTestCase):
     @override_settings(ANYMAIL_DEBUG_API_REQUESTS=True)
     def test_debug_logging(self):

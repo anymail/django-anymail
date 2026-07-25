@@ -4,7 +4,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.core import mail
-from django.test import SimpleTestCase, ignore_warnings, override_settings, tag
+from django.test import SimpleTestCase, ignore_warnings, tag
 from django.utils.timezone import (
     get_fixed_timezone,
     override as override_current_timezone,
@@ -28,14 +28,21 @@ from .utils import (
     AnymailTestMixin,
     create_text_attachment,
     decode_att,
+    get_default_mailer,
+    ignore_fail_silently_warning,
+    override_settings,
     sample_image_content,
 )
 
 
 @tag("sendgrid")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.sendgrid.EmailBackend",
-    ANYMAIL={"SENDGRID_API_KEY": "test_api_key"},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.sendgrid.EmailBackend",
+            "OPTIONS": {"api_key": "test_api_key"},
+        },
+    },
 )
 @ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendMockAPITestCase(RequestsBackendMockAPITestCase):
@@ -71,7 +78,7 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
             AnymailNotSupportedWarning,
             msg="django-anymail has dropped official support for SendGrid.",
         ):
-            mail.get_connection()
+            get_default_mailer()
 
     def test_send_mail(self):
         """Test basic API for simple send"""
@@ -80,7 +87,6 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
             "Here is the message.",
             "from@sender.example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         self.assert_esp_called("https://api.sendgrid.com/v3/mail/send")
         http_headers = self.get_api_call_headers()
@@ -391,6 +397,8 @@ class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "SendGrid API response 400"):
             mail.send_mail("Subject", "Body", "from@example.com", ["to@example.com"])
 
+    @ignore_fail_silently_warning()
+    def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=400)
         sent = mail.send_mail(
@@ -721,7 +729,15 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         self.assertNotIn("sections", data)
 
     @override_settings(
-        ANYMAIL_SENDGRID_MERGE_FIELD_FORMAT=":{}"  # :field as shown in SG examples
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.sendgrid.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "test_api_key",
+                    "merge_field_format": ":{}",  # :field as shown in SG examples
+                },
+            },
+        },
     )
     def test_legacy_merge_field_format_setting(self):
         # Provide merge field delimiters in settings.py
@@ -1073,7 +1089,15 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         )
 
     @override_settings(
-        ANYMAIL_SENDGRID_GENERATE_MESSAGE_ID=False  # else we force custom_args
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.sendgrid.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "test_api_key",
+                    "generate_message_id": False,  # else we force custom_args
+                },
+            },
+        },
     )
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
@@ -1230,7 +1254,17 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
             msg.anymail_status.recipients["cc@example.com"].message_id, "mocked-uuid-2"
         )
 
-    @override_settings(ANYMAIL_SENDGRID_GENERATE_MESSAGE_ID=False)
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.sendgrid.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "test_api_key",
+                    "generate_message_id": False,
+                },
+            },
+        },
+    )
     def test_disable_generate_message_id(self):
         msg = mail.EmailMessage(
             "Subject",
@@ -1243,6 +1277,7 @@ class SendGridBackendAnymailFeatureTests(SendGridBackendMockAPITestCase):
         self.assertIsNone(msg.anymail_status.recipients["to1@example.com"].message_id)
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=500)
@@ -1290,18 +1325,25 @@ class SendGridBackendSessionSharingTestCase(
 
 
 @tag("sendgrid")
-@override_settings(EMAIL_BACKEND="anymail.backends.sendgrid.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.sendgrid.EmailBackend"}},
+)
 @ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
     """Test ESP backend without required settings in place"""
 
     def test_missing_auth(self):
-        with self.assertRaisesRegex(AnymailConfigurationError, r"\bSENDGRID_API_KEY\b"):
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'api_key'|\bSENDGRID_API_KEY.*ANYMAIL_SENDGRID_API_KEY",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
 
 
 @tag("sendgrid")
-@override_settings(EMAIL_BACKEND="anymail.backends.sendgrid.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.sendgrid.EmailBackend"}},
+)
 @ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendDisallowsV2Tests(AnymailTestMixin, SimpleTestCase):
     """Using v2-API-only features should cause errors with v3 backend"""

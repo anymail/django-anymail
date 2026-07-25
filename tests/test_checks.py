@@ -1,10 +1,9 @@
 from django.core import checks
 from django.test import SimpleTestCase
-from django.test.utils import override_settings
 
 from anymail.checks import check_deprecated_settings, check_insecure_settings
 
-from .utils import AnymailTestMixin
+from .utils import AnymailTestMixin, override_settings
 
 
 class DeprecatedSettingsTests(AnymailTestMixin, SimpleTestCase):
@@ -38,7 +37,9 @@ class DeprecatedSettingsTests(AnymailTestMixin, SimpleTestCase):
             ],
         )
 
-    @override_settings(EMAIL_BACKEND="anymail.backends.sendgrid.EmailBackend")
+    @override_settings(
+        MAILERS={"default": {"BACKEND": "anymail.backends.sendgrid.EmailBackend"}}
+    )
     def test_sendgrid_unsupported(self):
         errors = check_deprecated_settings(None)
         self.assertEqual(

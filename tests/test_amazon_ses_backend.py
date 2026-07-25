@@ -7,18 +7,27 @@ from unittest.mock import ANY, patch
 
 import django
 from django.core import mail
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail import __version__ as ANYMAIL_VERSION
 from anymail.exceptions import AnymailAPIError, AnymailUnsupportedFeature
 from anymail.inbound import AnymailInboundMessage
 from anymail.message import AnymailMessage, attach_inline_image
 
-from .utils import AnymailTestMixin, create_text_attachment, sample_image_content
+from .utils import (
+    AnymailTestMixin,
+    create_text_attachment,
+    ignore_connection_warnings,
+    ignore_fail_silently_warning,
+    override_settings,
+    sample_image_content,
+)
 
 
 @tag("amazon_ses")
-@override_settings(EMAIL_BACKEND="anymail.backends.amazon_ses.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.amazon_ses.EmailBackend"}}
+)
 class AmazonSESBackendMockAPITestCase(AnymailTestMixin, SimpleTestCase):
     """TestCase that uses the Amazon SES EmailBackend with a mocked boto3 client"""
 
@@ -137,7 +146,6 @@ class AmazonSESBackendStandardEmailTests(AmazonSESBackendMockAPITestCase):
             "Here is the message.",
             "from@example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         params = self.get_send_params()
         # send_email takes a fully-formatted MIME message.
@@ -403,6 +411,7 @@ class AmazonSESBackendStandardEmailTests(AmazonSESBackendMockAPITestCase):
         # Raw AWS response is available on the exception:
         self.assertEqual(err.response, error_response)
 
+    @ignore_fail_silently_warning()
     def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_failure(
@@ -417,6 +426,7 @@ class AmazonSESBackendStandardEmailTests(AmazonSESBackendMockAPITestCase):
         sent = self.message.send(fail_silently=True)
         self.assertEqual(sent, 0)
 
+    @ignore_fail_silently_warning()
     def test_session_failure_fail_silently(self):
         # Make sure fail_silently is respected if boto3.Session creation fails
         # (e.g., due to invalid or missing credentials)
@@ -525,7 +535,14 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
         params = self.get_send_params()
         self.assertNotIn("Tags", params)
 
-    @override_settings(ANYMAIL_AMAZON_SES_MESSAGE_TAG_NAME="Campaign")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.amazon_ses.EmailBackend",
+                "OPTIONS": {"message_tag_name": "Campaign"},
+            }
+        }
+    )
     def test_amazon_message_tags(self):
         """
         The Anymail AMAZON_SES_MESSAGE_TAG_NAME setting enables a single Message Tag
@@ -785,8 +802,13 @@ class AmazonSESBackendAnymailFeatureTests(AmazonSESBackendMockAPITestCase):
         self.assertIn("ReplacementHeaders", params["BulkEmailEntries"][1])
 
     @override_settings(
-        # This will pass DefaultEmailTags: Name "Campaign"
-        ANYMAIL_AMAZON_SES_MESSAGE_TAG_NAME="Campaign"
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.amazon_ses.EmailBackend",
+                # This will pass DefaultEmailTags: Name "Campaign"
+                "OPTIONS": {"message_tag_name": "Campaign"},
+            }
+        }
     )
     def test_template_default_email_tag(self):
         raw_response = {
@@ -986,25 +1008,29 @@ class AmazonSESBackendConfigurationTests(AmazonSESBackendMockAPITestCase):
         )
 
     @override_settings(
-        ANYMAIL={
-            "AMAZON_SES_CLIENT_PARAMS": {
-                # Example for testing; it's not a good idea to hardcode credentials in
-                # your code. Safer: `os.getenv("MY_SPECIAL_AWS_KEY_ID")` etc.
-                "aws_access_key_id": "test-access-key-id",
-                "aws_secret_access_key": "test-secret-access-key",
-                "region_name": "ap-northeast-1",
-                # config can be given as dict of botocore.config.Config params
-                "config": {
-                    "read_timeout": 30,
-                    "retries": {"max_attempts": 2},
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.amazon_ses.EmailBackend",
+                "OPTIONS": {
+                    "client_params": {
+                        # Example for testing; it's not a good idea to hardcode credentials in
+                        # your code. Safer: `os.getenv("MY_SPECIAL_AWS_KEY_ID")` etc.
+                        "aws_access_key_id": "test-access-key-id",
+                        "aws_secret_access_key": "test-secret-access-key",
+                        "region_name": "ap-northeast-1",
+                        # config can be given as dict of botocore.config.Config params
+                        "config": {
+                            "read_timeout": 30,
+                            "retries": {"max_attempts": 2},
+                        },
+                    }
                 },
             }
         }
     )
     def test_client_params_in_setting(self):
         """
-        The Anymail AMAZON_SES_CLIENT_PARAMS setting specifies
-        boto3 session.client() params for Anymail
+        The client_params option specifies boto3 session.client() params
         """
         self.message.send()
         client_params = self.get_client_params()
@@ -1021,6 +1047,8 @@ class AmazonSESBackendConfigurationTests(AmazonSESBackendMockAPITestCase):
         self.assertEqual(config.read_timeout, 30)
         self.assertEqual(config.retries, {"max_attempts": 2})
 
+    # This case can be removed once the minimum version is Django 7.0.
+    @ignore_connection_warnings()
     def test_client_params_in_connection_init(self):
         """
         You can also supply credentials specifically
@@ -1030,7 +1058,6 @@ class AmazonSESBackendConfigurationTests(AmazonSESBackendMockAPITestCase):
 
         boto_config = Config(connect_timeout=30)
         conn = mail.get_connection(
-            "anymail.backends.amazon_ses.EmailBackend",
             client_params={
                 "aws_session_token": "test-session-token",
                 "config": boto_config,
@@ -1045,12 +1072,16 @@ class AmazonSESBackendConfigurationTests(AmazonSESBackendMockAPITestCase):
         self.assertEqual(config.connect_timeout, 30)
 
     @override_settings(
-        ANYMAIL={"AMAZON_SES_SESSION_PARAMS": {"profile_name": "anymail-testing"}}
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.amazon_ses.EmailBackend",
+                "OPTIONS": {"session_params": {"profile_name": "anymail-testing"}},
+            }
+        }
     )
     def test_session_params_in_setting(self):
         """
-        The Anymail AMAZON_SES_SESSION_PARAMS setting
-        specifies boto3.session.Session() params for Anymail
+        The session_params option specifies boto3 session.Session() params
         """
         self.message.send()
 
@@ -1064,7 +1095,12 @@ class AmazonSESBackendConfigurationTests(AmazonSESBackendMockAPITestCase):
         self.assertEqual(client_params, {})
 
     @override_settings(
-        ANYMAIL={"AMAZON_SES_CONFIGURATION_SET_NAME": "MyConfigurationSet"}
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.amazon_ses.EmailBackend",
+                "OPTIONS": {"configuration_set_name": "MyConfigurationSet"},
+            }
+        }
     )
     def test_config_set_setting(self):
         """You can supply a default ConfigurationSetName"""

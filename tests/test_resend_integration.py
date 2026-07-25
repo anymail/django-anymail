@@ -2,12 +2,12 @@ import os
 import unittest
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin
+from .utils import AnymailTestMixin, override_settings
 
 ANYMAIL_TEST_RESEND_API_KEY = os.getenv("ANYMAIL_TEST_RESEND_API_KEY")
 ANYMAIL_TEST_RESEND_DOMAIN = os.getenv("ANYMAIL_TEST_RESEND_DOMAIN")
@@ -20,8 +20,12 @@ ANYMAIL_TEST_RESEND_DOMAIN = os.getenv("ANYMAIL_TEST_RESEND_DOMAIN")
     "environment variables to run Resend integration tests",
 )
 @override_settings(
-    ANYMAIL_RESEND_API_KEY=ANYMAIL_TEST_RESEND_API_KEY,
-    EMAIL_BACKEND="anymail.backends.resend.EmailBackend",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.resend.EmailBackend",
+            "OPTIONS": {"api_key": ANYMAIL_TEST_RESEND_API_KEY},
+        },
+    },
 )
 class ResendBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Resend.com API integration tests
@@ -133,7 +137,14 @@ class ResendBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         )
 
     @unittest.skip("Resend has stopped responding to bad/missing API keys (12/2023)")
-    @override_settings(ANYMAIL_RESEND_API_KEY="Hey, that's not an API key!")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.resend.EmailBackend",
+                "OPTIONS": {"api_key": "Hey, that's not an API key!"},
+            },
+        },
+    )
     def test_invalid_api_key(self):
         with self.assertRaisesMessage(AnymailAPIError, "API key is invalid"):
             self.message.send()

@@ -4,11 +4,12 @@ from unittest.mock import patch
 
 import requests
 from django.core import mail
+from django.core.mail import EmailMessage
 from django.test import SimpleTestCase
 
 from anymail.exceptions import AnymailAPIError
 
-from .utils import AnymailTestMixin
+from .utils import AnymailTestMixin, get_default_mailer, ignore_fail_silently_warning
 
 UNSET = object()
 
@@ -232,25 +233,31 @@ class SessionSharingTestCases(RequestsBackendMockAPITestCase):
         self.assertEqual(self.mock_close.call_count, 1)
 
     def test_caller_managed_connections(self):
-        """Calling code can created long-lived connection that it opens and closes"""
-        connection = mail.get_connection()
+        """Calling code can create long-lived connection that it opens and closes"""
+        connection = get_default_mailer()
         connection.open()
-        mail.send_mail(
-            "Subject 1",
-            "body",
-            "from@example.com",
-            ["to@example.com"],
-            connection=connection,
+        connection.send_messages(
+            [
+                EmailMessage(
+                    "Subject 1",
+                    "body",
+                    "from@example.com",
+                    ["to@example.com"],
+                )
+            ]
         )
         session1 = self.mock_request.call_args[0]
         self.assertEqual(self.mock_close.call_count, 0)  # shouldn't be closed yet
 
-        mail.send_mail(
-            "Subject 2",
-            "body",
-            "from@example.com",
-            ["to@example.com"],
-            connection=connection,
+        connection.send_messages(
+            [
+                EmailMessage(
+                    "Subject 2",
+                    "body",
+                    "from@example.com",
+                    ["to@example.com"],
+                )
+            ]
         )
         self.assertEqual(self.mock_close.call_count, 0)  # still shouldn't be closed
         session2 = self.mock_request.call_args[0]
@@ -265,6 +272,7 @@ class SessionSharingTestCases(RequestsBackendMockAPITestCase):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
         self.assertEqual(self.mock_close.call_count, 1)
 
+    @ignore_fail_silently_warning()
     def test_session_closed_after_fail_silently_exception(self):
         self.set_mock_response(status_code=500)
         sent = mail.send_mail(
@@ -278,16 +286,19 @@ class SessionSharingTestCases(RequestsBackendMockAPITestCase):
         self.assertEqual(self.mock_close.call_count, 1)
 
     def test_caller_managed_session_closed_after_exception(self):
-        connection = mail.get_connection()
+        connection = get_default_mailer()
         connection.open()
         self.set_mock_response(status_code=500)
         with self.assertRaises(AnymailAPIError):
-            mail.send_mail(
-                "Subject",
-                "Message",
-                "from@example.com",
-                ["to@example.com"],
-                connection=connection,
+            connection.send_messages(
+                [
+                    EmailMessage(
+                        "Subject",
+                        "Message",
+                        "from@example.com",
+                        ["to@example.com"],
+                    )
+                ]
             )
         self.assertEqual(self.mock_close.call_count, 0)  # wait for us to close it
 

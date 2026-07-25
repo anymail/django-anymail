@@ -2,8 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from django.core import mail
-from django.core.exceptions import ImproperlyConfigured
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 from django.utils.timezone import (
     get_fixed_timezone,
     override as override_current_timezone,
@@ -11,6 +10,7 @@ from django.utils.timezone import (
 
 from anymail.exceptions import (
     AnymailAPIError,
+    AnymailConfigurationError,
     AnymailRecipientsRefused,
     AnymailSerializationError,
     AnymailUnsupportedFeature,
@@ -25,14 +25,20 @@ from .utils import (
     AnymailTestMixin,
     create_text_attachment,
     decode_att,
+    ignore_fail_silently_warning,
+    override_settings,
     sample_image_content,
 )
 
 
 @tag("mandrill")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.mandrill.EmailBackend",
-    ANYMAIL={"MANDRILL_API_KEY": "test_api_key"},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mandrill.EmailBackend",
+            "OPTIONS": {"api_key": "test_api_key"},
+        },
+    },
 )
 class MandrillBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     DEFAULT_RAW_RESPONSE = b"""[{
@@ -60,7 +66,6 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
             "Here is the message.",
             "from@example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         self.assert_esp_called("/messages/send.json")
         data = self.get_api_call_json()
@@ -274,6 +279,7 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
         with self.assertRaises(AnymailUnsupportedFeature):
             self.message.send()
 
+    @ignore_fail_silently_warning()
     def test_alternatives_fail_silently(self):
         # Make sure fail_silently is respected
         self.message.attach_alternative("{'not': 'allowed'}", "application/json")
@@ -286,6 +292,8 @@ class MandrillBackendStandardEmailTests(MandrillBackendMockAPITestCase):
         with self.assertRaisesMessage(AnymailAPIError, "Mandrill API response 400"):
             mail.send_mail("Subject", "Body", "from@example.com", ["to@example.com"])
 
+    @ignore_fail_silently_warning()
+    def test_api_failure_fail_silently(self):
         # Make sure fail_silently is respected
         self.set_mock_response(status_code=400)
         sent = mail.send_mail(
@@ -675,6 +683,7 @@ class MandrillBackendAnymailFeatureTests(MandrillBackendMockAPITestCase):
         self.assertEqual(msg.anymail_status.esp_response.content, response_content)
 
     # noinspection PyUnresolvedReferences
+    @ignore_fail_silently_warning()
     def test_send_failed_anymail_status(self):
         """If the send fails, anymail_status should contain initial values"""
         self.set_mock_response(status_code=500)
@@ -752,6 +761,7 @@ class MandrillBackendRecipientsRefusedTests(MandrillBackendMockAPITestCase):
         with self.assertRaises(AnymailRecipientsRefused):
             msg.send()
 
+    @ignore_fail_silently_warning()
     def test_fail_silently(self):
         self.set_mock_response(raw=b"""[
             {"email": "invalid@localhost", "status": "invalid"},
@@ -822,13 +832,15 @@ class MandrillBackendSessionSharingTestCase(
 
 
 @tag("mandrill")
-@override_settings(EMAIL_BACKEND="anymail.backends.mandrill.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.mandrill.EmailBackend"}},
+)
 class MandrillBackendImproperlyConfiguredTests(AnymailTestMixin, SimpleTestCase):
     """Test backend without required settings"""
 
     def test_missing_api_key(self):
-        with self.assertRaises(ImproperlyConfigured) as cm:
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'api_key'|\bMANDRILL_API_KEY.*ANYMAIL_MANDRILL_API_KEY",
+        ):
             mail.send_mail("Subject", "Message", "from@example.com", ["to@example.com"])
-        errmsg = str(cm.exception)
-        self.assertRegex(errmsg, r"\bMANDRILL_API_KEY\b")
-        self.assertRegex(errmsg, r"\bANYMAIL_MANDRILL_API_KEY\b")

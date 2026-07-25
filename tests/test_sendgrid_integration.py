@@ -3,12 +3,12 @@ import unittest
 from datetime import datetime, timedelta
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path
+from .utils import AnymailTestMixin, override_settings, sample_image_path
 
 ANYMAIL_TEST_SENDGRID_API_KEY = os.getenv("ANYMAIL_TEST_SENDGRID_API_KEY")
 ANYMAIL_TEST_SENDGRID_TEMPLATE_ID = os.getenv("ANYMAIL_TEST_SENDGRID_TEMPLATE_ID")
@@ -22,13 +22,19 @@ ANYMAIL_TEST_SENDGRID_DOMAIN = os.getenv("ANYMAIL_TEST_SENDGRID_DOMAIN")
     "environment variables to run SendGrid integration tests",
 )
 @override_settings(
-    ANYMAIL_SENDGRID_API_KEY=ANYMAIL_TEST_SENDGRID_API_KEY,
-    ANYMAIL_SENDGRID_SEND_DEFAULTS={
-        "esp_extra": {
-            "mail_settings": {"sandbox_mode": {"enable": True}},
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.sendgrid.EmailBackend",
+            "OPTIONS": {
+                "api_key": ANYMAIL_TEST_SENDGRID_API_KEY,
+                "send_defaults": {
+                    "esp_extra": {
+                        "mail_settings": {"sandbox_mode": {"enable": True}},
+                    },
+                },
+            },
         }
     },
-    EMAIL_BACKEND="anymail.backends.sendgrid.EmailBackend",
 )
 class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """
@@ -165,7 +171,14 @@ class SendGridBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message.send()
         self.assertEqual(message.anymail_status.status, {"queued"})
 
-    @override_settings(ANYMAIL_SENDGRID_API_KEY="Hey, that's not an API key!")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.sendgrid.EmailBackend",
+                "OPTIONS": {"api_key": "Hey, that's not an API key!"},
+            },
+        },
+    )
     def test_invalid_api_key(self):
         with self.assertRaises(AnymailAPIError) as cm:
             self.message.send()

@@ -2,12 +2,12 @@ import os
 import unittest
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin
+from .utils import AnymailTestMixin, override_settings
 
 ANYMAIL_TEST_POSTAL_API_KEY = os.getenv("ANYMAIL_TEST_POSTAL_API_KEY")
 ANYMAIL_TEST_POSTAL_API_URL = os.getenv("ANYMAIL_TEST_POSTAL_API_URL")
@@ -23,9 +23,15 @@ ANYMAIL_TEST_POSTAL_DOMAIN = os.getenv("ANYMAIL_TEST_POSTAL_DOMAIN")
     " ANYMAIL_TEST_POSTAL_DOMAIN environment variables to run Postal integration tests",
 )
 @override_settings(
-    ANYMAIL_POSTAL_API_KEY=ANYMAIL_TEST_POSTAL_API_KEY,
-    ANYMAIL_POSTAL_API_URL=ANYMAIL_TEST_POSTAL_API_URL,
-    EMAIL_BACKEND="anymail.backends.postal.EmailBackend",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.postal.EmailBackend",
+            "OPTIONS": {
+                "api_key": ANYMAIL_TEST_POSTAL_API_KEY,
+                "api_url": ANYMAIL_TEST_POSTAL_API_URL,
+            },
+        },
+    },
 )
 class PostalBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Postal API integration tests
@@ -106,7 +112,17 @@ class PostalBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         )
         self.assertIn("UnauthenticatedFromAddress", response["data"]["code"])
 
-    @override_settings(ANYMAIL_POSTAL_API_KEY="Hey, that's not an API key!")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.postal.EmailBackend",
+                "OPTIONS": {
+                    "api_key": "Hey, that's not an API key!",
+                    "api_url": ANYMAIL_TEST_POSTAL_API_URL,
+                },
+            },
+        },
+    )
     def test_invalid_server_token(self):
         with self.assertRaises(AnymailAPIError) as cm:
             self.message.send()

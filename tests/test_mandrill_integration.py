@@ -3,12 +3,12 @@ import unittest
 from email.utils import formataddr
 
 from django.core import mail
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError, AnymailRecipientsRefused
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path
+from .utils import AnymailTestMixin, override_settings, sample_image_path
 
 ANYMAIL_TEST_MANDRILL_API_KEY = os.getenv("ANYMAIL_TEST_MANDRILL_API_KEY")
 ANYMAIL_TEST_MANDRILL_DOMAIN = os.getenv("ANYMAIL_TEST_MANDRILL_DOMAIN")
@@ -21,8 +21,12 @@ ANYMAIL_TEST_MANDRILL_DOMAIN = os.getenv("ANYMAIL_TEST_MANDRILL_DOMAIN")
     "environment variables to run integration tests",
 )
 @override_settings(
-    MANDRILL_API_KEY=ANYMAIL_TEST_MANDRILL_API_KEY,
-    EMAIL_BACKEND="anymail.backends.mandrill.EmailBackend",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.mandrill.EmailBackend",
+            "OPTIONS": {"api_key": ANYMAIL_TEST_MANDRILL_API_KEY},
+        },
+    },
 )
 class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Mandrill API integration tests
@@ -165,7 +169,14 @@ class MandrillBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
                     " for blacklist recipient"
                 )
 
-    @override_settings(MANDRILL_API_KEY="Hey, that's not an API key!")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.mandrill.EmailBackend",
+                "OPTIONS": {"api_key": "Hey, that's not an API key!"},
+            },
+        },
+    )
     def test_invalid_api_key(self):
         # Example of trying to send with an invalid MANDRILL_API_KEY.
         # Mandrill responds either 401 or 500 status for this case (it varies),

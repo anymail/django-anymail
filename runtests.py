@@ -11,6 +11,10 @@ from pathlib import Path
 import django
 from django.conf import settings
 from django.test.utils import get_runner
+from django.utils.deprecation import (
+    RemovedAfterNextVersionWarning,
+    RemovedInNextVersionWarning,
+)
 
 
 def find_test_settings():
@@ -66,8 +70,12 @@ def setup_and_run_tests(test_labels=None):
     if exclude_tags:
         print("Excluding tests tagged: %r" % exclude_tags)
 
-    # show DeprecationWarning and other default-ignored warnings:
-    warnings.simplefilter("default")
+    if not sys.warnoptions:
+        # Print all warnings
+        warnings.simplefilter("default")
+        # Error on Django deprecations
+        warnings.simplefilter("error", RemovedInNextVersionWarning)
+        warnings.simplefilter("error", RemovedAfterNextVersionWarning)
 
     settings_module = find_test_settings()
     print(f"Using settings module {settings_module!r}.")

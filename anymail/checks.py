@@ -1,7 +1,34 @@
+import warnings
+
 from django.conf import settings
 from django.core import checks
 
 from anymail.utils import get_anymail_setting
+
+
+def get_configured_email_backends():
+    try:
+        mailers = settings.MAILERS
+    except AttributeError:
+        # Django < 6.1, or < 7.0 and using deprecated email settings.
+        pass
+    else:
+        return {
+            config.get("BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+            for config in mailers.values()
+        }
+
+    try:
+        from django.utils.deprecation import RemovedInDjango70Warning
+    except ImportError:
+        # Django < 6.1
+        return {settings.EMAIL_BACKEND}
+    else:
+        # Django 6.1 -- 6.2: ignore warning on deprecated setting access
+        with warnings.catch_warnings(
+            action="ignore", category=RemovedInDjango70Warning
+        ):
+            return {settings.EMAIL_BACKEND}
 
 
 def check_deprecated_settings(app_configs, **kwargs):
@@ -31,9 +58,9 @@ def check_deprecated_settings(app_configs, **kwargs):
             )
         )
 
-    if (
-        getattr(settings, "EMAIL_BACKEND", "")
-        == "anymail.backends.sendgrid.EmailBackend"
+    if any(
+        backend == "anymail.backends.sendgrid.EmailBackend"
+        for backend in get_configured_email_backends()
     ):
         errors.append(
             checks.Warning(

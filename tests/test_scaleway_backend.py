@@ -1,7 +1,7 @@
 import datetime
 
 from django.core import mail
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import (
     AnymailAPIError,
@@ -14,19 +14,29 @@ from .mock_requests_backend import (
     RequestsBackendMockAPITestCase,
     SessionSharingTestCases,
 )
-from .utils import create_text_attachment, decode_att, sample_image_content
+from .utils import (
+    create_text_attachment,
+    decode_att,
+    get_default_mailer,
+    override_settings,
+    sample_image_content,
+)
 
-# Minimal required ANYMAIL settings for Scaleway, used in multiple tests
-SCALEWAY_BASE_SETTINGS = {
-    "SCALEWAY_SECRET_KEY": "test_secret_key",
-    "SCALEWAY_PROJECT_ID": "test_project_id",
+# Minimal required MAILER OPTIONS for Scaleway, used in multiple tests
+SCALEWAY_BASE_OPTIONS = {
+    "secret_key": "test_secret_key",
+    "project_id": "test_project_id",
 }
 
 
 @tag("scaleway")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.scaleway.EmailBackend",
-    ANYMAIL=SCALEWAY_BASE_SETTINGS,
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.scaleway.EmailBackend",
+            "OPTIONS": SCALEWAY_BASE_OPTIONS,
+        },
+    },
 )
 class ScalewayBackendMockAPITestCase(RequestsBackendMockAPITestCase):
     DEFAULT_RAW_RESPONSE = b"""{
@@ -62,7 +72,6 @@ class ScalewayBackendStandardEmailTests(ScalewayBackendMockAPITestCase):
             "Here is the message.",
             "from@example.com",
             ["to@example.com"],
-            fail_silently=False,
         )
         self.assert_esp_called(
             "https://api.scaleway.com/transactional-email/v1alpha1/regions/fr-par/emails"
@@ -438,46 +447,84 @@ class ScalewayBackendSessionSharingTestCase(
 
 
 @tag("scaleway")
-@override_settings(EMAIL_BACKEND="anymail.backends.scaleway.EmailBackend")
 class ScalewayBackendConfigurationTests(SimpleTestCase):
-    @override_settings(ANYMAIL={"SCALEWAY_PROJECT_ID": "test_project_id"})
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.scaleway.EmailBackend",
+                "OPTIONS": {"project_id": "test_project_id"},
+            },
+        },
+    )
     def test_missing_secret_key(self):
         with self.assertRaisesRegex(
-            AnymailConfigurationError, r"You must set.*SCALEWAY_SECRET_KEY"
+            AnymailConfigurationError,
+            r"OPTIONS must define 'secret_key'|You must set.*SCALEWAY_SECRET_KEY",
         ):
-            mail.get_connection()
-
-    @override_settings(ANYMAIL={"SCALEWAY_SECRET_KEY": "test_secret_key"})
-    def test_missing_project_id(self):
-        with self.assertRaisesRegex(
-            AnymailConfigurationError, r"You must set.*SCALEWAY_PROJECT_ID"
-        ):
-            mail.get_connection()
+            get_default_mailer()
 
     @override_settings(
-        ANYMAIL={"SCALEWAY_PROJECT_ID": "test_project_id"},
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.scaleway.EmailBackend",
+                "OPTIONS": {"secret_key": "test_secret_key"},
+            },
+        },
+    )
+    def test_missing_project_id(self):
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"OPTIONS must define 'project_id'|You must set.*SCALEWAY_PROJECT_ID",
+        ):
+            get_default_mailer()
+
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.scaleway.EmailBackend",
+                "OPTIONS": {"project_id": "test_project_id"},
+            },
+        },
         SCALEWAY_SECRET_KEY="test_secret_key",
     )
     def test_bare_secret_key(self):
         # SCALEWAY_SECRET_KEY is allowed in settings file root
-        connection = mail.get_connection()
+        connection = get_default_mailer()
         self.assertEqual(connection.secret_key, "test_secret_key")
 
-    @override_settings(ANYMAIL=dict(SCALEWAY_BASE_SETTINGS, SCALEWAY_REGION="pl-waw"))
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.scaleway.EmailBackend",
+                "OPTIONS": {
+                    **SCALEWAY_BASE_OPTIONS,
+                    "region": "pl-waw",
+                },
+            },
+        },
+    )
     def test_region_setting(self):
-        backend = mail.get_connection()
+        backend = get_default_mailer()
         self.assertEqual(
             backend.api_url,
             "https://api.scaleway.com/transactional-email/v1alpha1/regions/pl-waw/",
         )
 
     @override_settings(
-        ANYMAIL=dict(SCALEWAY_BASE_SETTINGS, SCALEWAY_REGION="nl-ams # from /.env")
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.scaleway.EmailBackend",
+                "OPTIONS": {
+                    **SCALEWAY_BASE_OPTIONS,
+                    "region": "nl-ams # from /.env",
+                },
+            },
+        },
     )
     def test_bad_region_setting(self):
         # Make sure api_url is properly quoted
         # (e.g., misread from an env file that doesn't allow comments)
-        backend = mail.get_connection()
+        backend = get_default_mailer()
         self.assertEqual(
             backend.api_url,
             "https://api.scaleway.com/transactional-email/v1alpha1"
@@ -485,23 +532,33 @@ class ScalewayBackendConfigurationTests(SimpleTestCase):
         )
 
     @override_settings(
-        ANYMAIL=dict(
-            SCALEWAY_BASE_SETTINGS,
-            SCALEWAY_API_URL="https://scaleway.example.com/{region}/email",
-        )
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.scaleway.EmailBackend",
+                "OPTIONS": {
+                    **SCALEWAY_BASE_OPTIONS,
+                    "api_url": "https://scaleway.example.com/{region}/email",
+                },
+            },
+        },
     )
     def test_api_url_setting(self):
         # The {region} placeholder is replaced with the region setting
-        backend = mail.get_connection()
+        backend = get_default_mailer()
         self.assertEqual(backend.api_url, "https://scaleway.example.com/fr-par/email/")
 
     @override_settings(
-        ANYMAIL=dict(
-            SCALEWAY_BASE_SETTINGS,
-            SCALEWAY_API_URL="https://scaleway.example.com/email",
-        )
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.scaleway.EmailBackend",
+                "OPTIONS": {
+                    **SCALEWAY_BASE_OPTIONS,
+                    "api_url": "https://scaleway.example.com/email",
+                },
+            },
+        },
     )
     def test_api_url_setting_without_region(self):
         # The region placeholder is not required
-        backend = mail.get_connection()
+        backend = get_default_mailer()
         self.assertEqual(backend.api_url, "https://scaleway.example.com/email/")

@@ -1,7 +1,7 @@
 from unittest.mock import ANY
 
 from django.core.mail import EmailMessage, send_mail
-from django.test import ignore_warnings, override_settings, tag
+from django.test import ignore_warnings, tag
 
 from anymail.exceptions import AnymailConfigurationError, AnymailDeprecationWarning
 from anymail.webhooks.sendinblue import (
@@ -10,12 +10,13 @@ from anymail.webhooks.sendinblue import (
 )
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase
+from .utils import override_settings
 from .webhook_cases import WebhookTestCase
 
 
 @tag("brevo", "sendinblue")
 @override_settings(
-    EMAIL_BACKEND="anymail.backends.sendinblue.EmailBackend",
+    MAILERS={"default": {"BACKEND": "anymail.backends.sendinblue.EmailBackend"}},
     ANYMAIL={"SENDINBLUE_API_KEY": "test_api_key"},
 )
 @ignore_warnings(category=AnymailDeprecationWarning)
@@ -40,7 +41,9 @@ class SendinBlueBackendDeprecationTests(RequestsBackendMockAPITestCase):
     @override_settings(ANYMAIL={"BREVO_API_KEY": "test_api_key"})
     def test_missing_api_key_error_uses_correct_setting_name(self):
         # The sendinblue.EmailBackend requires SENDINBLUE_ settings names
-        with self.assertRaisesMessage(AnymailConfigurationError, "SENDINBLUE_API_KEY"):
+        with self.assertRaisesRegex(
+            AnymailConfigurationError, "'api_key'|SENDINBLUE_API_KEY"
+        ):
             send_mail("Subject", "Body", "from@example.com", ["to@example.com"])
 
 

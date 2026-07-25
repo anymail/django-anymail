@@ -2,12 +2,12 @@ import os
 import unittest
 from email.utils import formataddr
 
-from django.test import SimpleTestCase, override_settings, tag
+from django.test import SimpleTestCase, tag
 
 from anymail.exceptions import AnymailAPIError
 from anymail.message import AnymailMessage
 
-from .utils import AnymailTestMixin, sample_image_path
+from .utils import AnymailTestMixin, override_settings, sample_image_path
 
 # For most integration tests, Postmark's sandboxed "POSTMARK_API_TEST" token is used.
 # But to test template sends, a real Postmark server token and template id are needed:
@@ -23,8 +23,12 @@ ANYMAIL_TEST_POSTMARK_DOMAIN = os.getenv("ANYMAIL_TEST_POSTMARK_DOMAIN")
     "to run Postmark template integration tests",
 )
 @override_settings(
-    ANYMAIL_POSTMARK_SERVER_TOKEN="POSTMARK_API_TEST",
-    EMAIL_BACKEND="anymail.backends.postmark.EmailBackend",
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.postmark.EmailBackend",
+            "OPTIONS": {"server_token": "POSTMARK_API_TEST"},
+        },
+    },
 )
 class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
     """Postmark API integration tests
@@ -131,7 +135,14 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         "and ANYMAIL_TEST_POSTMARK_DOMAIN environment variables to run Postmark "
         "template integration tests",
     )
-    @override_settings(ANYMAIL_POSTMARK_SERVER_TOKEN=ANYMAIL_TEST_POSTMARK_SERVER_TOKEN)
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.postmark.EmailBackend",
+                "OPTIONS": {"server_token": ANYMAIL_TEST_POSTMARK_SERVER_TOKEN},
+            },
+        },
+    )
     def test_template(self):
         message = AnymailMessage(
             from_email=self.from_email,
@@ -146,7 +157,14 @@ class PostmarkBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         message.send()
         self.assertEqual(message.anymail_status.status, {"sent"})
 
-    @override_settings(ANYMAIL_POSTMARK_SERVER_TOKEN="Hey, that's not a server token!")
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.postmark.EmailBackend",
+                "OPTIONS": {"server_token": "Hey, that's not a server token!"},
+            },
+        },
+    )
     def test_invalid_server_token(self):
         # Message will include something like
         # "Request does not contain a valid Server token"

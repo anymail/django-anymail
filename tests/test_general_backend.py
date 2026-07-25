@@ -2,10 +2,7 @@ import unittest
 from datetime import datetime, timezone
 
 from django.core import mail
-from django.core.exceptions import ImproperlyConfigured
-from django.core.mail import get_connection, send_mail
 from django.test import SimpleTestCase
-from django.test.utils import override_settings
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy
 
@@ -14,12 +11,18 @@ from anymail.exceptions import (
     AnymailConfigurationError,
     AnymailError,
     AnymailInvalidAddress,
+    AnymailInvalidMailer,
     AnymailUnsupportedFeature,
 )
 from anymail.message import AnymailMessage
 from anymail.utils import EmailAddress, get_anymail_setting
 
-from .utils import AnymailTestMixin
+from .utils import (
+    AnymailTestMixin,
+    get_default_mailer,
+    ignore_connection_warnings,
+    override_settings,
+)
 
 
 def uts46_installed():
@@ -48,7 +51,9 @@ class SettingsTestBackend(TestBackend):
         super().__init__(*args, **kwargs)
 
 
-@override_settings(EMAIL_BACKEND="anymail.backends.test.EmailBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "anymail.backends.test.EmailBackend"}}
+)
 class TestBackendTestCase(AnymailTestMixin, SimpleTestCase):
     """Base TestCase using Anymail's Test EmailBackend"""
 
@@ -85,40 +90,69 @@ class TestBackendTestCase(AnymailTestMixin, SimpleTestCase):
             )
 
 
-@override_settings(EMAIL_BACKEND="tests.test_general_backend.SettingsTestBackend")
+@override_settings(
+    MAILERS={"default": {"BACKEND": "tests.test_general_backend.SettingsTestBackend"}}
+)
 class BackendSettingsTests(TestBackendTestCase):
     """Test settings initializations for Anymail EmailBackends"""
+
+    @unittest.skipUnless(
+        hasattr(mail, "mailers"), "MAILERS not supported in Django < 6.1"
+    )
+    def test_mailers_options(self):
+        # Note that self.settings() does not convert MAILERS to EMAIL_BACKEND
+        # on older Django versions (like our custom override_settings() does).
+        with self.settings(
+            ANYMAIL={"TEST_SAMPLE_SETTING": "setting_from_anymail_settings"},
+            MAILERS={
+                "default": {
+                    "BACKEND": "tests.test_general_backend.SettingsTestBackend",
+                    "OPTIONS": {"sample_setting": "setting_from_mailers_options"},
+                }
+            },
+        ):
+            backend = get_default_mailer()
+            self.assertEqual(backend.sample_setting, "setting_from_mailers_options")
+
+    @unittest.skipUnless(
+        hasattr(mail, "mailers"), "MAILERS not supported in Django < 6.1"
+    )
+    def test_missing_mailers_options(self):
+        with self.assertRaisesMessage(
+            AnymailInvalidMailer,
+            "MAILERS['default']: OPTIONS must define 'sample_setting'",
+        ):
+            get_default_mailer()
 
     @override_settings(ANYMAIL={"TEST_SAMPLE_SETTING": "setting_from_anymail_settings"})
     def test_anymail_setting(self):
         """ESP settings usually come from ANYMAIL settings dict"""
-        backend = get_connection()
+        backend = get_default_mailer()
         self.assertEqual(backend.sample_setting, "setting_from_anymail_settings")
 
     @override_settings(TEST_SAMPLE_SETTING="setting_from_bare_settings")
     def test_bare_setting(self):
         """ESP settings are also usually allowed at root of settings file"""
-        backend = get_connection()
+        backend = get_default_mailer()
         self.assertEqual(backend.sample_setting, "setting_from_bare_settings")
 
+    # This case can be removed once the minimum supported version is Django 7.0.
     @override_settings(ANYMAIL={"TEST_SAMPLE_SETTING": "setting_from_settings"})
+    @ignore_connection_warnings()
     def test_connection_kwargs_overrides_settings(self):
         """Can override settings file in get_connection"""
-        backend = get_connection()
-        self.assertEqual(backend.sample_setting, "setting_from_settings")
-
-        backend = get_connection(sample_setting="setting_from_kwargs")
+        backend = mail.get_connection(sample_setting="setting_from_kwargs")
         self.assertEqual(backend.sample_setting, "setting_from_kwargs")
 
     def test_missing_setting(self):
         """Settings without defaults must be provided"""
-        with self.assertRaises(AnymailConfigurationError) as cm:
-            get_connection()
-        self.assertIsInstance(cm.exception, ImproperlyConfigured)  # Django consistency
-        errmsg = str(cm.exception)
-        self.assertRegex(errmsg, r"\bTEST_SAMPLE_SETTING\b")
-        self.assertRegex(errmsg, r"\bANYMAIL_TEST_SAMPLE_SETTING\b")
+        with self.assertRaisesRegex(
+            AnymailConfigurationError,
+            r"'sample_setting'|\bTEST_SAMPLE_SETTING.*ANYMAIL_TEST_SAMPLE_SETTING",
+        ):
+            get_default_mailer()
 
+    # This case can be removed once the minimum version is Django 7.0.
     @override_settings(
         ANYMAIL={
             "TEST_USERNAME": "username_from_settings",
@@ -126,14 +160,15 @@ class BackendSettingsTests(TestBackendTestCase):
             "TEST_SAMPLE_SETTING": "required",
         }
     )
+    @ignore_connection_warnings()
     def test_username_password_kwargs_overrides(self):
         """Overrides for 'username' and 'password' should work like other overrides"""
-        # These are special-cased because of default args in Django core mail functions.
-        backend = get_connection()
+        # These are special-cased because of default args in mail.get_connection().
+        backend = mail.get_connection()
         self.assertEqual(backend.username, "username_from_settings")
         self.assertEqual(backend.password, "password_from_settings")
 
-        backend = get_connection(
+        backend = mail.get_connection(
             username="username_from_kwargs", password="password_from_kwargs"
         )
         self.assertEqual(backend.username, "username_from_kwargs")
@@ -190,6 +225,30 @@ class SendDefaultsTests(TestBackendTestCase):
         self.assertEqual(params["globalextra"], "globalsetting")
 
     @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.test.EmailBackend",
+                "OPTIONS": {
+                    "send_defaults": {
+                        "metadata": {"global": "espvalue"},
+                        "tags": ["esptag"],
+                        "track_opens": False,
+                        "esp_extra": {"globalextra": "espsetting"},
+                    }
+                },
+            }
+        }
+    )
+    def test_esp_send_defaults(self):
+        self.message.send()
+        params = self.get_send_params()
+        self.assertEqual(params["metadata"], {"global": "espvalue"})
+        self.assertEqual(params["tags"], ["esptag"])
+        self.assertEqual(params["track_opens"], False)
+        # Test EmailBackend merges esp_extra into params:
+        self.assertEqual(params["globalextra"], "espsetting")
+
+    @override_settings(
         ANYMAIL={
             # SEND_DEFAULTS for the Test EmailBackend, because
             # "TEST" is the name of the Test EmailBackend's ESP
@@ -201,7 +260,7 @@ class SendDefaultsTests(TestBackendTestCase):
             }
         }
     )
-    def test_esp_send_defaults(self):
+    def test_esp_send_defaults_anymail_setting(self):
         """Test that esp-specific send defaults are applied"""
         self.message.send()
         params = self.get_send_params()
@@ -258,7 +317,7 @@ class SendDefaultsTests(TestBackendTestCase):
         )
 
         # Send another message to make sure original SEND_DEFAULTS unchanged
-        send_mail("subject", "body", "from@example.com", ["to@example.com"])
+        mail.send_mail("subject", "body", "from@example.com", ["to@example.com"])
         params = self.get_send_params()
         self.assertEqual(
             params["metadata"], {"global": "globalvalue", "other": "othervalue"}
@@ -671,10 +730,7 @@ class BatchSendDetectionTestCase(TestBackendTestCase):
                     self.unsupported_feature("cc with batch send")
                 super().set_cc(emails)
 
-        connection = mail.get_connection(
-            "anymail.backends.test.EmailBackend",
-            payload_class=ImproperlyImplementedPayload,
-        )
+        connection = TestBackend(payload_class=ImproperlyImplementedPayload)
         with self.assertRaisesMessage(
             AssertionError, "Cannot call is_batch before all attributes processed"
         ):
@@ -695,7 +751,7 @@ class IDNAEncoderTests(TestBackendTestCase):
 
     def test_default_encode(self):
         """Default encoder is idna2008."""
-        connection = mail.get_connection()
+        connection = get_default_mailer()
         self.assertEqual(connection.idna_encode("faß.example"), "xn--fa-hia.example")
         self.assertEqual(
             connection.idna_encode("idna2008.މިސާލު.example"),
@@ -710,7 +766,7 @@ class IDNAEncoderTests(TestBackendTestCase):
     @override_settings(ANYMAIL={"IDNA_ENCODER": "idna2003"})
     def test_idna2003_encode(self):
         """idna2003 provides strict compatibility with Django and earlier releases."""
-        connection = mail.get_connection()
+        connection = get_default_mailer()
         self.assertEqual(connection.idna_encode("faß.example"), "fass.example")
         self.assertEqual(connection.idna_encode("✉.example"), "xn--4bi.example")
         self.assertEqual(connection.idna_encode("✉ß.example"), "xn--ss-ufy.example")
@@ -724,7 +780,7 @@ class IDNAEncoderTests(TestBackendTestCase):
     @override_settings(ANYMAIL={"IDNA_ENCODER": "uts46"})
     def test_uts46_encode(self):
         """uts46 handles some domains rejected by idna2008."""
-        connection = mail.get_connection()
+        connection = get_default_mailer()
         self.assertEqual(connection.idna_encode("faß.example"), "xn--fa-hia.example")
         self.assertEqual(
             connection.idna_encode("idna2008.މިސާލު.example"),
@@ -736,7 +792,7 @@ class IDNAEncoderTests(TestBackendTestCase):
     @override_settings(ANYMAIL={"IDNA_ENCODER": "none"})
     def test_none_encode(self):
         """No encoding, for ESPs that can handle IDNA themselves."""
-        connection = mail.get_connection()
+        connection = get_default_mailer()
         self.assertEqual(
             connection.idna_encode("idna2008.މިސާލު.example"), "idna2008.މިސާލު.example"
         )
@@ -744,15 +800,17 @@ class IDNAEncoderTests(TestBackendTestCase):
     @override_settings(ANYMAIL={"IDNA_ENCODER": f"{__name__}.custom_encoder"})
     def test_custom_idna_dotted_path(self):
         """IDNA_ENCODER can be set to a dotted import path to a custom function."""
-        connection = mail.get_connection()
+        connection = get_default_mailer()
         self.assertEqual(connection.idna_encode("example.com"), "CUSTOM:example.com")
 
     @override_settings(ANYMAIL={"IDNA_ENCODER": custom_encoder})
     def test_custom_idna_callable(self):
         """IDNA_ENCODER can be set directly to a callable."""
-        connection = mail.get_connection()
+        connection = get_default_mailer()
         self.assertEqual(connection.idna_encode("example.com"), "CUSTOM:example.com")
 
+    # This case can be removed once the minimum supported version is Django 7.0.
+    @ignore_connection_warnings()
     def test_custom_idna_param(self):
         """IDNA_ENCODER can be overridden in backend initialization params."""
         connection = mail.get_connection(idna_encoder=custom_encoder)
@@ -766,5 +824,20 @@ class IDNAEncoderTests(TestBackendTestCase):
     )
     def test_esp_specific_encoder(self):
         """<ESP_NAME>_IDNA_ENCODER takes precedence over IDNA_ENCODER."""
-        connection = mail.get_connection()
+        connection = get_default_mailer()
+        self.assertEqual(connection.idna_encode("✉.example"), "xn--4bi.example")
+
+    @unittest.skipIf(not hasattr(mail, "mailers"), "MAILERS not supported")
+    @override_settings(
+        ANYMAIL={"IDNA_ENCODER": "raw"},
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.test.EmailBackend",
+                "OPTIONS": {"idna_encoder": "idna2003"},
+            }
+        },
+    )
+    def test_mailers_options_override(self):
+        """Specific mailer OPTIONS takes precedence over IDNA_ENCODER setting."""
+        connection = mail.mailers.default
         self.assertEqual(connection.idna_encode("✉.example"), "xn--4bi.example")
