@@ -415,25 +415,258 @@ class MailKiteBackendAnymailFeatureTests(MailKiteBackendMockAPITestCase):
         data = self.get_api_call_json()
         self.assertEqual(data["templateData"], {"name": "Ann"})
 
-    def test_merge_data_unsupported(self):
-        # MailKite sends a single message to all recipients (no batch), so
-        # per-recipient merge data can't be expressed.
-        self.message.merge_data = {"to@example.com": {"customer_id": 3}}
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "merge_data"):
-            self.message.send()
+    def test_merge_data(self):
+        # Setting merge_data switches to the batch endpoint: one personalized
+        # message per `to` recipient.
+        self.set_mock_response(
+            json_data={
+                "results": [
+                    {"to": "alice@example.com", "id": "msg_a", "status": "sent"},
+                    {"to": "Bob <bob@example.com>", "id": "msg_b", "status": "sent"},
+                ],
+                "sent": 2,
+                "scheduled": 0,
+                "failed": 0,
+            }
+        )
+        message = AnymailMessage(
+            subject="Hello {{name}} ({{group}})",
+            body="Hi {{name}}",
+            from_email="from@example.com",
+            to=["alice@example.com", "Bob <bob@example.com>"],
+            merge_data={
+                "alice@example.com": {"name": "Alice", "group": "Developers"},
+                "bob@example.com": {"name": "Bob"},
+            },
+            merge_global_data={"group": "Users", "site": "ExampleCo"},
+        )
+        message.send()
+        self.assert_esp_called("/v1/send/batch")
+        data = self.get_api_call_json()
+        self.assertNotIn("to", data)
+        # merge_global_data is the shared default; per-recipient wins key-by-key
+        self.assertEqual(data["templateData"], {"group": "Users", "site": "ExampleCo"})
+        self.assertEqual(
+            data["recipients"],
+            [
+                {
+                    "to": "alice@example.com",
+                    "templateData": {"name": "Alice", "group": "Developers"},
+                },
+                {
+                    "to": "Bob <bob@example.com>",
+                    "templateData": {"name": "Bob"},
+                },
+            ],
+        )
+        # Per-recipient message ids from the batch response:
+        self.assertEqual(message.anymail_status.status, {"sent"})
+        self.assertEqual(
+            message.anymail_status.recipients["alice@example.com"].message_id, "msg_a"
+        )
+        self.assertEqual(
+            message.anymail_status.recipients["bob@example.com"].message_id, "msg_b"
+        )
 
     def test_empty_merge_data(self):
-        # Empty merge_data is a no-op (no batch send on this ESP)
+        # Empty merge_data still switches to batch mode (one message per
+        # recipient), just with no per-recipient substitutions.
+        self.set_mock_response(
+            json_data={
+                "results": [
+                    {"to": "alice@example.com", "id": "msg_a", "status": "sent"},
+                    {"to": "Bob <bob@example.com>", "id": "msg_b", "status": "sent"},
+                ],
+                "sent": 2,
+                "scheduled": 0,
+                "failed": 0,
+            }
+        )
         message = AnymailMessage(
+            subject="Subject",
+            body="Body",
             from_email="from@example.com",
             to=["alice@example.com", "Bob <bob@example.com>"],
             merge_data={},
         )
         message.send()
-        self.assert_esp_called("/v1/send")
+        self.assert_esp_called("/v1/send/batch")
         data = self.get_api_call_json()
-        # A single send to both recipients:
-        self.assertEqual(data["to"], ["alice@example.com", "Bob <bob@example.com>"])
+        self.assertEqual(
+            data["recipients"],
+            [{"to": "alice@example.com"}, {"to": "Bob <bob@example.com>"}],
+        )
+
+    def test_merge_metadata(self):
+        # Per-recipient metadata: `metadata` merged with the recipient's
+        # merge_metadata entry, carried in a per-recipient X-Metadata header.
+        self.set_mock_response(
+            json_data={
+                "results": [
+                    {"to": "alice@example.com", "id": "msg_a", "status": "sent"},
+                    {"to": "bob@example.com", "id": "msg_b", "status": "sent"},
+                ],
+                "sent": 2,
+                "scheduled": 0,
+                "failed": 0,
+            }
+        )
+        message = AnymailMessage(
+            subject="Subject",
+            body="Body",
+            from_email="from@example.com",
+            to=["alice@example.com", "bob@example.com"],
+            metadata={"kind": "welcome", "batch": 11},
+            merge_metadata={
+                "alice@example.com": {"user_id": 123},
+                "bob@example.com": {"user_id": 456, "kind": "vip-welcome"},
+            },
+        )
+        message.send()
+        data = self.get_api_call_json()
+        # Shared metadata still travels as the shared X-Metadata header:
+        self.assertEqual(
+            json.loads(data["headers"]["X-Metadata"]), {"kind": "welcome", "batch": 11}
+        )
+        # Each recipient's header is metadata updated with their entry:
+        self.assertEqual(
+            json.loads(data["recipients"][0]["headers"]["X-Metadata"]),
+            {"kind": "welcome", "batch": 11, "user_id": 123},
+        )
+        self.assertEqual(
+            json.loads(data["recipients"][1]["headers"]["X-Metadata"]),
+            {"kind": "vip-welcome", "batch": 11, "user_id": 456},
+        )
+
+    def test_merge_headers(self):
+        self.set_mock_response(
+            json_data={
+                "results": [
+                    {"to": "alice@example.com", "id": "msg_a", "status": "sent"},
+                    {"to": "bob@example.com", "id": "msg_b", "status": "sent"},
+                ],
+                "sent": 2,
+                "scheduled": 0,
+                "failed": 0,
+            }
+        )
+        message = AnymailMessage(
+            subject="Subject",
+            body="Body",
+            from_email="from@example.com",
+            to=["alice@example.com", "bob@example.com"],
+            headers={"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
+            merge_headers={
+                "alice@example.com": {
+                    "List-Unsubscribe": "<https://example.com/a/>",
+                },
+                "bob@example.com": {
+                    "List-Unsubscribe": "<https://example.com/b/>",
+                },
+            },
+        )
+        message.send()
+        data = self.get_api_call_json()
+        # Shared headers stay shared; per-recipient headers win key-by-key:
+        self.assertEqual(
+            data["headers"],
+            {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
+        )
+        self.assertEqual(
+            data["recipients"][0]["headers"],
+            {"List-Unsubscribe": "<https://example.com/a/>"},
+        )
+        self.assertEqual(
+            data["recipients"][1]["headers"],
+            {"List-Unsubscribe": "<https://example.com/b/>"},
+        )
+
+    def test_batch_partial_failure(self):
+        # A batch can partially succeed; failed recipients get status "failed"
+        # (or "rejected" for suppressed addresses) and no exception is raised.
+        self.set_mock_response(
+            json_data={
+                "results": [
+                    {"to": "ok@example.com", "id": "msg_ok", "status": "sent"},
+                    {
+                        "to": "bounced@example.com",
+                        "status": "failed",
+                        "error": "Suppressed (unsubscribed or bounced)",
+                        "code": "recipient_suppressed",
+                    },
+                    {
+                        "to": "broken@example.com",
+                        "status": "failed",
+                        "error": "send failed",
+                        "code": "send_failed",
+                    },
+                ],
+                "sent": 1,
+                "scheduled": 0,
+                "failed": 2,
+            }
+        )
+        message = AnymailMessage(
+            subject="Subject",
+            body="Body",
+            from_email="from@example.com",
+            to=["ok@example.com", "bounced@example.com", "broken@example.com"],
+            merge_data={},
+        )
+        sent = message.send()
+        self.assertEqual(sent, 1)  # Anymail counts partial batch success as 1
+        recipients = message.anymail_status.recipients
+        self.assertEqual(recipients["ok@example.com"].status, "sent")
+        self.assertEqual(recipients["ok@example.com"].message_id, "msg_ok")
+        self.assertEqual(recipients["bounced@example.com"].status, "rejected")
+        self.assertIsNone(recipients["bounced@example.com"].message_id)
+        self.assertEqual(recipients["broken@example.com"].status, "failed")
+        self.assertEqual(message.anymail_status.status, {"sent", "rejected", "failed"})
+
+    def test_batch_scheduled(self):
+        # send_at works with batch: every message is parked (one ssnd_… each),
+        # normalized to Anymail's "queued".
+        self.set_mock_response(
+            json_data={
+                "results": [
+                    {"to": "alice@example.com", "id": "ssnd_a", "status": "scheduled"},
+                    {"to": "bob@example.com", "id": "ssnd_b", "status": "scheduled"},
+                ],
+                "sent": 0,
+                "scheduled": 2,
+                "failed": 0,
+            }
+        )
+        message = AnymailMessage(
+            subject="Subject",
+            body="Body",
+            from_email="from@example.com",
+            to=["alice@example.com", "bob@example.com"],
+            merge_data={"alice@example.com": {"name": "Alice"}},
+        )
+        message.send_at = "2026-10-11T12:13:14Z"
+        message.send()
+        data = self.get_api_call_json()
+        self.assertEqual(data["scheduledAt"], "2026-10-11T12:13:14Z")
+        self.assertEqual(message.anymail_status.status, {"queued"})
+        self.assertEqual(
+            message.anymail_status.recipients["alice@example.com"].message_id, "ssnd_a"
+        )
+
+    def test_batch_cc_bcc_unsupported(self):
+        # Batch sends one message per `to` recipient; there is no cc/bcc.
+        message = AnymailMessage(
+            subject="Subject",
+            body="Body",
+            from_email="from@example.com",
+            to=["alice@example.com"],
+            cc=["cc@example.com"],
+            merge_data={},
+        )
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "cc or bcc with batch send"
+        ):
+            message.send()
 
     def test_track_opens(self):
         # Per-send override of the from-domain's open-tracking default

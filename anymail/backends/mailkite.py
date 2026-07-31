@@ -53,6 +53,34 @@ class EmailBackend(AnymailRequestsBackend):
 
     def parse_recipient_status(self, response, payload, message):
         parsed_response = self.deserialize_json_response(response, payload, message)
+
+        if isinstance(parsed_response, dict) and "results" in parsed_response:
+            # Batch send: per-recipient outcomes, in the same order as the
+            # recipients we posted. A batch can partially succeed -- failed
+            # recipients get status "failed" (no exception is raised).
+            results = parsed_response["results"]
+            if not isinstance(results, list) or len(results) != len(
+                payload.to_recipients
+            ):
+                raise AnymailRequestsAPIError(
+                    "Invalid MailKite API batch response format",
+                    email_message=message,
+                    payload=payload,
+                    response=response,
+                    backend=self,
+                )
+            recipient_status = CaseInsensitiveCasePreservingDict()
+            for recip, result in zip(payload.to_recipients, results):
+                status = result.get("status", DEFAULT_RESPONSE_STATUS)
+                if status == "failed" and result.get("code") == "recipient_suppressed":
+                    # unsubscribed / bounced / complained address
+                    status = "rejected"
+                status = RESPONSE_STATUS_MAP.get(status, status)
+                recipient_status[recip.addr_spec] = AnymailRecipientStatus(
+                    message_id=result.get("id"), status=status
+                )
+            return dict(recipient_status)
+
         try:
             message_id = parsed_response["id"]
             status = parsed_response.get("status", DEFAULT_RESPONSE_STATUS)
@@ -81,6 +109,11 @@ class EmailBackend(AnymailRequestsBackend):
 class MailKitePayload(RequestsPayload):
     def __init__(self, message, defaults, backend, *args, **kwargs):
         self.recipients = []  # for parse_recipient_status
+        self.to_recipients = []  # `to` only, for batch fan-out
+        self.metadata = None  # needed to merge with merge_metadata in batch
+        self.merge_data = {}
+        self.merge_metadata = {}
+        self.merge_headers = {}
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = "Bearer %s" % backend.api_key
         headers["Content-Type"] = "application/json"
@@ -88,11 +121,45 @@ class MailKitePayload(RequestsPayload):
         super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)
 
     def get_api_endpoint(self):
-        # MailKite has a single send endpoint; there is no separate batch API.
+        if self.is_batch():
+            # One personalized message per `to` recipient.
+            return "v1/send/batch"
         return "v1/send"
 
     def serialize_data(self):
+        if self.is_batch():
+            self.restructure_data_for_batch()
         return self.serialize_json(self.data)
+
+    def restructure_data_for_batch(self):
+        """Convert the single-send payload to MailKite's batch-send shape"""
+        # Shared fields (from/subject/html/text/templateId/templateData/headers/
+        # replyTo/attachments/scheduledAt/...) stay as built; the `to` list
+        # becomes recipients[], each entry carrying its own templateData and
+        # headers merged over the shared ones (per-recipient wins).
+        if "cc" in self.data or "bcc" in self.data:
+            # Batch sends one message per `to` recipient; there is no cc/bcc.
+            self.unsupported_feature("cc or bcc with batch send")
+        self.data.pop("to", None)
+        recipients = []
+        for email in self.to_recipients:
+            recipient = {"to": email.format(idna_encode=self.backend.idna_encode)}
+            recipient_data = self.merge_data.get(email.addr_spec)
+            if recipient_data:
+                recipient["templateData"] = recipient_data
+            headers = {}
+            if email.addr_spec in self.merge_metadata:
+                # Anymail semantics: this recipient's metadata is `metadata`
+                # updated with their merge_metadata entry.
+                recipient_metadata = dict(self.metadata or {})
+                recipient_metadata.update(self.merge_metadata[email.addr_spec])
+                headers["X-Metadata"] = self.serialize_json(recipient_metadata)
+            if email.addr_spec in self.merge_headers:
+                headers.update(self.merge_headers[email.addr_spec])
+            if headers:
+                recipient["headers"] = headers
+            recipients.append(recipient)
+        self.data["recipients"] = recipients
 
     #
     # Payload construction
@@ -112,6 +179,8 @@ class MailKitePayload(RequestsPayload):
                 email.format(idna_encode=self.backend.idna_encode) for email in emails
             ]
             self.recipients += emails
+            if recipient_type == "to":
+                self.to_recipients = emails
 
     def set_subject(self, subject):
         self.data["subject"] = subject
@@ -181,6 +250,7 @@ class MailKitePayload(RequestsPayload):
         self.data.setdefault("headers", {})["X-Metadata"] = self.serialize_json(
             metadata
         )
+        self.metadata = metadata  # merged with merge_metadata in a batch send
 
     def set_tags(self, tags):
         # MailKite has no tags field; carry them as JSON in a custom header.
@@ -214,11 +284,20 @@ class MailKitePayload(RequestsPayload):
         # MailKite renders templates server-side from templateData.
         self.data["templateData"] = merge_global_data
 
+    # Setting any of merge_data / merge_metadata / merge_headers switches to
+    # MailKite's batch-send endpoint: one personalized message per `to`
+    # recipient, with per-recipient values merged over the shared ones.
+    # The payload is restructured in serialize_data (see
+    # restructure_data_for_batch), once every attribute has been processed.
+
     def set_merge_data(self, merge_data):
-        # MailKite sends a single message to all recipients (not one per
-        # recipient), so per-recipient merge data can't be expressed.
-        if any(recipient_data for recipient_data in merge_data.values()):
-            self.unsupported_feature("merge_data")
+        self.merge_data = merge_data
+
+    def set_merge_metadata(self, merge_metadata):
+        self.merge_metadata = merge_metadata
+
+    def set_merge_headers(self, merge_headers):
+        self.merge_headers = merge_headers
 
     def set_esp_extra(self, extra):
         self.data.update(extra)
