@@ -91,13 +91,15 @@ class MailKiteBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     def test_scheduled_send(self):
         # A future send_at parks the message with MailKite's scheduler.
-        # (Don't add metadata, tags, or extra headers here: MailKite doesn't
-        # yet accept custom headers on scheduled sends.)
+        # Metadata and tags (carried as headers) are preserved on the
+        # scheduled message.
         message = AnymailMessage(
             subject="Anymail MailKite scheduled-send integration test",
             body="This message was scheduled 2 minutes ahead via send_at",
             from_email=self.from_email,
             to=["test+to1@anymail.dev"],
+            metadata={"meta1": "scheduled"},
+            tags=["integration-scheduled"],
         )
         message.send_at = datetime.now(timezone.utc) + timedelta(minutes=2)
         message.send()

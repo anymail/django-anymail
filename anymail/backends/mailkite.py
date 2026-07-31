@@ -188,10 +188,7 @@ class MailKitePayload(RequestsPayload):
 
     def set_send_at(self, send_at):
         # A future scheduledAt parks the message for MailKite's scheduler;
-        # an omitted or past value sends immediately. Note: MailKite rejects
-        # scheduled sends that include custom headers (which this backend also
-        # uses to carry metadata and tags), so send_at can't currently be
-        # combined with extra headers, metadata, or tags.
+        # an omitted or past value sends immediately.
         try:
             send_at = send_at.isoformat(
                 timespec="milliseconds" if send_at.microsecond else "seconds"
