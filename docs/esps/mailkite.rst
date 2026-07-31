@@ -127,14 +127,21 @@ can tell Anymail to suppress these errors and send anyway — see
   (:func:`~anymail.message.attach_inline_image`) are not supported through Anymail.
   Attach them as regular attachments instead.
 
-**No per-recipient merge**
-  MailKite sends a single message to all recipients (there is no one-per-recipient
-  batch send), so :attr:`~anymail.message.AnymailMessage.merge_data`,
-  :attr:`~anymail.message.AnymailMessage.merge_metadata` and
-  :attr:`~anymail.message.AnymailMessage.merge_headers` are not supported. Use
-  :attr:`~anymail.message.AnymailMessage.template_id` with
-  :attr:`~anymail.message.AnymailMessage.merge_global_data` to render a single
-  message from a `MailKite template`_.
+**Batch sending / per-recipient merge**
+  Setting :attr:`~anymail.message.AnymailMessage.merge_data`,
+  :attr:`~anymail.message.AnymailMessage.merge_metadata` or
+  :attr:`~anymail.message.AnymailMessage.merge_headers` switches to MailKite's
+  batch-send endpoint: each ``to`` recipient gets an **individual message**
+  showing only their own address, personalized with their merge values
+  (per-recipient values win over
+  :attr:`~anymail.message.AnymailMessage.merge_global_data`, metadata and
+  extra headers, key by key). Each recipient gets their own
+  ``message_id`` in :attr:`~anymail.message.AnymailMessage.anymail_status`,
+  and a batch can partially succeed — a suppressed address reports status
+  ``rejected`` and other failures ``failed``, without raising an error.
+  Two restrictions: MailKite allows at most **50 recipients per batch
+  message**, and ``cc``/``bcc`` can't be combined with a batch send (each
+  message goes to exactly one recipient).
 
 **Single reply-to field**
   MailKite's ``replyTo`` is a single string. If you supply multiple reply-to

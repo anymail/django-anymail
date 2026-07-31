@@ -110,3 +110,32 @@ class MailKiteBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
         # which Anymail normalizes to "queued":
         self.assertEqual(anymail_status.status, {"queued"})
         self.assertTrue(anymail_status.message_id.startswith("ssnd_"))
+
+    def test_batch_send(self):
+        # merge_data switches to MailKite's batch endpoint: one personalized
+        # message per recipient, each with its own message id.
+        message = AnymailMessage(
+            subject="Anymail MailKite batch integration test, {{name}}",
+            body="This message was personalized for {{name}} ({{group}})",
+            from_email=self.from_email,
+            to=["test+to1@anymail.dev", "Recipient 2 <test+to2@anymail.dev>"],
+            merge_data={
+                "test+to1@anymail.dev": {"name": "One"},
+                "test+to2@anymail.dev": {"name": "Two"},
+            },
+            merge_global_data={"group": "integration"},
+            merge_metadata={
+                "test+to1@anymail.dev": {"user_id": 1},
+                "test+to2@anymail.dev": {"user_id": 2},
+            },
+        )
+        message.send()
+
+        recipient_status = message.anymail_status.recipients
+        self.assertEqual(recipient_status["test+to1@anymail.dev"].status, "sent")
+        self.assertEqual(recipient_status["test+to2@anymail.dev"].status, "sent")
+        # Batch = one message per recipient, so the ids differ:
+        self.assertNotEqual(
+            recipient_status["test+to1@anymail.dev"].message_id,
+            recipient_status["test+to2@anymail.dev"].message_id,
+        )
