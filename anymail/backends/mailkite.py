@@ -11,9 +11,12 @@ from .base_requests import AnymailRequestsBackend, RequestsPayload
 
 # MailKite message status values returned from the send endpoint, mapped to
 # Anymail's normalized recipient statuses. The API documents the send response
-# as ``{"id": "...", "status": "..."}`` (e.g. ``"queued"``); we pass the status
-# through as-is, defaulting to ``"queued"`` when the ESP omits it.
+# as ``{"id": "...", "status": "..."}`` (e.g. ``"queued"``, or ``"scheduled"``
+# for a send_at message parked for later delivery); we normalize ``"scheduled"``
+# to Anymail's ``"queued"`` and pass other statuses through as-is, defaulting
+# to ``"queued"`` when the ESP omits the status.
 DEFAULT_RESPONSE_STATUS = "queued"
+RESPONSE_STATUS_MAP = {"scheduled": "queued"}
 
 
 class EmailBackend(AnymailRequestsBackend):
@@ -53,6 +56,7 @@ class EmailBackend(AnymailRequestsBackend):
         try:
             message_id = parsed_response["id"]
             status = parsed_response.get("status", DEFAULT_RESPONSE_STATUS)
+            status = RESPONSE_STATUS_MAP.get(status, status)
         except (KeyError, TypeError) as err:
             raise AnymailRequestsAPIError(
                 "Invalid MailKite API response format",
@@ -182,9 +186,22 @@ class MailKitePayload(RequestsPayload):
         # MailKite has no tags field; carry them as JSON in a custom header.
         self.data.setdefault("headers", {})["X-Tags"] = self.serialize_json(tags)
 
-    # MailKite's /v1/send endpoint has no scheduling parameter (scheduled sends
-    # are a separate flow), and no per-message tracking toggle.
-    # def set_send_at(self, send_at):
+    def set_send_at(self, send_at):
+        # A future scheduledAt parks the message for MailKite's scheduler;
+        # an omitted or past value sends immediately. Note: MailKite rejects
+        # scheduled sends that include custom headers (which this backend also
+        # uses to carry metadata and tags), so send_at can't currently be
+        # combined with extra headers, metadata, or tags.
+        try:
+            send_at = send_at.isoformat(
+                timespec="milliseconds" if send_at.microsecond else "seconds"
+            )
+        except AttributeError:
+            # User is responsible for formatting their own string
+            pass
+        self.data["scheduledAt"] = send_at
+
+    # MailKite's /v1/send endpoint has no per-message tracking toggle.
     # def set_track_clicks(self, track_clicks):
     # def set_track_opens(self, track_opens):
     # def set_envelope_sender(self, envelope_sender):
