@@ -119,12 +119,7 @@ can tell Anymail to suppress these errors and send anyway — see
   :attr:`~anymail.message.AnymailMessage.send_at` is supported: a future time
   parks the message with MailKite's scheduler (the API responds with an
   ``ssnd_…`` id and Anymail reports a ``queued`` status); a past or omitted
-  time sends immediately. One caveat: MailKite does not yet accept custom
-  headers on *scheduled* sends, and this backend also carries metadata and
-  tags as headers — so combining ``send_at`` with
-  :attr:`~anymail.message.AnymailMessage.metadata`,
-  :attr:`~anymail.message.AnymailMessage.tags`, or ``extra_headers`` will be
-  rejected by the MailKite API (a 400 with code ``headers_unscheduled``).
+  time sends immediately.
 
 **No inline attachments**
   The send API has no Content-ID field, so inline images
