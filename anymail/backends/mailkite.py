@@ -273,8 +273,12 @@ class MailKitePayload(RequestsPayload):
         # the from-domain's default applies.
         self.data["trackOpens"] = track_opens
 
-    # MailKite's /v1/send endpoint has no per-message click-tracking toggle.
-    # def set_track_clicks(self, track_clicks):
+    def set_track_clicks(self, track_clicks):
+        # Per-send click-tracking override (HTML messages only): MailKite
+        # rewrites links to a signed redirect that records the click. When
+        # omitted, the from-domain's default applies.
+        self.data["trackClicks"] = track_clicks
+
     # def set_envelope_sender(self, envelope_sender):
 
     def set_template_id(self, template_id):
