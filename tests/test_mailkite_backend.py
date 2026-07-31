@@ -1,8 +1,13 @@
 import json
+from datetime import date, datetime
 from decimal import Decimal
 
 from django.core import mail
 from django.test import SimpleTestCase, tag
+from django.utils.timezone import (
+    get_fixed_timezone,
+    override as override_current_timezone,
+)
 
 from anymail.exceptions import (
     AnymailAPIError,
@@ -302,10 +307,58 @@ class MailKiteBackendAnymailFeatureTests(MailKiteBackendMockAPITestCase):
         )
 
     def test_send_at(self):
-        # The /v1/send endpoint has no scheduling parameter.
-        self.message.send_at = "2022-10-11T12:13:14Z"
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "send_at"):
+        utc_plus_6 = get_fixed_timezone(6 * 60)
+        utc_minus_8 = get_fixed_timezone(-8 * 60)
+
+        with override_current_timezone(utc_plus_6):
+            # Timezone-naive datetime assumed to be Django current_timezone
+            self.message.send_at = datetime(2022, 10, 11, 12, 13, 14, 123456)
             self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data["scheduledAt"], "2022-10-11T12:13:14.123+06:00")
+
+            # Timezone-aware datetime converted to UTC:
+            self.message.send_at = datetime(2016, 3, 4, 5, 6, 7, tzinfo=utc_minus_8)
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data["scheduledAt"], "2016-03-04T05:06:07-08:00")
+
+            # Date-only treated as midnight in current timezone
+            self.message.send_at = date(2022, 10, 22)
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data["scheduledAt"], "2022-10-22T00:00:00+06:00")
+
+            # POSIX timestamp
+            self.message.send_at = 1651820889  # 2022-05-06 07:08:09 UTC
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data["scheduledAt"], "2022-05-06T07:08:09+00:00")
+
+            # String passed unchanged (caller is responsible for formatting)
+            self.message.send_at = "2022-10-13T18:02:00Z"
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data["scheduledAt"], "2022-10-13T18:02:00Z")
+
+    def test_scheduled_response_status(self):
+        # A future send_at parks the message; MailKite responds 202 with an
+        # ssnd_… id and status "scheduled", which normalizes to "queued".
+        self.set_mock_response(
+            status_code=202,
+            json_data={
+                "id": "ssnd_test12345",
+                "status": "scheduled",
+                "scheduledAt": 1767222896000,
+            },
+        )
+        self.message.send_at = "2026-01-01T00:34:56Z"
+        self.message.send()
+        self.assertEqual(self.message.anymail_status.status, {"queued"})
+        self.assertEqual(self.message.anymail_status.message_id, "ssnd_test12345")
+        self.assertEqual(
+            self.message.anymail_status.recipients["to@example.com"].status, "queued"
+        )
 
     def test_tags(self):
         self.message.tags = ["receipt", "reorder test 12"]

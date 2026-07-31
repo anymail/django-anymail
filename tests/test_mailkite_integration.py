@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import datetime, timedelta, timezone
 from email.utils import formataddr
 
 from django.test import SimpleTestCase, tag
@@ -87,3 +88,22 @@ class MailKiteBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             recipient_status["test+to1@anymail.dev"].message_id,
             recipient_status["test+to2@anymail.dev"].message_id,
         )
+
+    def test_scheduled_send(self):
+        # A future send_at parks the message with MailKite's scheduler.
+        # (Don't add metadata, tags, or extra headers here: MailKite doesn't
+        # yet accept custom headers on scheduled sends.)
+        message = AnymailMessage(
+            subject="Anymail MailKite scheduled-send integration test",
+            body="This message was scheduled 2 minutes ahead via send_at",
+            from_email=self.from_email,
+            to=["test+to1@anymail.dev"],
+        )
+        message.send_at = datetime.now(timezone.utc) + timedelta(minutes=2)
+        message.send()
+
+        anymail_status = message.anymail_status
+        # MailKite returns an ssnd_… scheduled-send id and "scheduled" status,
+        # which Anymail normalizes to "queued":
+        self.assertEqual(anymail_status.status, {"queued"})
+        self.assertTrue(anymail_status.message_id.startswith("ssnd_"))
