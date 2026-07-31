@@ -198,9 +198,13 @@ class MailKitePayload(RequestsPayload):
             pass
         self.data["scheduledAt"] = send_at
 
-    # MailKite's /v1/send endpoint has no per-message tracking toggle.
+    def set_track_opens(self, track_opens):
+        # Per-send open-tracking override (HTML messages only). When omitted,
+        # the from-domain's default applies.
+        self.data["trackOpens"] = track_opens
+
+    # MailKite's /v1/send endpoint has no per-message click-tracking toggle.
     # def set_track_clicks(self, track_clicks):
-    # def set_track_opens(self, track_opens):
     # def set_envelope_sender(self, envelope_sender):
 
     def set_template_id(self, template_id):

@@ -14,9 +14,10 @@ second inbound vendor. This backend implements the transactional send API.
 
 .. note::
 
-    This backend covers transactional **sending**.
-    `MailKite inbound webhook`_ and delivery-status tracking support are planned
-    as a follow-up — please open an issue if you need them sooner.
+    This integration covers transactional **sending** and the
+    :ref:`inbound webhook <mailkite-inbound>`. Delivery-status (tracking)
+    webhook support is planned as a follow-up — please open an issue if you
+    need it sooner.
 
 .. _MailKite: https://mailkite.dev/
 .. _send API: https://mailkite.dev/docs
@@ -146,9 +147,53 @@ can tell Anymail to suppress these errors and send anyway — see
   :attr:`~anymail.message.AnymailMessage.tags` as JSON in custom ``X-Metadata`` and
   ``X-Tags`` headers, respectively.
 
-**No per-message tracking toggles**
-  The send API doesn't expose click/open tracking per message, so
-  :attr:`~anymail.message.AnymailMessage.track_clicks` and ``track_opens`` are not
-  supported. Configure those at the MailKite account/domain level.
+
+.. _mailkite-inbound:
+
+Inbound webhook
+---------------
+
+MailKite is inbound-first: mail sent to any address on a verified domain is
+parsed and delivered to your webhook as JSON — decoded subject and bodies,
+attachments, and the SPF/DKIM/DMARC/spam verdicts computed at MailKite's
+receiving edge — so there is no raw MIME to parse on your end.
+
+To use Anymail's normalized :ref:`inbound <inbound>` handling, set your
+MailKite domain's webhook URL (in the `MailKite dashboard`_, or via the
+``setWebhook`` API) to:
+
+    :samp:`https://{yoursite.example.com}/anymail/mailkite/inbound/`
+
+MailKite signs every delivery with an ``X-MailKite-Signature`` header
+(HMAC-SHA256). Anymail requires the signing secret to verify it:
+
+  .. code-block:: python
+
+      ANYMAIL = {
+          ...
+          "MAILKITE_WEBHOOK_SECRET": "<your webhook signing secret>",
+      }
+
+You can read the secret from your domain's webhook settings in the MailKite
+dashboard (or the ``getWebhookSecret`` API). Requests with a missing, invalid,
+or expired signature are rejected with HTTP 400; MailKite's automatic retries
+re-sign each attempt.
+
+Anymail exposes MailKite's parsed fields on the
+:class:`~anymail.inbound.AnymailInboundMessage`: envelope sender and
+recipient, from/to (with display names), subject, text and html bodies, and
+attachments (fetched from MailKite's signed attachment URLs, or decoded
+inline on zero-retention and at-rest-encrypted domains).
+:attr:`~anymail.inbound.AnymailInboundMessage.spam_detected` reflects
+MailKite's spam verdict. The complete event — including the ``auth`` block
+(SPF/DKIM/DMARC results) and ``threadId`` (pass it back as ``esp_extra
+inReplyTo`` to reply in-thread) — is available in the event's
+:attr:`~anymail.signals.AnymailInboundEvent.esp_event`.
+
+**Open tracking, but no click tracking**
+  :attr:`~anymail.message.AnymailMessage.track_opens` is supported as a
+  per-message override of the sending domain's open-tracking default
+  (HTML messages only). MailKite has no click tracking, so
+  :attr:`~anymail.message.AnymailMessage.track_clicks` is not supported.
 
 .. _MailKite template: https://mailkite.dev/docs

@@ -436,9 +436,22 @@ class MailKiteBackendAnymailFeatureTests(MailKiteBackendMockAPITestCase):
         self.assertEqual(data["to"], ["alice@example.com", "Bob <bob@example.com>"])
 
     def test_track_opens(self):
+        # Per-send override of the from-domain's open-tracking default
         self.message.track_opens = True
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "track_opens"):
-            self.message.send()
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertIs(data["trackOpens"], True)
+
+        self.message.track_opens = False
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertIs(data["trackOpens"], False)
+
+    def test_track_opens_default_omitted(self):
+        # Unset track_opens must not send the field (domain default applies)
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertNotIn("trackOpens", data)
 
     def test_track_clicks(self):
         self.message.track_clicks = True
