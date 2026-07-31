@@ -16,6 +16,6 @@ Anymail support status [#support-status]_,Full,Full,Full,Full,Full,Unsupported,F
 :attr:`~AnymailMessage.merge_global_data`,Yes [#caveats]_,Yes,Yes,Yes,Yes,Yes,Yes,Yes,No,Yes,No,No,Yes,Yes,Yes
 .. rubric:: :ref:`Status <esp-send-status>` and :ref:`event tracking <event-tracking>`,,,,,,,,,,,,,,,
 :attr:`~AnymailMessage.anymail_status`,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes
-:class:`~anymail.signals.AnymailTrackingEvent` from webhooks,Yes,Yes,Yes,Yes,Yes,Not yet,Yes,Yes,Yes,Yes,Yes,Not yet,Yes,Yes,Yes
+:class:`~anymail.signals.AnymailTrackingEvent` from webhooks,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Not yet,Yes,Yes,Yes
 .. rubric:: :ref:`Inbound handling <inbound>`,,,,,,,,,,,,,,,
 :class:`~anymail.signals.AnymailInboundEvent` from webhooks,Yes,Yes,Yes,Yes,Yes,Yes,No,Yes,Yes,Yes,Yes,No,Yes,Yes,No

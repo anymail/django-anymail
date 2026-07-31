@@ -266,18 +266,24 @@ class MailKiteInboundTestCase(MailKiteWebhookTestCase):
         self.assertEqual(attachments[0].as_uploaded_file().read(), b"%PDF-1.4 sample")
 
     def test_ignores_unknown_event_types(self):
-        # Future event types on the same webhook must not error or fire signals
+        # Non-email.* payloads must not error or fire signals
         response = self.client_post_signed(
             "/anymail/mailkite/inbound/",
-            {"id": "evt_1", "type": "email.delivered"},
+            {"id": "evt_1", "type": "ping"},
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.inbound_handler.call_count, 0)
 
     def test_misconfigured_tracking(self):
-        # (No tracking webhook exists yet; this documents current behavior:
-        # non-inbound events are ignored rather than raising.)
-        response = self.client_post_signed(
-            "/anymail/mailkite/inbound/", {"type": "email.bounced"}
-        )
-        self.assertEqual(response.status_code, 200)
+        # A tracking event arriving on the inbound URL means the webhook URLs
+        # are swapped -- surface a configuration hint rather than dropping it.
+        from anymail.exceptions import AnymailConfigurationError
+
+        with self.assertRaisesMessage(
+            AnymailConfigurationError,
+            "You seem to have set MailKite's *tracking-event* webhook"
+            " to Anymail's MailKite *inbound* webhook URL.",
+        ):
+            self.client_post_signed(
+                "/anymail/mailkite/inbound/", {"type": "email.bounced"}
+            )
