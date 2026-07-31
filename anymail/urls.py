@@ -11,6 +11,10 @@ from .webhooks.mailersend import (
 )
 from .webhooks.mailgun import MailgunInboundWebhookView, MailgunTrackingWebhookView
 from .webhooks.mailjet import MailjetInboundWebhookView, MailjetTrackingWebhookView
+from .webhooks.mailkite import (
+    MailKiteInboundWebhookView,
+    MailKiteTrackingWebhookView,
+)
 from .webhooks.mailtrap import MailtrapTrackingWebhookView
 from .webhooks.mandrill import MandrillCombinedWebhookView
 from .webhooks.postal import PostalInboundWebhookView, PostalTrackingWebhookView
@@ -57,6 +61,11 @@ urlpatterns = [
         "mailjet/inbound/",
         MailjetInboundWebhookView.as_view(),
         name="mailjet_inbound_webhook",
+    ),
+    path(
+        "mailkite/inbound/",
+        MailKiteInboundWebhookView.as_view(),
+        name="mailkite_inbound_webhook",
     ),
     path(
         "postal/inbound/",
@@ -108,6 +117,11 @@ urlpatterns = [
         "mailjet/tracking/",
         MailjetTrackingWebhookView.as_view(),
         name="mailjet_tracking_webhook",
+    ),
+    path(
+        "mailkite/tracking/",
+        MailKiteTrackingWebhookView.as_view(),
+        name="mailkite_tracking_webhook",
     ),
     path(
         "mailtrap/tracking/",
