@@ -73,6 +73,7 @@ class MailKiteBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             headers={"X-Anymail-Test": "value"},
             metadata={"meta1": "simple string", "meta2": 2},
             tags=["integration", "tag 2"],
+            track_opens=True,
         )
         message.attach_alternative("<p>HTML content</p>", "text/html")
         message.attach("attachment1.txt", "Here is some\ntext for you", "text/plain")
