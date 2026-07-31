@@ -6,9 +6,16 @@ from email.utils import formataddr
 
 import requests
 
-from ..exceptions import AnymailWebhookValidationFailure
+from ..exceptions import AnymailConfigurationError, AnymailWebhookValidationFailure
 from ..inbound import AnymailInboundMessage
-from ..signals import AnymailInboundEvent, EventType, inbound
+from ..signals import (
+    AnymailInboundEvent,
+    AnymailTrackingEvent,
+    EventType,
+    RejectReason,
+    inbound,
+    tracking,
+)
 from ..utils import get_anymail_setting
 from .base import AnymailBaseWebhookView
 
@@ -19,11 +26,15 @@ from .base import AnymailBaseWebhookView
 SIGNATURE_TOLERANCE_MS = 5 * 60 * 1000
 
 
-class MailKiteInboundWebhookView(AnymailBaseWebhookView):
-    """Handler for MailKite inbound webhook (``email.received`` events)"""
+class MailKiteBaseWebhookView(AnymailBaseWebhookView):
+    """Base view for MailKite webhooks (shared signature validation)
+
+    MailKite signs the inbound-mail webhook and the tracking-event webhook
+    with the same account webhook secret and the same signature scheme, so
+    one MAILKITE_WEBHOOK_SECRET setting covers both views.
+    """
 
     esp_name = "MailKite"
-    signal = inbound
     warn_if_no_basic_auth = False  # because we validate against the signature
 
     # (Declaring class attr allows override by kwargs in View.as_view.)
@@ -76,11 +87,23 @@ class MailKiteInboundWebhookView(AnymailBaseWebhookView):
                 "MailKite webhook called with expired signature"
             )
 
+
+class MailKiteInboundWebhookView(MailKiteBaseWebhookView):
+    """Handler for MailKite inbound webhook (``email.received`` events)"""
+
+    signal = inbound
+
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
         if esp_event.get("type") != "email.received":
-            # Ignore any future event types MailKite may add to the same
-            # webhook, rather than erroring on every delivery of them.
+            if str(esp_event.get("type", "")).startswith("email."):
+                raise AnymailConfigurationError(
+                    "You seem to have set MailKite's *tracking-event* webhook"
+                    " to Anymail's MailKite *inbound* webhook URL."
+                    " (Or MailKite has added an event type this version of"
+                    " Anymail doesn't know about.)"
+                )
+            # Ignore anything else, rather than erroring on every delivery.
             return []
         return [self.esp_to_anymail_event(esp_event)]
 
@@ -152,4 +175,81 @@ class MailKiteInboundWebhookView(AnymailBaseWebhookView):
             content=content,
             filename=attachment.get("filename"),
             base64=base64_encoded,
+        )
+
+
+class MailKiteTrackingWebhookView(MailKiteBaseWebhookView):
+    """Handler for MailKite tracking-event webhook (``email.*`` events)"""
+
+    signal = tracking
+
+    # Map MailKite event type: Anymail normalized type.
+    # (email.delivered is reserved by MailKite for a future release;
+    # mapping it now means it works the day the ESP starts emitting it.)
+    event_types = {
+        "email.sent": EventType.SENT,
+        "email.delivered": EventType.DELIVERED,
+        "email.bounced": EventType.BOUNCED,
+        "email.complained": EventType.COMPLAINED,
+        "email.opened": EventType.OPENED,
+        "email.clicked": EventType.CLICKED,
+    }
+
+    def parse_events(self, request):
+        esp_event = json.loads(request.body.decode("utf-8"))
+        if esp_event.get("type") == "email.received":
+            raise AnymailConfigurationError(
+                "You seem to have set MailKite's *inbound* webhook"
+                " to Anymail's MailKite *tracking* webhook URL."
+            )
+        return [self.esp_to_anymail_event(esp_event)]
+
+    def esp_to_anymail_event(self, esp_event):
+        # Payload documented in MailKite's tracking-event schema:
+        # {id: evt_…, type: "email.<event>", createdAt (ms), createdAtIso,
+        #  data: {messageId, providerMessageId, from, to, subject,
+        #         bounce?{type, diagnostic}, complaint?{feedbackType},
+        #         open?/click?{url?, machine, userAgent, client, os, …}}}
+        event_type = self.event_types.get(esp_event.get("type"), EventType.UNKNOWN)
+        data = esp_event.get("data") or {}
+
+        try:
+            timestamp = datetime.fromtimestamp(
+                esp_event["createdAt"] / 1000.0, tz=timezone.utc
+            )
+        except (KeyError, TypeError):
+            timestamp = None
+
+        reject_reason = None
+        description = None
+        mta_response = None
+        bounce = data.get("bounce")
+        if bounce is not None:
+            reject_reason = RejectReason.BOUNCED
+            mta_response = bounce.get("diagnostic")
+            description = bounce.get("diagnostic")
+        complaint = data.get("complaint")
+        if complaint is not None:
+            reject_reason = RejectReason.SPAM
+            description = complaint.get("feedbackType")
+
+        click = data.get("click") or {}
+        open_info = data.get("open") or {}
+        engagement = click or open_info
+
+        return AnymailTrackingEvent(
+            event_type=event_type,
+            timestamp=timestamp,
+            # messageId is null for provider bounce/complaint notifications
+            # (they can't be correlated to a stored message); recipient is
+            # always present and is the reliable key for those events.
+            message_id=data.get("messageId"),
+            event_id=esp_event.get("id"),
+            recipient=data.get("to"),
+            reject_reason=reject_reason,
+            description=description,
+            mta_response=mta_response,
+            click_url=click.get("url"),
+            user_agent=engagement.get("userAgent"),
+            esp_event=esp_event,
         )

@@ -12,18 +12,6 @@ verdict, delivered together as one signed webhook. That makes it a good fit for
 support inboxes, reply-to-thread flows, and agent mailboxes without wiring a
 second inbound vendor. This backend implements the transactional send API.
 
-.. note::
-
-    This integration covers transactional **sending** and the
-    :ref:`inbound webhook <mailkite-inbound>`. Delivery-status (tracking)
-    webhook support is planned as a follow-up — please open an issue if you
-    need it sooner.
-
-.. _MailKite: https://mailkite.dev/
-.. _send API: https://mailkite.dev/docs
-.. _MailKite inbound webhook: https://mailkite.dev/docs
-
-
 Installation
 ------------
 
@@ -153,6 +141,42 @@ can tell Anymail to suppress these errors and send anyway — see
   :attr:`~anymail.message.AnymailMessage.metadata` and
   :attr:`~anymail.message.AnymailMessage.tags` as JSON in custom ``X-Metadata`` and
   ``X-Tags`` headers, respectively.
+
+
+.. _MailKite tracking events: https://mailkite.dev/docs
+
+.. _mailkite-tracking:
+
+Status tracking webhooks
+------------------------
+
+MailKite can POST signed engagement events for your outbound mail —
+``email.sent``, ``email.bounced``, ``email.complained``, ``email.opened``
+and ``email.clicked`` — to a per-domain *tracking webhook*. This is a
+**separate URL** from the inbound webhook below (so inbound consumers never
+receive event types they don't expect). Set it with the ``setTrackingWebhook``
+API (or ``mailkite webhook set-tracking`` in the CLI) to:
+
+    :samp:`https://{yoursite.example.com}/anymail/mailkite/tracking/`
+
+Deliveries are signed exactly like inbound ones, verified with the same
+``MAILKITE_WEBHOOK_SECRET`` setting as the inbound webhook (see below).
+Anymail normalizes the events to
+:class:`~anymail.signals.AnymailTrackingEvent`: bounces carry the DSN
+diagnostic in :attr:`~anymail.signals.AnymailTrackingEvent.mta_response`
+(reject reason ``bounced``), complaints report reject reason ``spam``,
+clicks carry :attr:`~anymail.signals.AnymailTrackingEvent.click_url`, and
+opens/clicks include the user agent. One caveat: bounce and complaint events
+originate from provider notifications and carry a null ``message_id`` —
+key on :attr:`~anymail.signals.AnymailTrackingEvent.recipient` for those
+(the full event, including MailKite's machine/scanner flags on opens and
+clicks, is in :attr:`~anymail.signals.AnymailTrackingEvent.esp_event`).
+``email.delivered`` is reserved by MailKite for a future release and is
+already mapped, so it will work when the ESP starts emitting it.
+
+.. _MailKite: https://mailkite.dev/
+.. _send API: https://mailkite.dev/docs
+.. _MailKite inbound webhook: https://mailkite.dev/docs
 
 
 .. _mailkite-inbound:
