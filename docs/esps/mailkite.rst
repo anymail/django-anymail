@@ -197,10 +197,14 @@ MailKite's spam verdict. The complete event — including the ``auth`` block
 inReplyTo`` to reply in-thread) — is available in the event's
 :attr:`~anymail.signals.AnymailInboundEvent.esp_event`.
 
-**Open tracking, but no click tracking**
-  :attr:`~anymail.message.AnymailMessage.track_opens` is supported as a
-  per-message override of the sending domain's open-tracking default
-  (HTML messages only). MailKite has no click tracking, so
-  :attr:`~anymail.message.AnymailMessage.track_clicks` is not supported.
+**Open and click tracking**
+  :attr:`~anymail.message.AnymailMessage.track_opens` and
+  :attr:`~anymail.message.AnymailMessage.track_clicks` are supported as
+  per-message overrides of the sending domain's tracking defaults (HTML
+  messages only). With click tracking on, MailKite rewrites links to a
+  signed redirect that records the click and forwards the reader to the
+  original URL; ``mailto:``/``tel:`` links and in-page anchors are never
+  rewritten, and clicks from security scanners are flagged so they can be
+  excluded from click counts.
 
 .. _MailKite template: https://mailkite.dev/docs

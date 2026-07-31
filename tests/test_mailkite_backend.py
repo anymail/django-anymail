@@ -687,9 +687,22 @@ class MailKiteBackendAnymailFeatureTests(MailKiteBackendMockAPITestCase):
         self.assertNotIn("trackOpens", data)
 
     def test_track_clicks(self):
+        # Per-send override of the from-domain's click-tracking default
         self.message.track_clicks = True
-        with self.assertRaisesMessage(AnymailUnsupportedFeature, "track_clicks"):
-            self.message.send()
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertIs(data["trackClicks"], True)
+
+        self.message.track_clicks = False
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertIs(data["trackClicks"], False)
+
+    def test_track_clicks_default_omitted(self):
+        # Unset track_clicks must not send the field (domain default applies)
+        self.message.send()
+        data = self.get_api_call_json()
+        self.assertNotIn("trackClicks", data)
 
     def test_default_omits_options(self):
         """Make sure by default we don't send any ESP-specific options.
