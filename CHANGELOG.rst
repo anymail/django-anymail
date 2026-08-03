@@ -25,6 +25,22 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+Unreleased
+----------
+
+New ESPs
+~~~~~~~~
+
+* **MailKite:** Add support for this ESP. MailKite is an inbound-first developer
+  email platform -- it sends transactional mail via a single JSON API, and also
+  *receives* email (parsed body plus an authentication verdict, delivered as a
+  signed webhook). The backend supports per-message open/click tracking
+  overrides, server-side templates with merge tags (``template_id`` and
+  ``merge_global_data``), scheduled sending (``send_at``), and batch sending with
+  per-recipient ``merge_metadata`` and ``merge_headers``. It does not wire up
+  outbound tracking webhooks (MailKite does not emit them) or inbound signals
+  (MailKite delivers inbound mail directly to your own webhook URL).
+
 v15.1
 -----
 
