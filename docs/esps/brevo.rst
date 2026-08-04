@@ -130,15 +130,6 @@ override this by enabling the :setting:`ANYMAIL_IGNORE_UNSUPPORTED_FEATURES`
 setting, and Anymail will try to limit the API request to features
 Brevo can handle.
 
-**HTML body required**
-  Brevo's API returns an error if you attempt to send a message with
-  only a plain-text body. Be sure to :ref:`include HTML <sending-html>`
-  content for your messages if you are not using a template.
-
-  (Brevo *does* allow HTML without a plain-text body. This is generally
-  not recommended, though, as some email systems treat HTML-only content as a
-  spam signal.)
-
 **Inline images**
   Brevo's v3 API doesn't support inline images, at all.
   (Confirmed with Brevo support Feb 2018.)
