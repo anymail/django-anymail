@@ -50,6 +50,15 @@ nor ``ANYMAIL_POSTMARK_SERVER_TOKEN`` is set.
 You can override the server token for an individual message in
 its :ref:`esp_extra <postmark-esp-extra>`.
 
+.. setting:: ANYMAIL_POSTMARK_MESSAGE_STREAM
+
+.. rubric:: POSTMARK_MESSAGE_STREAM
+
+.. versionadded:: vNext
+
+The Postmark message stream ID to use for sending. If not set, Postmark will
+use the default transactional message stream for most sends, or the default
+broadcast message stream for bulk API sends.
 
 .. setting:: ANYMAIL_POSTMARK_API_URL
 
@@ -76,7 +85,7 @@ Example:
     .. code-block:: python
 
         message.esp_extra = {
-            'MessageStream': 'marketing',  # send using specific message stream ID
+            'FuturePostmarkOption': 'value',
             'server_token': '<API server token for just this message>',
         }
 

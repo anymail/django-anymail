@@ -25,6 +25,9 @@ class EmailBackend(AnymailRequestsBackend):
         self.server_token = get_anymail_setting(
             "server_token", esp_name=esp_name, kwargs=kwargs, allow_bare=True
         )
+        self.message_stream = get_anymail_setting(
+            "message_stream", esp_name=esp_name, kwargs=kwargs, default=None
+        )
         api_url = get_anymail_setting(
             "api_url",
             esp_name=esp_name,
@@ -304,6 +307,8 @@ class PostmarkPayload(RequestsPayload):
 
     def init_payload(self):
         self.data = {}  # becomes json
+        if self.backend.message_stream is not None:
+            self.data["MessageStream"] = self.backend.message_stream
 
     def set_from_email_list(self, emails):
         # Postmark accepts multiple From email addresses

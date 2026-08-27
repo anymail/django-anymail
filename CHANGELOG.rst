@@ -25,6 +25,19 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes*
+
+Features
+~~~~~~~~
+
+* **Postmark:** Add a ``POSTMARK_MESSAGE_STREAM`` option that controls the
+  Postmark message stream used for sending. With Django 6.1 ``MAILERS`` you can
+  specify a different ``message_stream`` for each configured mailer.
+
+
 v15.1
 -----
 

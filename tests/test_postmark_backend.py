@@ -752,6 +752,7 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
         """
         self.message.send()
         data = self.get_api_call_json()
+        self.assertNotIn("MessageStream", data)
         self.assertNotIn("Metadata", data)
         self.assertNotIn("Tag", data)
         self.assertNotIn("TemplateId", data)
@@ -779,6 +780,31 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
         )
         data = self.get_api_call_json()
         self.assertNotIn("server_token", data)  # not in the json
+
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.postmark.EmailBackend",
+                "OPTIONS": {
+                    "message_stream": "custom-message-stream",
+                    "server_token": "test_server_token",
+                },
+            },
+        },
+    )
+    def test_message_stream(self):
+        with self.subTest("default"):
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data["MessageStream"], "custom-message-stream")
+
+        with self.subTest("esp_extra override"):
+            self.message.esp_extra = {
+                "MessageStream": "message-specific-message-stream",
+            }
+            self.message.send()
+            data = self.get_api_call_json()
+            self.assertEqual(data["MessageStream"], "message-specific-message-stream")
 
     # noinspection PyUnresolvedReferences
     def test_send_attaches_anymail_status(self):
