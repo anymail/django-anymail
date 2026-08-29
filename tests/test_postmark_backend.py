@@ -1,5 +1,6 @@
 import json
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core import mail
 from django.test import SimpleTestCase, tag
@@ -907,6 +908,183 @@ class PostmarkBackendAnymailFeatureTests(PostmarkBackendMockAPITestCase):
         self.assertIn("Don't know how to send this data to Postmark", str(err))
         # original message:
         self.assertRegex(str(err), r"Decimal.*is not JSON serializable")
+
+
+@tag("postmark")
+@override_settings(
+    MAILERS={
+        "default": {
+            "BACKEND": "anymail.backends.postmark.EmailBackend",
+            "OPTIONS": {
+                "server_token": "test_server_token",
+                "use_bulk_api": True,
+            },
+        },
+    }
+)
+class PostmarkBulkApiTests(PostmarkBackendMockAPITestCase):
+    DEFAULT_RAW_RESPONSE = json.dumps(
+        {
+            "Id": "238848c1-57c7-4811-9e22-6dbcd7f9f239",
+            "SubmittedAt": "2026-08-27T18:13:28.1768928Z",
+            "TotalMessages": 1,
+            "PercentageCompleted": 0,
+            "Status": "Accepted",
+            "Subject": "Subject",
+            "ReleasedCount": 0,
+            "FailedCount": 0,
+        }
+    ).encode()
+
+    def setUp(self):
+        super().setUp()
+
+        # Patch uuid4 to generate predictable message_ids for testing
+        patch_uuid4 = patch(
+            "anymail.backends.postmark.uuid.uuid4",
+            side_effect=[f"mocked-uuid-{n:d}" for n in range(1, 10)],
+        )
+        patch_uuid4.start()
+        self.addCleanup(patch_uuid4.stop)
+
+    def test_uses_bulk_api(self):
+        self.message.send()
+        self.assert_esp_called("/email/bulk")
+        data = self.get_api_call_json()
+        self.assertEqual(data["Subject"], "Subject")
+        self.assertEqual(data["TextBody"], "Text Body")
+        self.assertEqual(data["From"], "from@example.com")
+        self.assertEqual(
+            data["Messages"],
+            [
+                {
+                    "To": "to@example.com",
+                    "Metadata": {"anymail_id": "mocked-uuid-1"},
+                }
+            ],
+        )
+        status = self.message.anymail_status
+        self.assertEqual(
+            status.recipients["to@example.com"].message_id, "mocked-uuid-1"
+        )
+        self.assertEqual(status.recipients["to@example.com"].status, "queued")
+
+    def test_all_options(self):
+        message = AnymailMessage(
+            from_email="from@example.com",
+            to=["one@example.com", "Second Recipient <two@example.com>"],
+            cc=["cc@example.com"],
+            bcc=["bcc@example.com"],
+            subject="Newsletter {{issue_date}}",
+            body="Newsletter for {{name}}...",
+            merge_global_data={"issue_date": "2026 Aug 29"},
+            merge_data={
+                "one@example.com": {"name": "One"},
+                "two@example.com": {"name": "Two"},
+            },
+            headers={"X-Custom": "header"},
+            merge_headers={
+                "two@example.com": {"List-Unsubscribe": "mailto:unsub+2@example.com"},
+            },
+            metadata={"issue_id": "12345"},
+            merge_metadata={
+                "one@example.com": {"first_issue": "yes"},
+            },
+        )
+        message.attach_alternative("<b>Newsletter for {{name}}...</b>", "text/html")
+        # Postmark's bulk API sends the same attachments to all recipients
+        message.attach("newsletter.txt", "Newsletter", "text/plain")
+
+        message.send()
+        data = self.get_api_call_json()
+        self.maxDiff = None
+        self.assertEqual(
+            data,
+            {
+                "From": "from@example.com",
+                "Subject": "Newsletter {{issue_date}}",
+                "TextBody": "Newsletter for {{name}}...",
+                "HtmlBody": "<b>Newsletter for {{name}}...</b>",
+                "Attachments": [
+                    {
+                        "Name": "newsletter.txt",
+                        "Content": "TmV3c2xldHRlcg==",
+                        "ContentType": 'text/plain; charset="utf-8"',
+                    }
+                ],
+                "Headers": [{"Name": "X-Custom", "Value": "header"}],
+                "Messages": [
+                    {
+                        "To": "one@example.com",
+                        "Cc": "cc@example.com",
+                        "Bcc": "bcc@example.com",
+                        "TemplateModel": {
+                            "issue_date": "2026 Aug 29",
+                            "name": "One",
+                        },
+                        "Metadata": {
+                            "anymail_id": "mocked-uuid-1",
+                            "issue_id": "12345",
+                            "first_issue": "yes",
+                        },
+                    },
+                    {
+                        "To": "Second Recipient <two@example.com>",
+                        "Cc": "cc@example.com",
+                        "Bcc": "bcc@example.com",
+                        "TemplateModel": {
+                            "issue_date": "2026 Aug 29",
+                            "name": "Two",
+                        },
+                        "Headers": [
+                            {"Name": "X-Custom", "Value": "header"},
+                            {
+                                "Name": "List-Unsubscribe",
+                                "Value": "mailto:unsub+2@example.com",
+                            },
+                        ],
+                        "Metadata": {
+                            "anymail_id": "mocked-uuid-2",
+                            "issue_id": "12345",
+                        },
+                    },
+                ],
+            },
+        )
+
+    def test_bulk_api_not_enabled(self):
+        self.set_mock_response(
+            status_code=422,
+            json_data={
+                "ErrorCode": 14,
+                "Message": "This endpoint requires approval to access. Contact support"
+                " to use the Bulk API postmarkapp.com/contact",
+            },
+        )
+        with self.assertRaisesMessage(
+            AnymailAPIError, "This endpoint requires approval to access."
+        ):
+            self.message.send()
+
+    @override_settings(
+        MAILERS={
+            "default": {
+                "BACKEND": "anymail.backends.postmark.EmailBackend",
+                "OPTIONS": {
+                    "server_token": "test_server_token",
+                    "use_bulk_api": True,
+                    "generate_message_id": False,
+                },
+            },
+        }
+    )
+    def test_disable_generated_message_id(self):
+        self.message.send()
+        self.assert_esp_called("/email/bulk")
+        data = self.get_api_call_json()
+        self.assertEqual(data["Messages"], [{"To": "to@example.com"}])
+        status = self.message.anymail_status
+        self.assertIsNone(status.recipients["to@example.com"].message_id)
 
 
 @tag("postmark")

@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from requests.structures import CaseInsensitiveDict
 
@@ -27,6 +28,16 @@ class EmailBackend(AnymailRequestsBackend):
         )
         self.message_stream = get_anymail_setting(
             "message_stream", esp_name=esp_name, kwargs=kwargs, default=None
+        )
+        self.use_bulk_api = get_anymail_setting(
+            "use_bulk_api", esp_name=esp_name, kwargs=kwargs, default=False
+        )
+        # Anymail-generated message IDs are currently used only for Postmark's bulk API.
+        self.generate_message_id = get_anymail_setting(
+            "generate_message_id",
+            esp_name=esp_name,
+            kwargs=kwargs,
+            default=self.use_bulk_api,
         )
         api_url = get_anymail_setting(
             "api_url",
@@ -60,6 +71,10 @@ class EmailBackend(AnymailRequestsBackend):
         )
 
         parsed_response = self.deserialize_json_response(response, payload, message)
+        if "PercentageCompleted" in parsed_response:
+            return self.parse_bulk_recipient_status(
+                response, payload, message, recipient_status, parsed_response
+            )
         if not isinstance(parsed_response, list):
             # non-batch calls return a single response object
             parsed_response = [parsed_response]
@@ -193,6 +208,15 @@ class EmailBackend(AnymailRequestsBackend):
 
         return dict(recipient_status)
 
+    def parse_bulk_recipient_status(
+        self, response, payload, message, recipient_status, parsed_response
+    ):
+        for addr_spec, message_id in payload.generated_message_ids.items():
+            recipient_status[addr_spec] = AnymailRecipientStatus(
+                message_id=message_id, status="queued"
+            )
+        return recipient_status
+
     @staticmethod
     def _addr_specs_from_error_msg(error_msg, pattern):
         """Extract a list of email addr_specs from Postmark error_msg.
@@ -221,9 +245,12 @@ class PostmarkPayload(RequestsPayload):
         self.merge_data = None
         self.merge_metadata = None
         self.merge_headers = {}
+        self.generated_message_ids = {}
         super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)
 
     def get_api_endpoint(self):
+        if self.backend.use_bulk_api:
+            return "email/bulk"
         batch_send = self.is_batch()
         if "TemplateAlias" in self.data or "TemplateId" in self.data:
             if batch_send:
@@ -249,6 +276,10 @@ class PostmarkPayload(RequestsPayload):
         return params
 
     def serialize_data(self):
+        if self.backend.generate_message_id:
+            self.generated_message_ids = {
+                to.addr_spec: str(uuid.uuid4()) for to in self.to_emails
+            }
         api_endpoint = self.get_api_endpoint()
         if api_endpoint == "email":
             data = self.data
@@ -260,6 +291,9 @@ class PostmarkPayload(RequestsPayload):
             assert (
                 self.merge_data is None and self.merge_metadata is None
             )  # else it's a batch send
+            data = self.data
+        elif api_endpoint == "email/bulk":
+            self.update_data_for_bulk_api()
             data = self.data
         else:
             raise AssertionError(
@@ -300,6 +334,54 @@ class PostmarkPayload(RequestsPayload):
                 {"Name": name, "Value": value} for name, value in headers.items()
             ]
         return data
+
+    def update_data_for_bulk_api(self):
+        self.data.pop("To", None)
+        cc = self.data.pop("Cc", None)
+        bcc = self.data.pop("Bcc", None)
+        base_metadata = self.data.pop("Metadata", {})
+        base_template_model = self.data.pop("TemplateModel", {})
+
+        messages = []
+        self.data["Messages"] = messages
+        for to in self.to_emails:
+            message = {"To": to.format(idna_encode=self.backend.idna_encode)}
+            if cc is not None:
+                message["Cc"] = cc
+            if bcc is not None:
+                message["Bcc"] = bcc
+
+            if self.merge_data and to.addr_spec in self.merge_data:
+                template_model = base_template_model | self.merge_data[to.addr_spec]
+            else:
+                template_model = base_template_model
+            if template_model:
+                message["TemplateModel"] = template_model
+
+            metadata = base_metadata
+            if self.merge_metadata and to.addr_spec in self.merge_metadata:
+                metadata = metadata | self.merge_metadata[to.addr_spec]
+            try:
+                metadata["anymail_id"] = self.generated_message_ids[to.addr_spec]
+            except KeyError:
+                pass
+            if metadata:
+                message["Metadata"] = metadata
+
+            if to.addr_spec in self.merge_headers:
+                if "Headers" in self.data:
+                    # merge global and recipient headers
+                    headers = CaseInsensitiveDict(
+                        (item["Name"], item["Value"]) for item in self.data["Headers"]
+                    )
+                    headers.update(self.merge_headers[to.addr_spec])
+                else:
+                    headers = self.merge_headers[to.addr_spec]
+                message["Headers"] = [
+                    {"Name": name, "Value": value} for name, value in headers.items()
+                ]
+
+            messages.append(message)
 
     #
     # Payload construction

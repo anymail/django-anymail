@@ -50,6 +50,14 @@ nor ``ANYMAIL_POSTMARK_SERVER_TOKEN`` is set.
 You can override the server token for an individual message in
 its :ref:`esp_extra <postmark-esp-extra>`.
 
+.. setting:: ANYMAIL_POSTMARK_USE_BULK_API
+
+.. rubric:: POSTMARK_USE_BULK_API
+
+.. versionadded:: vNext
+
+Set ``True`` to use Postmark's bulk API for all sending. See :ref:`postmark-bulk-api`.
+
 .. setting:: ANYMAIL_POSTMARK_MESSAGE_STREAM
 
 .. rubric:: POSTMARK_MESSAGE_STREAM
@@ -217,17 +225,87 @@ duplicated for *every* to-recipient.)
 If you want to use batch sending with a regular message (without a template), set
 merge data to an empty dict: `message.merge_data = {}`.
 
-Postmark only applies merge data through its template APIs, so non-empty
-:attr:`~anymail.message.AnymailMessage.merge_data` or
+Postmark only applies merge data through its template APIs or with the bulk API,
+so non-empty :attr:`~anymail.message.AnymailMessage.merge_data` or
 :attr:`~anymail.message.AnymailMessage.merge_global_data` requires a
-:attr:`~anymail.message.AnymailMessage.template_id`. Anymail raises an
-:exc:`~anymail.exceptions.AnymailUnsupportedFeature` error otherwise, rather
-than sending a message where the merge data would be silently ignored.
+:attr:`~anymail.message.AnymailMessage.template_id` (or enabling the bulk API).
+Anymail raises an :exc:`~anymail.exceptions.AnymailUnsupportedFeature` error otherwise,
+rather than sending a message where the merge data would be silently ignored.
 
 See this `Postmark blog post on templates`_ for more information.
 
 .. _Postmark blog post on templates:
     https://postmarkapp.com/blog/special-delivery-postmark-templates
+
+
+.. _postmark-bulk-api:
+
+Using Postmark's bulk API
+-------------------------
+
+.. versionadded:: vNext
+
+Postmark supports a separate `bulk API`_ which is optimized for large-volume
+broadcast sending. By default, Anymail uses one of Postmark's transactional
+sending APIs. You can enable bulk sending with the ``ANYMAIL`` configuration
+option :setting:`POSTMARK_USE_BULK_API <ANYMAIL_POSTMARK_USE_BULK_API>`.
+
+Postmark currently requires customers to request approval for the bulk API.
+Trying to send without that approval will result in a 422 error.
+
+When the bulk API is used, Anymail treats *all* sends as :ref:`batch sending
+<batch-send>` (whether or not :attr:`.merge_data` or some other batch attribute
+is used). That is, each ``to`` address results in a separate message, and
+multiple ``to`` recipients do not see the other ``to`` addresses. (``cc`` and
+``bcc`` are duplicated to each ``to`` recipient.)
+
+Postmark's bulk API allows customizing the message for each recipient, either
+with a :attr:`.template_id` or using inline `{{ variable }}` substitutions
+in the body and subject. In either case, use Anymail's :attr:`.merge_data` and
+:attr:`.merge_global_data` to supply the substitutions.
+
+The bulk API may delay sending, so is not suitable for high-priority
+transactional emails like password resets or order confirmations. It's best to
+direct different types of email to the appropriate API. Using
+:ref:`multiple mailer configurations <topic-email-configuration>` (available
+starting in Django 6.1) is recommended for this. For example:
+
+.. code-block:: python
+
+    MAILERS = {
+        # Configure the default mailer for transactional sending:
+        "default": {
+            "BACKEND": "anymail.backends.postmark.EmailBackend",
+            "OPTIONS": {
+                "server_token": ...,
+            },
+        },
+        # Create a second mailer for broadcast sending with the bulk API:
+        "announcements": {
+            "BACKEND": "anymail.backends.postmark.EmailBackend",
+            "OPTIONS": {
+                "server_token": ...,
+                "use_bulk_api": True,
+                # Set the Postmark message stream ID if needed. If not set,
+                # Postmark's bulk API will use your default broadcast stream.
+                "message_stream": "broadcast-announcements",
+            },
+        },
+    }
+
+With that configuration, you can direct particular emails to the bulk API with
+``using="announcements"`` in the send call.
+
+Because the bulk API may defer sending, Postmark's *Message-ID* is not
+available at send time. To facilitate status tracking, Anymail will generate a
+unique ID for each ``to`` recipient in a bulk send and include it as
+per-recipient metadata (the ``"anymail_id"`` :attr:`~.AnymailMessage.metadata`
+field is reserved for this purpose). The generated IDs are available in the
+:attr:`message.anymail_status.recipients <.AnymailStatus.recipients>` dict
+after sending and in tracking webhooks as :attr:`event.message_id
+<.AnymailTrackingEvent.message_id>`.
+
+.. _bulk API: https://postmarkapp.com/developer/api/bulk-email
 
 
 .. _postmark-webhooks:
