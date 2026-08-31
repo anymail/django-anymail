@@ -33,6 +33,8 @@ vNext
 Features
 ~~~~~~~~
 
+* **Mailtrap:** Support signature verification for tracking event webhooks.
+
 * **Postmark:** Add support for Postmark's bulk API. See
   `Using Postmark's bulk API
   <https://anymail.dev/en/latest/esps/postmark/#using-postmark-s-bulk-api>`_.
