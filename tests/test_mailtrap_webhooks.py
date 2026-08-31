@@ -6,6 +6,7 @@ from unittest.mock import ANY
 
 from django.test import override_settings, tag
 
+from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.mailtrap import MailtrapTrackingWebhookView
 
@@ -445,3 +446,15 @@ class MailtrapDeliveryTestCase(WebhookTestCase):
         self.assertEqual(event.message_id, "1df37d17-0286-4d8b-8edf-bc4ec5be86e6")
         self.assertEqual(event.recipient, "receiver@example.com")
         self.assertEqual(event.reject_reason, "blocked")
+
+    def test_misconfigured_inbound(self):
+        errmsg = (
+            "You seem to have set Mailtrap's *inbound* webhook"
+            " to Anymail's Mailtrap *tracking* webhook URL."
+        )
+        with self.assertRaisesMessage(AnymailConfigurationError, errmsg):
+            self.client.post(
+                "/anymail/mailtrap/tracking/",
+                content_type="application/json",
+                data={"events": [{"event": "inbound.message_received"}]},
+            )

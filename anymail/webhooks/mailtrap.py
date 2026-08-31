@@ -2,12 +2,23 @@ import hashlib
 import hmac
 import json
 import sys
+from collections.abc import Iterator
 from datetime import datetime, timezone
+from urllib.parse import quote, urljoin
 
+import requests
 from django.utils.crypto import constant_time_compare
 
-from ..exceptions import AnymailWebhookValidationFailure
-from ..signals import AnymailTrackingEvent, EventType, RejectReason, tracking
+from ..exceptions import AnymailConfigurationError, AnymailWebhookValidationFailure
+from ..inbound import AnymailInboundMessage
+from ..signals import (
+    AnymailInboundEvent,
+    AnymailTrackingEvent,
+    EventType,
+    RejectReason,
+    inbound,
+    tracking,
+)
 from ..utils import get_anymail_setting
 from .base import AnymailBaseWebhookView
 
@@ -132,6 +143,12 @@ class MailtrapTrackingWebhookView(MailtrapWebhookView):
     }
 
     def esp_to_anymail_event(self, esp_event: MailtrapReceiveEvent):
+        if esp_event["event"].startswith("inbound"):
+            raise AnymailConfigurationError(
+                "You seem to have set Mailtrap's *inbound* webhook "
+                "to Anymail's Mailtrap *tracking* webhook URL."
+            )
+
         event_type = self.event_types.get(esp_event["event"], EventType.UNKNOWN)
         timestamp = datetime.fromtimestamp(esp_event["timestamp"], tz=timezone.utc)
         reject_reason = self.reject_reasons.get(esp_event["event"])
@@ -153,3 +170,124 @@ class MailtrapTrackingWebhookView(MailtrapWebhookView):
             user_agent=esp_event.get("user_agent"),
             esp_event=esp_event,
         )
+
+
+class MailtrapInboundEvent(TypedDict):
+    # Notification webhook payload
+    event: Literal["inbound.message_received"]
+    event_id: str
+    timestamp: int
+    inbox_id: int
+    message_id: str
+    # from: str
+
+
+class MailtrapInboundMessage(TypedDict):
+    # Result from get inbound message API
+    # https://docs.mailtrap.io/developers/inbound/messages#get-api-inbound-inboxes-inbox_id-messages-id
+    id: str
+    raw_message_url: str
+    raw_message_expires_at: NotRequired[str]
+    # (There are several other fields that Anymail doesn't currently use.)
+
+
+class MailtrapInboundWebhookView(MailtrapWebhookView):
+    """Handler for Mailtrap inbound webhook events."""
+
+    signal = inbound
+
+    RAW_MIME_DOWNLOAD_CHUNK_SIZE = 16 * 1024
+
+    # (Declaring class attr allows override by kwargs in View.as_view.)
+    api_token = None
+    api_url = None
+    inbound_secret = None
+
+    def __init__(self, **kwargs):
+        self.api_token = get_anymail_setting(
+            "api_token", esp_name=self.esp_name, kwargs=kwargs, allow_bare=True
+        )
+        self.api_url = get_anymail_setting(
+            "api_url",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            default="https://mailtrap.io/api/",
+        )
+        if not self.api_url.endswith("/"):
+            self.api_url += "/"
+        super().__init__(_secret_name="inbound_secret", **kwargs)
+
+    def parse_events(self, request):
+        esp_events: list[MailtrapInboundEvent] = json.loads(
+            request.body.decode("utf-8")
+        ).get("events", [])
+        return [self.esp_to_anymail_event(esp_event) for esp_event in esp_events]
+
+    def esp_to_anymail_event(
+        self, esp_event: MailtrapInboundEvent
+    ) -> AnymailInboundEvent:
+        if esp_event["event"] != "inbound.message_received":
+            if esp_event["event"].startswith("inbound"):
+                raise ValueError(
+                    f"Unknown Mailtrap inbound event type: {esp_event['event']}"
+                )
+            raise AnymailConfigurationError(
+                "You seem to have set Mailtrap's *tracking* webhook "
+                "to Anymail's Mailtrap *inbound* webhook URL."
+            )
+
+        try:
+            timestamp = datetime.fromtimestamp(
+                esp_event["timestamp"] / 1000, tz=timezone.utc
+            )
+        except (KeyError, TypeError, ValueError):
+            timestamp = None
+
+        inbox_id = esp_event["inbox_id"]
+        message_id = esp_event["message_id"]
+        message_data = self.fetch_inbound_message(inbox_id, message_id)
+
+        # Download the full raw message. (message_data isn't quite enough to
+        # reconstruct the inbound message, and any attachments would require
+        # separate downloads anyway. Easier to do it all at once.)
+        # The raw_message_url is a signed S3 URL -- no auth required.
+        raw_message_url = message_data["raw_message_url"]
+        chunks_iterator = self.fetch_raw_message_chunks(raw_message_url)
+        message = AnymailInboundMessage.parse_raw_mime_chunks(chunks_iterator)
+
+        # Mailtrap doesn't seem to provide envelope_sender, envelope_recipient,
+        # or any spam scoring.
+
+        return AnymailInboundEvent(
+            event_type=EventType.INBOUND,
+            timestamp=timestamp,
+            # esp_event["event_id"] may not be stable across retries;
+            # inbox_id+message_id is unique to an inbound message:
+            event_id=f"{inbox_id}/{message_id}",
+            # The fetched inbound message_data is more useful than
+            # (and includes nearly all of) the esp_event webhook payload:
+            esp_event=message_data,
+            message=message,
+        )
+
+    def fetch_inbound_message(
+        self, inbox_id: int, message_id: str
+    ) -> MailtrapInboundMessage:
+        message_url = urljoin(
+            self.api_url,
+            f"inbound/inboxes/{quote(str(inbox_id), safe='')}"
+            f"/messages/{quote(message_id, safe='')}",
+        )
+        response = requests.get(
+            message_url, headers={"Authorization": f"Bearer {self.api_token}"}
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def fetch_raw_message_chunks(self, raw_message_url: str) -> Iterator[bytes]:
+        # The raw_message_url is a signed S3 URL -- no auth required.
+        with requests.get(raw_message_url, stream=True) as response:
+            response.raise_for_status()
+            yield from response.iter_content(
+                chunk_size=self.RAW_MIME_DOWNLOAD_CHUNK_SIZE
+            )
