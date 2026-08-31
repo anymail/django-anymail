@@ -42,7 +42,7 @@ Features
   `Using Postmark's bulk API
   <https://anymail.dev/en/latest/esps/postmark/#using-postmark-s-bulk-api>`_.
 
-  Also add a ``POSTMARK_MESSAGE_STREAM`` option to specify the id of the
+* **Postmark:** Add ``POSTMARK_MESSAGE_STREAM`` option to specify the id of the
   Postmark message stream used for sending. With Django 6.1 ``MAILERS`` you can
   use a different ``message_stream`` for each configured mailer.
 

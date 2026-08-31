@@ -56,7 +56,9 @@ its :ref:`esp_extra <postmark-esp-extra>`.
 
 .. versionadded:: vNext
 
-Set ``True`` to use Postmark's bulk API for all sending. See :ref:`postmark-bulk-api`.
+Set ``True`` to use Postmark's bulk API for *all* sending. (This is not
+recommended if you also send transactional emails; instead, enable the bulk API
+only for specific sends.) See :ref:`postmark-bulk-api` below.
 
 .. setting:: ANYMAIL_POSTMARK_MESSAGE_STREAM
 
@@ -68,7 +70,14 @@ The Postmark message stream ID to use for sending. If not set, Postmark will
 use the default transactional message stream for most sends, or the default
 broadcast message stream for bulk API sends.
 
-.. setting:: ANYMAIL_POSTMARK_API_URL
+To override the message stream for particular sends, include
+``"message_stream"`` in the :setting:`MAILERS` options for a particular mailer
+configuration (Django 6.1 or later) or pass ``message_stream="<id>"`` to
+:func:`django.core.mail.get_connection`. You can also provide a
+``"MessageStream"`` (note the capitalization) in Anymail's
+:attr:`~anymail.message.AnymailMessage.esp_extra` on particular message.
+
+.. setting:: ANYMAIL_POSTMARK_ API_URL
 
 .. rubric:: POSTMARK_API_URL
 
@@ -247,8 +256,10 @@ Using Postmark's bulk API
 
 Postmark supports a separate `bulk API`_ which is optimized for large-volume
 broadcast sending. By default, Anymail uses one of Postmark's transactional
-sending APIs. You can enable bulk sending with the ``ANYMAIL`` configuration
-option :setting:`POSTMARK_USE_BULK_API <ANYMAIL_POSTMARK_USE_BULK_API>`.
+sending APIs. You can enable bulk sending for *all* sending with the
+``ANYMAIL`` configuration option :setting:`POSTMARK_USE_BULK_API
+<ANYMAIL_POSTMARK_USE_BULK_API>`, or use one of the approaches described below
+to use the bulk API only for specific sends.
 
 Postmark currently requires customers to request approval for the bulk API.
 Trying to send without that approval will result in a 422 error.
@@ -295,6 +306,12 @@ starting in Django 6.1) is recommended for this. For example:
 
 With that configuration, you can direct particular emails to the bulk API with
 ``using="announcements"`` in the send call.
+
+Prior to Django 6.1, to use the bulk API only for specific messages, don't set
+:setting:`POSTMARK_USE_BULK_API <ANYMAIL_POSTMARK_USE_BULK_API>` in your
+Anymail settings. Instead, call :func:`django.core.mail.get_connection` with
+``use_bulk_api=True`` and pass the resulting connection to Django's sending
+functions or :class:`~django.core.mail.EmailMessage` constructor .
 
 Because the bulk API may defer sending, Postmark's *Message-ID* is not
 available at send time. To facilitate status tracking, Anymail will generate a
