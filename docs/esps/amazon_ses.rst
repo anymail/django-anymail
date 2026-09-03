@@ -27,21 +27,32 @@ AWS SDK for Python, and supports sending, tracking, and inbound receiving capabi
 Installation
 ------------
 
-You must ensure the :pypi:`boto3` package is installed to use Anymail's Amazon SES
-backend. Either include the ``amazon-ses`` option when you install Anymail:
+You must ensure the :pypi:`boto3` package is installed to use Anymail's Amazon
+SES backend. If you are using Amazon SES inbound email with S3 encryption, you
+will also need the :pypi:`amazon-s3-encryption-client-python` package.
+
+Either include the ``amazon-ses`` option when you install Anymail (it installs
+both additional dependencies):
 
     .. code-block:: console
 
         $ pip install "django-anymail[amazon-ses]"
 
-or separately run ``pip install boto3``.
+or separately run ``pip install boto3`` and (if needed) ``pip install
+amazon-s3-encryption-client-python``.
 
 .. versionchanged:: 10.0
 
     In earlier releases, the "extra name" could use an underscore
     (``django-anymail[amazon_ses]``). That now causes pip to warn
     that "django-anymail does not provide the extra 'amazon_ses',"
-    and may result in a broken installation that is missing boto3.
+    and may result in a broken installation that is missing required
+    dependencies.
+
+.. versionchanged:: vNext
+
+    The ``django-anymail[amazon-ses]`` installation extra now includes
+    the :pypi:`amazon-s3-encryption-client-python` package.
 
 To send mail with Anymail's Amazon SES backend, set:
 
@@ -517,8 +528,17 @@ To use Anymail's inbound webhook with Amazon SES:
 
    * **For the S3 action:** choose or create any S3 bucket that Boto will be able to read.
      (See :ref:`amazon-ses-iam-permissions`; *don't* use a world-readable bucket!)
-     "Object key prefix" is optional. Anymail does *not* currently support the
-     "Encrypt message" option. Finally, choose the SNS Topic you created in step 2.
+     "Object key prefix" is optional.
+
+     Anymail supports (but doesn't require) the "Encrypt message" option. If
+     you enable it, you must also set :setting:`AMAZON_SES_INBOUND_KMS_KEY_ID
+     <ANYMAIL_AMAZON_SES_INBOUND_KMS_KEY_ID>` to the selected KMS key id.
+
+     Finally, choose the SNS Topic you created in step 2.
+
+     .. versionadded:: vNext
+
+        Support for encrypted messages in the S3 receipt action.
 
 Amazon SES will likely deliver a test message to your Anymail inbound handler immediately
 after you complete the last step.
@@ -693,6 +713,32 @@ accepting Amazon SNS subscription confirmation requests.
 See :ref:`amazon-ses-confirm-sns-subscriptions` above.
 
 
+.. setting:: ANYMAIL_AMAZON_SES_INBOUND_KMS_KEY_ID
+
+.. rubric:: AMAZON_SES_INBOUND_KMS_KEY_ID
+
+.. versionadded:: vNext
+
+Required only for Amazon SES inbound email using the S3 receipt action with the
+"encrypt message" option enabled. action. The KMS key ID or ARN configured for
+the S3 encryption. The credentials Anymail uses must have ``kms:Decrypt``
+permission for this key.
+
+  .. code-block:: python
+
+      ANYMAIL = {
+          ...
+          "AMAZON_SES_INBOUND_KMS_KEY_ID": "arn:aws:kms:...:key/MY-KEY-ID",
+      }
+
+You can use the exact ARN or a key alias. E.g., for the default AWS-managed key
+you can use ``"arn:aws:kms:REGION:AWSACCOUNTID:alias/aws/ses"`` with your
+12-digit account ID and the AWS region where you are receiving inbound email.
+
+Setting this without enabling "encrypt message" in the inbound S3 receipt
+action will result in the error "S3EncryptionClientError: Instruction file body
+is empty for key" when Anymail tries to decrypt an inbound message.
+
 .. _amazon-ses-iam-permissions:
 
 IAM permissions
@@ -716,6 +762,9 @@ Anymail requires IAM permissions that will allow it to use these actions:
   * With an "S3 action" receipt rule: ``s3:GetObject`` on the S3 bucket
     and prefix used (or S3 Access Control List read access for inbound
     messages in that bucket)
+  * If encryption is enabled on the S3 receipt rule: also ``kms:Decrypt`` on
+    the KMS key configured for the S3 action (key aliases are *not* supported
+    in the example policy below; you must use the actual key ARN.)
 
 
 This IAM policy covers all of those:
@@ -741,6 +790,10 @@ This IAM policy covers all of those:
             "Effect": "Allow",
             "Action": ["s3:GetObject"],
             "Resource": ["arn:aws:s3:::MY-PRIVATE-BUCKET-NAME/MY-INBOUND-PREFIX/*"]
+          }, {
+            "Effect": "Allow",
+            "Action": ["kms:Decrypt"],
+            "Resource": ["arn:aws:kms:MY-REGION:MY-ACCOUNT-ID:key/MY-KMS-KEY-ID"]
           }]
         }
 
@@ -787,10 +840,11 @@ for any features you aren't using, and you may want to add additional restrictio
 
 * For inbound S3 delivery, there are multiple ways to control S3 access and data
   retention. See Amazon's `Managing access permissions to your Amazon S3 resources`_.
-  (And obviously, you should *never store incoming emails to a public bucket!*)
+  (And of course, you should *never store incoming emails to a public bucket!*)
 
   Also, you may need to grant Amazon SES (but *not* Anymail) permission to *write*
-  to your inbound bucket. See Amazon's `Giving permissions to Amazon SES for email receiving`_.
+  to your inbound bucket and (if encryption is enabled on the S3 receipt rule) to
+  encrypt the message. See Amazon's `Giving permissions to Amazon SES for email receiving`_.
 
 * For all operations, you can limit source IP, allowable times, user agent, and more.
   (Requests from Anymail will include "django-anymail/*version*" along with Boto's user-agent.)

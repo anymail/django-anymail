@@ -2,9 +2,9 @@ import json
 from base64 import b64encode
 from datetime import datetime, timezone
 from textwrap import dedent
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, MagicMock, call, patch
 
-from django.test import tag
+from django.test import override_settings, tag
 
 from anymail.exceptions import AnymailAPIError, AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage
@@ -35,7 +35,35 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         self.mock_client = self.mock_session.return_value.client
         #: boto3.session.Session().client('s3', ...)
         self.mock_s3 = self.mock_client.return_value
+        #: boto3.session.Session().client('kms', ...)
+        self.mock_kms = MagicMock()
+
+        def mock_get_boto_client(service_name, **kwargs):
+            return {"s3": self.mock_s3, "kms": self.mock_kms}[service_name]
+
+        self.mock_client.side_effect = mock_get_boto_client
         self.mock_s3.download_fileobj.side_effect = mock_download_fileobj
+
+        self.patch_encryption_client = patch(
+            "anymail.webhooks.amazon_ses.S3EncryptionClient", autospec=True
+        )
+        self.mock_encryption_client = self.patch_encryption_client.start()
+        self.addCleanup(self.patch_encryption_client.stop)
+        self.patch_encryption_config = patch(
+            "anymail.webhooks.amazon_ses.S3EncryptionClientConfig", autospec=True
+        )
+        self.mock_encryption_config = self.patch_encryption_config.start()
+        self.addCleanup(self.patch_encryption_config.stop)
+        self.patch_keyring = patch(
+            "anymail.webhooks.amazon_ses.KmsKeyring", autospec=True
+        )
+        self.mock_keyring = self.patch_keyring.start()
+        self.addCleanup(self.patch_keyring.stop)
+        self.patch_commitment_policy = patch(
+            "anymail.webhooks.amazon_ses.CommitmentPolicy", autospec=True
+        )
+        self.mock_commitment_policy = self.patch_commitment_policy.start()
+        self.addCleanup(self.patch_commitment_policy.stop)
 
     TEST_MIME_MESSAGE = dedent("""\
         Return-Path: <bounce-handler@mail.example.org>
@@ -378,6 +406,126 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
             " the HeadObject operation: Forbidden",
             str(cm.exception),
         )
+
+    @override_settings(
+        ANYMAIL_AMAZON_SES_INBOUND_KMS_KEY_ID="arn:aws:kms:us-east-1:111111111111:alias/aws/ses"
+    )
+    def test_inbound_s3_encrypted(self):
+        """Should decrypt an encrypted S3 receipt object before parsing it"""
+        decrypted_body = (
+            self.mock_encryption_client.return_value.get_object.return_value["Body"]
+        )
+        decrypted_body.read.return_value = self.TEST_MIME_MESSAGE.encode("ascii")
+
+        raw_ses_event = {
+            "notificationType": "Received",
+            "mail": {
+                "source": "envelope-from@example.org",
+                "timestamp": "2018-03-30T17:21:51.636Z",
+                "messageId": "encrypted-message-id",
+            },
+            "receipt": {
+                "recipients": ["inbound@example.com"],
+                "action": {
+                    "type": "S3",
+                    "bucketName": "InboundEmailBucket-KeepPrivate",
+                    "objectKey": "inbound/encrypted-message-id",
+                },
+            },
+        }
+        raw_sns_message = {
+            "Type": "Notification",
+            "MessageId": "8f6dee70-c885-558a-be7d-bd48bbf5335e",
+            "TopicArn": "arn:aws:sns:us-east-1:111111111111:SES_Inbound",
+            "Message": json.dumps(raw_ses_event),
+        }
+
+        response = self.post_from_sns("/anymail/amazon_ses/inbound/", raw_sns_message)
+        self.assertEqual(response.status_code, 200)
+        self.mock_client.assert_has_calls(
+            [call("s3", config=ANY), call("kms", config=ANY)]
+        )
+        self.mock_keyring.assert_called_once_with(
+            self.mock_kms,
+            "arn:aws:kms:us-east-1:111111111111:alias/aws/ses",
+            enable_legacy_wrapping_algorithms=True,
+        )
+        self.mock_encryption_config.assert_called_once_with(
+            self.mock_keyring.return_value,
+            commitment_policy=self.mock_commitment_policy.REQUIRE_ENCRYPT_ALLOW_DECRYPT,
+        )
+        self.mock_encryption_client.assert_called_once_with(
+            self.mock_s3, self.mock_encryption_config.return_value
+        )
+        self.mock_encryption_client.return_value.get_object.assert_called_once_with(
+            Bucket="InboundEmailBucket-KeepPrivate", Key="inbound/encrypted-message-id"
+        )
+        decrypted_body.close.assert_called_once_with()
+        self.mock_s3.close.assert_called_once_with()
+        self.mock_kms.close.assert_called_once_with()
+
+        kwargs = self.assert_handler_called_once_with(
+            self.inbound_handler,
+            sender=AmazonSESInboundWebhookView,
+            event=ANY,
+            esp_name="Amazon SES",
+        )
+        message = kwargs["event"].message
+        self.assertEqual(message.subject, "Test inbound message")
+        self.assertEqual(message.text, "It's a body\N{HORIZONTAL ELLIPSIS}\n")
+
+    @override_settings(
+        ANYMAIL_AMAZON_SES_INBOUND_KMS_KEY_ID="arn:aws:kms:us-east-1:111111111111:alias/aws/ses"
+    )
+    def test_inbound_s3_encrypted_client_error(self):
+        """Issue a helpful error when encrypted S3 download fails"""
+        from botocore.exceptions import ClientError
+
+        self.mock_encryption_client.return_value.get_object.side_effect = ClientError(
+            {"Error": {"Code": 403, "Message": "Forbidden"}},
+            operation_name="GetObject",
+        )
+
+        view = AmazonSESInboundWebhookView()
+        with self.assertRaisesMessage(
+            AnymailAPIError,
+            "Anymail AmazonSESInboundWebhookView couldn't download"
+            " S3 object 'YourBucket:inbound/the_object_key'",
+        ) as cm:
+            view.download_encrypted_s3_object("YourBucket", "inbound/the_object_key")
+
+        self.assertIsInstance(cm.exception, ClientError)
+        self.assertIn(
+            "ClientError: An error occurred (403) when calling"
+            " the GetObject operation: Forbidden",
+            str(cm.exception),
+        )
+        self.mock_s3.close.assert_called_once_with()
+        self.mock_kms.close.assert_called_once_with()
+
+    @override_settings(
+        ANYMAIL_AMAZON_SES_INBOUND_KMS_KEY_ID="arn:aws:kms:us-east-1:111111111111:alias/aws/ses"
+    )
+    def test_inbound_s3_encrypted_decryption_error(self):
+        """Issue a helpful error when encrypted S3 object verification fails"""
+        from s3_encryption.exceptions import S3EncryptionClientSecurityError
+
+        self.mock_encryption_client.return_value.get_object.side_effect = (
+            S3EncryptionClientSecurityError("Authentication tag verification failed")
+        )
+
+        view = AmazonSESInboundWebhookView()
+        with self.assertRaisesMessage(
+            AnymailAPIError,
+            "Anymail AmazonSESInboundWebhookView failed decrypting"
+            " S3 object 'YourBucket:inbound/the_object_key'",
+        ) as cm:
+            view.download_encrypted_s3_object("YourBucket", "inbound/the_object_key")
+
+        self.assertIsInstance(cm.exception, S3EncryptionClientSecurityError)
+        self.assertIn("Authentication tag verification failed", str(cm.exception))
+        self.mock_s3.close.assert_called_once_with()
+        self.mock_kms.close.assert_called_once_with()
 
     def test_incorrect_tracking_event(self):
         """The inbound webhook should warn if it receives tracking events"""

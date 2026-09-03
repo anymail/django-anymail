@@ -33,6 +33,10 @@ vNext
 Features
 ~~~~~~~~
 
+* **Amazon SES:** Add support for inbound messages using S3 encryption.
+  This requires the :pypi:`amazon-s3-encryption-client-python` package, which
+  is now included when installing with the ``django-anymail[amazon-ses]`` extra.
+
 * **Mailtrap:** Support signature verification for tracking event webhooks.
 
 * **Mailtrap:** Add support for inbound email. See
