@@ -221,12 +221,21 @@ class MailtrapInboundWebhookView(MailtrapWebhookView):
         esp_events: list[MailtrapInboundEvent] = json.loads(
             request.body.decode("utf-8")
         ).get("events", [])
-        return [self.esp_to_anymail_event(esp_event) for esp_event in esp_events]
+        return [
+            self.esp_to_anymail_event(esp_event)
+            for esp_event in esp_events
+            if esp_event is not None
+        ]
 
     def esp_to_anymail_event(
         self, esp_event: MailtrapInboundEvent
     ) -> AnymailInboundEvent:
-        if esp_event["event"] != "inbound.message_received":
+        # Mailtrap's sample payload uses "inbound_message_received",
+        # actual webhook calls use "inbound.message_received".
+        if esp_event["event"] not in {
+            "inbound.message_received",
+            "inbound_message_received",
+        }:
             if esp_event["event"].startswith("inbound"):
                 raise ValueError(
                     f"Unknown Mailtrap inbound event type: {esp_event['event']}"
@@ -236,14 +245,10 @@ class MailtrapInboundWebhookView(MailtrapWebhookView):
                 "to Anymail's Mailtrap *inbound* webhook URL."
             )
 
-        try:
-            timestamp = datetime.fromtimestamp(
-                esp_event["timestamp"] / 1000, tz=timezone.utc
-            )
-        except (KeyError, TypeError, ValueError):
-            timestamp = None
-
-        inbox_id = esp_event["inbox_id"]
+        inbox_id = esp_event.get("inbox_id")
+        if inbox_id is None or inbox_id == 1:
+            # Ignore example payload from "Test your integration"
+            return None
         message_id = esp_event["message_id"]
         message_data = self.fetch_inbound_message(inbox_id, message_id)
 
@@ -254,6 +259,13 @@ class MailtrapInboundWebhookView(MailtrapWebhookView):
         raw_message_url = message_data["raw_message_url"]
         chunks_iterator = self.fetch_raw_message_chunks(raw_message_url)
         message = AnymailInboundMessage.parse_raw_mime_chunks(chunks_iterator)
+
+        try:
+            timestamp = datetime.fromtimestamp(
+                esp_event["timestamp"] / 1000, tz=timezone.utc
+            )
+        except (KeyError, TypeError, ValueError):
+            timestamp = None
 
         # Mailtrap doesn't seem to provide envelope_sender, envelope_recipient,
         # or any spam scoring.

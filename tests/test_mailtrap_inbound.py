@@ -104,7 +104,8 @@ class MailtrapInboundTestCase(MailtrapWebhookTestCase):
                     "timestamp": 1788113042436,
                     "inbox_id": 1111,
                     "message_id": "0000111122223333444",
-                    "from": "Sender Name <from@example.com>",
+                    # Mailtrap does not seem to include the email address (9/2026)
+                    "from": "Sender Name ",
                 }
             ]
         }
@@ -187,6 +188,33 @@ class MailtrapInboundTestCase(MailtrapWebhookTestCase):
         self.assertEqual(message.text, "Hello, world!")
         self.assertEqual(message.html, "<p>Hello, world!</p>")
         self.assertEqual(message["Message-ID"], "<ABCDE12345@mail.example.com>")
+
+    @responses.activate
+    def test_mailtrap_example_payload(self):
+        # Mailtrap's "Test your integration" has an incorrect event name under
+        # "Example of payload" (9/2026). Anymail should accept and ignore that,
+        # without attempting to fetch any messages.
+        raw_webhook_payload = {
+            "events": [
+                {
+                    "event": "inbound_message_received",  # (sic)
+                    "message_id": "8d2a4c16-9c7f-4a7e-8b51-8d2a4c169c7f",
+                    "inbound_inbox_id": 1,
+                    "inbound_inbox_address": "hello@inbound.example.com",
+                    "from": "sender@example.com",
+                    "to": "hello@inbound.example.com",
+                    "subject": "Hello from a customer",
+                    "timestamp": 1733497282,
+                }
+            ]
+        }
+        response = self.client.post(
+            "/anymail/mailtrap/inbound/",
+            content_type="application/json",
+            data=raw_webhook_payload,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(responses.calls), 0)
 
     def test_misconfigured_tracking(self):
         errmsg = (
