@@ -220,7 +220,10 @@ class AnymailInboundMessage(EmailMessage):
                 return payload
             charset = charset or self.get_content_charset("US-ASCII")
             errors = errors or "replace"
-            return payload.decode(charset, errors=errors)
+            text = payload.decode(charset, errors=errors)
+            # ByteParser/ByteFeedParser inconsistently handle line endings
+            # in text parts, depending on how they are called. Normalize to \n.
+            return re.sub(r"\r\n|\r", "\n", text)
 
     def as_uploaded_file(self):
         """Return the attachment converted to a Django UploadedFile"""

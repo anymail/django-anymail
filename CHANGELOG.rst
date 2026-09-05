@@ -50,6 +50,14 @@ Features
   Postmark message stream used for sending. With Django 6.1 ``MAILERS`` you can
   use a different ``message_stream`` for each configured mailer.
 
+Fixes
+~~~~~
+
+* **Inbound:** ``AnymailInboundMessage``'s ``text`` and ``html`` attributes
+  and ``get_content_text()`` method now normalize line endings to ``\n``.
+  In earlier releases, either ``\n`` or ``\r\n`` could be returned,
+  inconsistently and somewhat unpredictably.
+
 
 v15.1
 -----

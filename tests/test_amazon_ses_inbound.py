@@ -208,10 +208,10 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
             ["Recipient <inbound@example.com>", "someone-else@example.org"],
         )
         self.assertEqual(message.subject, "Test inbound message")
-        self.assertEqual(message.text, "It's a body\N{HORIZONTAL ELLIPSIS}\r\n")
+        self.assertEqual(message.text, "It's a body\N{HORIZONTAL ELLIPSIS}\n")
         self.assertEqual(
             message.html,
-            """<div dir="ltr">It's a body\N{HORIZONTAL ELLIPSIS}</div>\r\n""",
+            """<div dir="ltr">It's a body\N{HORIZONTAL ELLIPSIS}</div>\n""",
         )
         self.assertIs(message.spam_detected, False)
 
@@ -277,10 +277,10 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
             ["Recipient <inbound@example.com>", "someone-else@example.org"],
         )
         self.assertEqual(message.subject, "Test inbound message")
-        self.assertEqual(message.text, "It's a body\N{HORIZONTAL ELLIPSIS}\r\n")
+        self.assertEqual(message.text, "It's a body\N{HORIZONTAL ELLIPSIS}\n")
         self.assertEqual(
             message.html,
-            """<div dir="ltr">It's a body\N{HORIZONTAL ELLIPSIS}</div>\r\n""",
+            """<div dir="ltr">It's a body\N{HORIZONTAL ELLIPSIS}</div>\n""",
         )
         self.assertIs(message.spam_detected, True)
 

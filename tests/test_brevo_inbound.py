@@ -87,10 +87,10 @@ class BrevoInboundTestCase(WebhookTestCase):
         self.assertEqual([str(e) for e in message.cc], ["test+cc@anymail.dev"])
         self.assertEqual(message.subject, "Testing Brevo inbound")
         self.assertEqual(message.date.isoformat(" "), "2023-07-17 11:11:22-07:00")
-        self.assertEqual(message.text, "This is a *test message*.\r\n\n- Sender\r\n")
+        self.assertEqual(message.text, "This is a *test message*.\n\n- Sender\n")
         self.assertEqual(
             message.html,
-            '<div dir="ltr">This is a <u>test message</u>.<div><br></div><div>- Mike</div><div><br></div></div>\r\n',  # NOQA: E501
+            '<div dir="ltr">This is a <u>test message</u>.<div><br></div><div>- Mike</div><div><br></div></div>\n',  # NOQA: E501
         )
 
         self.assertIsNone(message.envelope_sender)

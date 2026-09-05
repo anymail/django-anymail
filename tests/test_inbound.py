@@ -1,6 +1,7 @@
 import quopri
 from base64 import b64encode
 from email.utils import collapse_rfc2231_value
+from io import BytesIO
 from textwrap import dedent
 
 from django.test import SimpleTestCase
@@ -242,7 +243,7 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
         )
         msg = AnymailInboundMessage.parse_raw_mime_bytes(raw)
         self.assertEqual(msg["Subject"], "Test bytes")
-        self.assertEqual(msg.get_content_text(), "Ĝi estas retpoŝto.\r\n")
+        self.assertEqual(msg.get_content_text(), "Ĝi estas retpoŝto.\n")
         self.assertEqual(msg.get_content_bytes(), b"\xd8i estas retpo\xfeto.\r\n")
         self.assertEqual(msg.defects, [])
 
@@ -293,6 +294,23 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
                 " Fri, 03 May 2013 18:26:27 +0000"
             ],
         )
+
+    def test_all_parsers_remove_cr_from_text_parts(self):
+        raw = dedent("""\
+            Subject: test
+
+            Line 1
+            Line 2
+            """).replace("\n", "\r\n").encode()
+        with self.subTest("parse_raw_mime_bytes"):
+            msg = AnymailInboundMessage.parse_raw_mime_bytes(raw)
+            self.assertEqual(msg.text, "Line 1\nLine 2\n")
+        with self.subTest("parse_raw_mime_file"):
+            msg = AnymailInboundMessage.parse_raw_mime_file(BytesIO(raw))
+            self.assertEqual(msg.text, "Line 1\nLine 2\n")
+        with self.subTest("parse_raw_mime_chunks"):
+            msg = AnymailInboundMessage.parse_raw_mime_chunks([raw])
+            self.assertEqual(msg.text, "Line 1\nLine 2\n")
 
 
 class AnymailInboundMessageConveniencePropTests(SimpleTestCase):
@@ -727,9 +745,7 @@ class EmailParserBehaviorTests(SimpleTestCase):
             )
             self.assertEqual(
                 msg.get_content_text(),
-                "Not-A-Header: This is the body.{end} It is not folded.{end}".format(
-                    end=end
-                ),
+                "Not-A-Header: This is the body.\n It is not folded.\n",
             )
             self.assertEqual(msg.defects, [])
 
