@@ -19,7 +19,7 @@ from ..signals import (
     inbound,
     tracking,
 )
-from ..utils import get_anymail_setting
+from ..utils import DEFAULT_DOWNLOAD_CHUNK_SIZE, get_anymail_setting
 from .base import AnymailBaseWebhookView
 
 if sys.version_info < (3, 11):
@@ -196,8 +196,6 @@ class MailtrapInboundWebhookView(MailtrapWebhookView):
 
     signal = inbound
 
-    RAW_MIME_DOWNLOAD_CHUNK_SIZE = 16 * 1024
-
     # (Declaring class attr allows override by kwargs in View.as_view.)
     api_token = None
     api_url = None
@@ -215,6 +213,12 @@ class MailtrapInboundWebhookView(MailtrapWebhookView):
         )
         if not self.api_url.endswith("/"):
             self.api_url += "/"
+        self.chunk_size = get_anymail_setting(
+            "download_chunk_size",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            default=DEFAULT_DOWNLOAD_CHUNK_SIZE,
+        )
         super().__init__(_secret_name="inbound_secret", **kwargs)
 
     def parse_events(self, request):
@@ -300,6 +304,4 @@ class MailtrapInboundWebhookView(MailtrapWebhookView):
         # The raw_message_url is a signed S3 URL -- no auth required.
         with requests.get(raw_message_url, stream=True) as response:
             response.raise_for_status()
-            yield from response.iter_content(
-                chunk_size=self.RAW_MIME_DOWNLOAD_CHUNK_SIZE
-            )
+            yield from response.iter_content(chunk_size=self.chunk_size)

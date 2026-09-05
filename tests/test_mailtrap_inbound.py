@@ -4,7 +4,7 @@ from unittest.mock import ANY
 
 import responses
 from django.test import override_settings, tag
-from responses.matchers import header_matcher
+from responses.matchers import header_matcher, request_kwargs_matcher
 
 from anymail.exceptions import AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage
@@ -152,7 +152,11 @@ class MailtrapInboundTestCase(MailtrapWebhookTestCase):
 
         # Mock: download raw MIME
         responses.add(
-            responses.GET, raw_message_url, content_type="message/rfc822", body=raw_mime
+            responses.GET,
+            raw_message_url,
+            content_type="message/rfc822",
+            body=raw_mime,
+            match=[request_kwargs_matcher({"stream": True})],
         )
 
         response = self.client.post(
