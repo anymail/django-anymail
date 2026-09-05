@@ -53,6 +53,9 @@ Features
   Postmark message stream used for sending. With Django 6.1 ``MAILERS`` you can
   use a different ``message_stream`` for each configured mailer.
 
+* **Resend:** Large inbound messages are now downloaded and parsed
+  incrementally to reduce memory usage.
+
 Fixes
 ~~~~~
 
