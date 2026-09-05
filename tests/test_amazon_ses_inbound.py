@@ -9,6 +9,7 @@ from django.test import override_settings, tag
 from anymail.exceptions import AnymailAPIError, AnymailConfigurationError
 from anymail.inbound import AnymailInboundMessage
 from anymail.signals import AnymailInboundEvent
+from anymail.utils import DEFAULT_DOWNLOAD_CHUNK_SIZE
 from anymail.webhooks.amazon_ses import AmazonSESInboundWebhookView
 
 from .test_amazon_ses_webhooks import AmazonSESWebhookTestsMixin
@@ -19,7 +20,7 @@ from .webhook_cases import WebhookTestCase
 class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
     def setUp(self):
         super().setUp()
-        # Mock boto3.session.Session().client('s3').download_fileobj. (We could also
+        # Mock boto3.session.Session().client('s3').get_object. (We could also
         # use botocore.stub.Stubber, but mock works well with our test structure.)
         self.patch_boto3_session = patch(
             "anymail.webhooks.amazon_ses.boto3.session.Session", autospec=True
@@ -27,10 +28,16 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         self.mock_session = self.patch_boto3_session.start()  # boto3.session.Session
         self.addCleanup(self.patch_boto3_session.stop)
 
-        def mock_download_fileobj(bucket, key, fileobj):
-            fileobj.write(self.mock_s3_downloadables[bucket][key])
+        def mock_get_object(*, Bucket, Key):
+            stream = MagicMock()
+            stream.iter_chunks.return_value = iter(
+                [self.mock_s3_downloadables[Bucket][Key]]
+            )
+            self.mock_s3_streams.append(stream)
+            return {"Body": stream}
 
         self.mock_s3_downloadables = {}  #: bucket: key: bytes
+        self.mock_s3_streams = []
         #: boto3.session.Session().client
         self.mock_client = self.mock_session.return_value.client
         #: boto3.session.Session().client('s3', ...)
@@ -42,7 +49,7 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
             return {"s3": self.mock_s3, "kms": self.mock_kms}[service_name]
 
         self.mock_client.side_effect = mock_get_boto_client
-        self.mock_s3.download_fileobj.side_effect = mock_download_fileobj
+        self.mock_s3.get_object.side_effect = mock_get_object
 
         self.patch_encryption_client = patch(
             "anymail.webhooks.amazon_ses.S3EncryptionClient", autospec=True
@@ -325,11 +332,15 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         self.assertEqual(response.status_code, 200)
 
         self.mock_client.assert_called_once_with("s3", config=ANY)
-        self.mock_s3.download_fileobj.assert_called_once_with(
-            "InboundEmailBucket-KeepPrivate",
-            "inbound/fqef5sop459utgdf4o9lqbsv7jeo73pejig34301",
-            ANY,
+        self.mock_s3.get_object.assert_called_once_with(
+            Bucket="InboundEmailBucket-KeepPrivate",
+            Key="inbound/fqef5sop459utgdf4o9lqbsv7jeo73pejig34301",
         )
+        self.mock_s3_streams[0].iter_chunks.assert_called_once_with(
+            DEFAULT_DOWNLOAD_CHUNK_SIZE
+        )
+        self.mock_s3_streams[0].close.assert_called_once_with()
+        self.mock_s3.close.assert_called_once_with()
 
         kwargs = self.assert_handler_called_once_with(
             self.inbound_handler,
@@ -371,7 +382,7 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         # "An error occurred (403) when calling the HeadObject operation: Forbidden"
         from botocore.exceptions import ClientError
 
-        self.mock_s3.download_fileobj.side_effect = ClientError(
+        self.mock_s3.get_object.side_effect = ClientError(
             {"Error": {"Code": 403, "Message": "Forbidden"}},
             operation_name="HeadObject",
         )
@@ -406,6 +417,7 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
             " the HeadObject operation: Forbidden",
             str(cm.exception),
         )
+        self.mock_s3.close.assert_called_once_with()
 
     @override_settings(
         ANYMAIL_AMAZON_SES_INBOUND_KMS_KEY_ID="arn:aws:kms:us-east-1:111111111111:alias/aws/ses"
@@ -415,7 +427,9 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         decrypted_body = (
             self.mock_encryption_client.return_value.get_object.return_value["Body"]
         )
-        decrypted_body.read.return_value = self.TEST_MIME_MESSAGE.encode("ascii")
+        decrypted_body.iter_chunks.return_value = iter(
+            [self.TEST_MIME_MESSAGE.encode("ascii")]
+        )
 
         raw_ses_event = {
             "notificationType": "Received",
@@ -453,6 +467,7 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         self.mock_encryption_config.assert_called_once_with(
             self.mock_keyring.return_value,
             commitment_policy=self.mock_commitment_policy.REQUIRE_ENCRYPT_ALLOW_DECRYPT,
+            enable_delayed_authentication=True,
         )
         self.mock_encryption_client.assert_called_once_with(
             self.mock_s3, self.mock_encryption_config.return_value
@@ -460,6 +475,7 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         self.mock_encryption_client.return_value.get_object.assert_called_once_with(
             Bucket="InboundEmailBucket-KeepPrivate", Key="inbound/encrypted-message-id"
         )
+        decrypted_body.iter_chunks.assert_called_once_with(DEFAULT_DOWNLOAD_CHUNK_SIZE)
         decrypted_body.close.assert_called_once_with()
         self.mock_s3.close.assert_called_once_with()
         self.mock_kms.close.assert_called_once_with()
@@ -492,7 +508,7 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
             "Anymail AmazonSESInboundWebhookView couldn't download"
             " S3 object 'YourBucket:inbound/the_object_key'",
         ) as cm:
-            view.download_encrypted_s3_object("YourBucket", "inbound/the_object_key")
+            list(view.fetch_s3_chunks("YourBucket", "inbound/the_object_key"))
 
         self.assertIsInstance(cm.exception, ClientError)
         self.assertIn(
@@ -510,9 +526,18 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
         """Issue a helpful error when encrypted S3 object verification fails"""
         from s3_encryption.exceptions import S3EncryptionClientSecurityError
 
-        self.mock_encryption_client.return_value.get_object.side_effect = (
-            S3EncryptionClientSecurityError("Authentication tag verification failed")
+        def mock_iter_chunks(chunk_size):
+            # Delayed authentication yields unverified plaintext, then reports an
+            # invalid authentication tag when the stream is read to completion.
+            yield b"unverified plaintext"
+            raise S3EncryptionClientSecurityError(
+                "Authentication tag verification failed"
+            )
+
+        decrypted_body = (
+            self.mock_encryption_client.return_value.get_object.return_value["Body"]
         )
+        decrypted_body.iter_chunks.side_effect = mock_iter_chunks
 
         view = AmazonSESInboundWebhookView()
         with self.assertRaisesMessage(
@@ -520,10 +545,12 @@ class AmazonSESInboundTests(WebhookTestCase, AmazonSESWebhookTestsMixin):
             "Anymail AmazonSESInboundWebhookView failed decrypting"
             " S3 object 'YourBucket:inbound/the_object_key'",
         ) as cm:
-            view.download_encrypted_s3_object("YourBucket", "inbound/the_object_key")
+            list(view.fetch_s3_chunks("YourBucket", "inbound/the_object_key"))
 
         self.assertIsInstance(cm.exception, S3EncryptionClientSecurityError)
         self.assertIn("Authentication tag verification failed", str(cm.exception))
+        decrypted_body.iter_chunks.assert_called_once_with(DEFAULT_DOWNLOAD_CHUNK_SIZE)
+        decrypted_body.close.assert_called_once_with()
         self.mock_s3.close.assert_called_once_with()
         self.mock_kms.close.assert_called_once_with()
 

@@ -37,6 +37,9 @@ Features
   This requires the :pypi:`amazon-s3-encryption-client-python` package, which
   is now included when installing with the ``django-anymail[amazon-ses]`` extra.
 
+* **Amazon SES:** When using the S3 receipt action for inbound email, large
+  messages are now downloaded and parsed incrementally to reduce memory usage.
+
 * **Mailtrap:** Support signature verification for tracking event webhooks.
 
 * **Mailtrap:** Add support for inbound email. See
