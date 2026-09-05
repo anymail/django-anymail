@@ -255,14 +255,6 @@ class AnymailInboundMessage(EmailMessage):
         return BytesParser(cls, policy=default_policy).parsebytes(b)
 
     @classmethod
-    def parse_raw_mime_file(cls, fp):
-        """Returns a new AnymailInboundMessage parsed from file-like object fp"""
-        if isinstance(fp.read(0), bytes):
-            return BytesParser(cls, policy=default_policy).parse(fp)
-        else:
-            return Parser(cls, policy=default_policy).parse(fp)
-
-    @classmethod
     def parse_raw_mime_chunks(cls, chunks):
         """Returns a new AnymailInboundMessage parsed from (streamed) chunks"""
         parser = BytesFeedParser(cls, policy=default_policy)

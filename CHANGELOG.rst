@@ -56,6 +56,9 @@ Features
 Fixes
 ~~~~~
 
+* **Amazon SES:** Avoid a Python bug that could corrupt images and attachments
+  in inbound messages.
+
 * **Inbound:** ``AnymailInboundMessage``'s ``text`` and ``html`` attributes
   and ``get_content_text()`` method now normalize line endings to ``\n``.
   In earlier releases, either ``\n`` or ``\r\n`` could be returned,

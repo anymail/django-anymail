@@ -1,7 +1,6 @@
 import quopri
 from base64 import b64encode
 from email.utils import collapse_rfc2231_value
-from io import BytesIO
 from textwrap import dedent
 
 from django.test import SimpleTestCase
@@ -9,7 +8,7 @@ from django.test import SimpleTestCase
 from anymail.exceptions import AnymailDeprecationWarning
 from anymail.inbound import AnymailInboundMessage
 
-from .utils import SAMPLE_IMAGE_FILENAME, sample_email_path, sample_image_content
+from .utils import SAMPLE_IMAGE_FILENAME, sample_image_content
 
 SAMPLE_IMAGE_CONTENT = sample_image_content()
 
@@ -269,32 +268,6 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
         msg = AnymailInboundMessage.parse_raw_mime(raw)
         self.assertEqual(msg.text, "Unicode ✓")  # *not* "Unicode \\u2713"
 
-    def test_parse_raw_mime_file_text(self):
-        with open(sample_email_path()) as fp:
-            msg = AnymailInboundMessage.parse_raw_mime_file(fp)
-        self.assertEqual(msg["Subject"], "Test email")
-        self.assertEqual(msg.text, "Hi Bob, This is a message. Thanks!\n")
-        self.assertEqual(
-            msg.get_all("Received"),
-            [  # this is the first line in the sample email file
-                "by luna.mailgun.net with SMTP mgrt 8734663311733;"
-                " Fri, 03 May 2013 18:26:27 +0000"
-            ],
-        )
-
-    def test_parse_raw_mime_file_bytes(self):
-        with open(sample_email_path(), mode="rb") as fp:
-            msg = AnymailInboundMessage.parse_raw_mime_file(fp)
-        self.assertEqual(msg["Subject"], "Test email")
-        self.assertEqual(msg.text, "Hi Bob, This is a message. Thanks!\n")
-        self.assertEqual(
-            msg.get_all("Received"),
-            [  # this is the first line in the sample email file
-                "by luna.mailgun.net with SMTP mgrt 8734663311733;"
-                " Fri, 03 May 2013 18:26:27 +0000"
-            ],
-        )
-
     def test_all_parsers_remove_cr_from_text_parts(self):
         raw = dedent("""\
             Subject: test
@@ -304,9 +277,6 @@ class AnymailInboundMessageConstructionTests(SimpleTestCase):
             """).replace("\n", "\r\n").encode()
         with self.subTest("parse_raw_mime_bytes"):
             msg = AnymailInboundMessage.parse_raw_mime_bytes(raw)
-            self.assertEqual(msg.text, "Line 1\nLine 2\n")
-        with self.subTest("parse_raw_mime_file"):
-            msg = AnymailInboundMessage.parse_raw_mime_file(BytesIO(raw))
             self.assertEqual(msg.text, "Line 1\nLine 2\n")
         with self.subTest("parse_raw_mime_chunks"):
             msg = AnymailInboundMessage.parse_raw_mime_chunks([raw])
