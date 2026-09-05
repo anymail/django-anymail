@@ -54,7 +54,7 @@ its :ref:`esp_extra <postmark-esp-extra>`.
 
 .. rubric:: POSTMARK_USE_BULK_API
 
-.. versionadded:: vNext
+.. versionadded:: 15.2
 
 Set ``True`` to use Postmark's bulk API for *all* sending. (This is not
 recommended if you also send transactional emails; instead, enable the bulk API
@@ -64,7 +64,7 @@ only for specific sends.) See :ref:`postmark-bulk-api` below.
 
 .. rubric:: POSTMARK_MESSAGE_STREAM
 
-.. versionadded:: vNext
+.. versionadded:: 15.2
 
 The Postmark message stream ID to use for sending. If not set, Postmark will
 use the default transactional message stream for most sends, or the default
@@ -252,7 +252,7 @@ See this `Postmark blog post on templates`_ for more information.
 Using Postmark's bulk API
 -------------------------
 
-.. versionadded:: vNext
+.. versionadded:: 15.2
 
 Postmark supports a separate `bulk API`_ which is optimized for large-volume
 broadcast sending. By default, Anymail uses one of Postmark's transactional

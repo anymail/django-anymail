@@ -25,10 +25,10 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
-vNext
+v15.2
 -----
 
-*Unreleased changes*
+*2026-09-05*
 
 Features
 ~~~~~~~~
@@ -43,11 +43,11 @@ Features
 * **Mailtrap:** Support signature verification for tracking event webhooks.
 
 * **Mailtrap:** Add support for inbound email. See
-  `docs <https://anymail.dev/en/latest/esps/mailtrap/#inbound-webhook>`.
+  `docs <https://anymail.dev/en/stable/esps/mailtrap/#inbound-webhook>`.
 
 * **Postmark:** Add support for Postmark's bulk API. See
   `Using Postmark's bulk API
-  <https://anymail.dev/en/latest/esps/postmark/#using-postmark-s-bulk-api>`_.
+  <https://anymail.dev/en/stable/esps/postmark/#using-postmark-s-bulk-api>`_.
 
 * **Postmark:** Add ``POSTMARK_MESSAGE_STREAM`` option to specify the id of the
   Postmark message stream used for sending. With Django 6.1 ``MAILERS`` you can

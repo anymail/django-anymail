@@ -285,7 +285,7 @@ webhook to verify Mailtrap's signature, require a :setting:`WEBHOOK_SECRET
 <ANYMAIL_WEBHOOK_SECRET>` shared secret, or both. Using at least signature
 verification is recommended.
 
-.. versionadded:: vNext
+.. versionadded:: 15.2
 
     Support for verifying Mailtrap webhook signatures.
 
@@ -342,7 +342,7 @@ rejected, bounced, deferred, delivered, opened, clicked, complained, unsubscribe
 Inbound webhook
 ---------------
 
-.. versionadded:: vNext
+.. versionadded:: 15.2
 
 To receive email from Mailtrap through Anymail's normalized :ref:`inbound
 <inbound>` handling, first follow Mailtrap's guide to set up a `Mailtrap

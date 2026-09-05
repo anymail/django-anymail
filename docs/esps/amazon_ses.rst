@@ -49,7 +49,7 @@ amazon-s3-encryption-client-python``.
     and may result in a broken installation that is missing required
     dependencies.
 
-.. versionchanged:: vNext
+.. versionchanged:: 15.2
 
     The ``django-anymail[amazon-ses]`` installation extra now includes
     the :pypi:`amazon-s3-encryption-client-python` package.
@@ -536,7 +536,7 @@ To use Anymail's inbound webhook with Amazon SES:
 
      Finally, choose the SNS Topic you created in step 2.
 
-     .. versionadded:: vNext
+     .. versionadded:: 15.2
 
         Support for encrypted messages in the S3 receipt action.
 
@@ -717,7 +717,7 @@ See :ref:`amazon-ses-confirm-sns-subscriptions` above.
 
 .. rubric:: AMAZON_SES_INBOUND_KMS_KEY_ID
 
-.. versionadded:: vNext
+.. versionadded:: 15.2
 
 Required only for Amazon SES inbound email using the S3 receipt action with the
 "encrypt message" option enabled. action. The KMS key ID or ARN configured for

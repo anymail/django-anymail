@@ -232,7 +232,7 @@ Normalized inbound message
         (such as those sometimes composed by the Apple Mail app), this will
         include only the text before the first inline image.
 
-        .. versionchanged:: vNext
+        .. versionchanged:: 15.2
             Line endings are normalized to ``\n``.
 
     .. attribute:: html
@@ -240,7 +240,7 @@ Normalized inbound message
         The message's HTML message body as a `str`, or `None` if the
         message doesn't include an HTML body.
 
-        .. versionchanged:: vNext
+        .. versionchanged:: 15.2
             Line endings are normalized to ``\n``.
 
     .. attribute:: attachments
@@ -413,7 +413,7 @@ have these methods:
         The errors param is as in :meth:`~bytes.decode`. The default "replace" substitutes the
         Unicode "replacement character" for any illegal characters in the text.
 
-        .. versionchanged:: vNext
+        .. versionchanged:: 15.2
             Line endings are normalized to ``\n``.
 
     .. method:: get_content_bytes()
