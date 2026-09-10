@@ -234,12 +234,7 @@ class MailtrapInboundWebhookView(MailtrapWebhookView):
     def esp_to_anymail_event(
         self, esp_event: MailtrapInboundEvent
     ) -> AnymailInboundEvent:
-        # Mailtrap's sample payload uses "inbound_message_received",
-        # actual webhook calls use "inbound.message_received".
-        if esp_event["event"] not in {
-            "inbound.message_received",
-            "inbound_message_received",
-        }:
+        if esp_event["event"] != "inbound.message_received":
             if esp_event["event"].startswith("inbound"):
                 raise ValueError(
                     f"Unknown Mailtrap inbound event type: {esp_event['event']}"

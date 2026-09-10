@@ -104,8 +104,7 @@ class MailtrapInboundTestCase(MailtrapWebhookTestCase):
                     "timestamp": 1788113042436,
                     "inbox_id": 1111,
                     "message_id": "0000111122223333444",
-                    # Mailtrap does not seem to include the email address (9/2026)
-                    "from": "Sender Name ",
+                    "from": "Sender Name \u003cfrom@example.com\u003e",
                 }
             ]
         }
@@ -195,20 +194,17 @@ class MailtrapInboundTestCase(MailtrapWebhookTestCase):
 
     @responses.activate
     def test_mailtrap_example_payload(self):
-        # Mailtrap's "Test your integration" has an incorrect event name under
-        # "Example of payload" (9/2026). Anymail should accept and ignore that,
+        # Anymail should ignore Mailtrap's "Test your integration" payload
         # without attempting to fetch any messages.
         raw_webhook_payload = {
             "events": [
                 {
-                    "event": "inbound_message_received",  # (sic)
-                    "message_id": "8d2a4c16-9c7f-4a7e-8b51-8d2a4c169c7f",
-                    "inbound_inbox_id": 1,
-                    "inbound_inbox_address": "hello@inbound.example.com",
-                    "from": "sender@example.com",
-                    "to": "hello@inbound.example.com",
-                    "subject": "Hello from a customer",
-                    "timestamp": 1733497282,
+                    "event": "inbound.message_received",
+                    "event_id": "2ba5edd1-a8ad-11f1-b81f-0a58a9feac02",
+                    "timestamp": 1789062148652,
+                    "inbox_id": 1,
+                    "message_id": "1875440790670688064",
+                    "from": "John Doe \u003csender@example.com\u003e",
                 }
             ]
         }
