@@ -6,6 +6,7 @@ from ..utils import (
     BASIC_NUMERIC_TYPES,
     CaseInsensitiveCasePreservingDict,
     get_anymail_setting,
+    rfc2047_encode,
 )
 from .base_requests import AnymailRequestsBackend, RequestsPayload
 
@@ -195,10 +196,20 @@ class MailKitePayload(RequestsPayload):
 
     def set_extra_headers(self, headers):
         # MailKite requires header values to be strings. Stringify ints/floats;
-        # anything else is the caller's responsibility.
+        # anything else is the caller's responsibility. It incorrectly sends
+        # non-ASCII extra headers as 8-bit content. Work around by converting
+        # to RFC 2047.
         self.data.setdefault("headers", {}).update(
             {
-                k: str(v) if isinstance(v, BASIC_NUMERIC_TYPES) else v
+                k: (
+                    str(v)
+                    if isinstance(v, BASIC_NUMERIC_TYPES)
+                    else (
+                        rfc2047_encode(v)
+                        if isinstance(v, str) and not v.isascii()
+                        else v
+                    )
+                )
                 for k, v in headers.items()
             }
         )
