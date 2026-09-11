@@ -25,6 +25,7 @@ and notes about any quirks or limitations:
    scaleway
    sendgrid
    sparkpost
+   sweego
    unisender_go
 
 
