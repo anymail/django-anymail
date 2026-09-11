@@ -20,7 +20,11 @@ from ..signals import (
     inbound,
     tracking,
 )
-from ..utils import get_anymail_setting, parse_single_address
+from ..utils import (
+    DEFAULT_DOWNLOAD_CHUNK_SIZE,
+    get_anymail_setting,
+    parse_single_address,
+)
 from .base import AnymailBaseWebhookView, AnymailCoreWebhookView
 
 try:
@@ -218,7 +222,6 @@ class ResendInboundWebhookView(SvixWebhookValidationMixin, AnymailBaseWebhookVie
     _secret_setting_name = "inbound_secret"
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
         self.api_key = get_anymail_setting(
             "api_key",
             esp_name=self.esp_name,
@@ -233,6 +236,13 @@ class ResendInboundWebhookView(SvixWebhookValidationMixin, AnymailBaseWebhookVie
         )
         if not self.api_url.endswith("/"):
             self.api_url += "/"
+        self.chunk_size = get_anymail_setting(
+            "download_chunk_size",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            default=DEFAULT_DOWNLOAD_CHUNK_SIZE,
+        )
+        super().__init__(**kwargs)
 
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
@@ -284,9 +294,11 @@ class ResendInboundWebhookView(SvixWebhookValidationMixin, AnymailBaseWebhookVie
         raw = data.get("raw") or {}
         raw_url = raw.get("download_url")
         if raw_url:
-            raw_response = requests.get(raw_url)
-            raw_response.raise_for_status()
-            return AnymailInboundMessage.parse_raw_mime_bytes(raw_response.content)
+            with requests.get(raw_url, stream=True) as raw_response:
+                raw_response.raise_for_status()
+                return AnymailInboundMessage.parse_raw_mime_chunks(
+                    raw_response.iter_content(self.chunk_size)
+                )
 
         # Fall back to constructing from parsed fields
         headers = []

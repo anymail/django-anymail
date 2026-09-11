@@ -1,6 +1,7 @@
 import re
 import warnings
 from base64 import b64decode
+from email.feedparser import BytesFeedParser
 from email.message import EmailMessage
 from email.parser import BytesParser, Parser
 from email.policy import default as default_policy
@@ -219,7 +220,10 @@ class AnymailInboundMessage(EmailMessage):
                 return payload
             charset = charset or self.get_content_charset("US-ASCII")
             errors = errors or "replace"
-            return payload.decode(charset, errors=errors)
+            text = payload.decode(charset, errors=errors)
+            # ByteParser/ByteFeedParser inconsistently handle line endings
+            # in text parts, depending on how they are called. Normalize to \n.
+            return re.sub(r"\r\n|\r", "\n", text)
 
     def as_uploaded_file(self):
         """Return the attachment converted to a Django UploadedFile"""
@@ -251,12 +255,13 @@ class AnymailInboundMessage(EmailMessage):
         return BytesParser(cls, policy=default_policy).parsebytes(b)
 
     @classmethod
-    def parse_raw_mime_file(cls, fp):
-        """Returns a new AnymailInboundMessage parsed from file-like object fp"""
-        if isinstance(fp.read(0), bytes):
-            return BytesParser(cls, policy=default_policy).parse(fp)
-        else:
-            return Parser(cls, policy=default_policy).parse(fp)
+    def parse_raw_mime_chunks(cls, chunks):
+        """Returns a new AnymailInboundMessage parsed from (streamed) chunks"""
+        parser = BytesFeedParser(cls, policy=default_policy)
+        for chunk in chunks:
+            if chunk:
+                parser.feed(chunk)
+        return parser.close()
 
     @classmethod
     def construct(

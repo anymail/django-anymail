@@ -292,7 +292,7 @@ class MailerSendInboundTestCase(MailerSendWebhookTestCase):
         self.assertEqual(message.subject, "Testing inbound 🌎")
         self.assertEqual(message.date.isoformat(" "), "2023-03-03 18:22:03-08:00")
         self.assertEqual(
-            message.text, "This is a *test*!\r\n\r\n[image: sample_image.png]\r\n"
+            message.text, "This is a *test*!\n\n[image: sample_image.png]\n"
         )
         self.assertHTMLEqual(
             message.html,
@@ -333,7 +333,7 @@ class MailerSendInboundTestCase(MailerSendWebhookTestCase):
         self.assertEqual(attachments[0].get_filename(), "sample_data.csv")
         self.assertEqual(attachments[0].get_content_type(), "text/csv")
         self.assertEqual(
-            attachments[0].get_content_text(), "Product,Price\r\nWidget,33.20"
+            attachments[0].get_content_text(), "Product,Price\nWidget,33.20"
         )
 
     def test_misconfigured_inbound(self):

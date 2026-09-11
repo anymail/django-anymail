@@ -1,16 +1,45 @@
+import hashlib
+import hmac
+import json
 from datetime import datetime, timezone
 from unittest.mock import ANY
 
-from django.test import tag
+from django.test import override_settings, tag
 
+from anymail.exceptions import AnymailConfigurationError
 from anymail.signals import AnymailTrackingEvent
 from anymail.webhooks.mailtrap import MailtrapTrackingWebhookView
 
 from .webhook_cases import WebhookBasicAuthTestCase, WebhookTestCase
 
+TEST_WEBHOOK_SIGNING_SECRET = "TEST_WEBHOOK_SIGNING_SECRET"
+
+
+def mailtrap_signature(data, secret):
+    """Generate a Mailtrap webhook signature for data with secret"""
+    # https://docs.mailtrap.io/email-api-smtp/advanced/webhooks#webhook-signature-verification
+    return hmac.new(
+        key=secret.encode(),
+        msg=data,
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+
+
+class MailtrapWebhookTestCase(WebhookTestCase):
+    def client_post_signed(self, url, json_data, secret=TEST_WEBHOOK_SIGNING_SECRET):
+        """Return self.client.post(url, serialized json_data) signed with secret"""
+        data = json.dumps(json_data).encode()
+        signature = mailtrap_signature(data, secret)
+        return self.client.post(
+            url,
+            content_type="application/json",
+            data=data,
+            headers={"Mailtrap-Signature": signature},
+        )
+
 
 @tag("mailtrap")
-class MailtrapWebhookSecurityTestCase(WebhookBasicAuthTestCase):
+class MailtrapWebhookBasicAuthSecurityTestCase(WebhookBasicAuthTestCase):
     def call_webhook(self):
         return self.client.post(
             "/anymail/mailtrap/tracking/",
@@ -19,6 +48,51 @@ class MailtrapWebhookSecurityTestCase(WebhookBasicAuthTestCase):
         )
 
     # Actual tests are in WebhookBasicAuthTestCase
+
+
+@tag("mailtrap")
+@override_settings(ANYMAIL_MAILTRAP_TRACKING_SECRET=TEST_WEBHOOK_SIGNING_SECRET)
+class MailtrapWebhookSignedSecurityTestCase(
+    MailtrapWebhookTestCase, WebhookBasicAuthTestCase
+):
+    should_warn_if_no_auth = False
+
+    def call_webhook(self):
+        return self.client_post_signed(
+            "/anymail/mailtrap/tracking/",
+            json_data={},
+            secret=TEST_WEBHOOK_SIGNING_SECRET,
+        )
+
+    # Additional tests are in WebhookBasicAuthTestCase
+
+    def test_valid_signature(self):
+        response = self.client_post_signed(
+            "/anymail/mailtrap/tracking/",
+            json_data={"events": []},
+            secret=TEST_WEBHOOK_SIGNING_SECRET,
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_invalid_signature(self):
+        response = self.client_post_signed(
+            "/anymail/mailtrap/tracking/",
+            json_data={"events": []},
+            secret="invalid-secret",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_missing_signature(self):
+        response = self.client.post(
+            "/anymail/mailtrap/tracking/",
+            data={"events": []},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_set_secret_in_view_param(self):
+        view = MailtrapTrackingWebhookView.as_view(tracking_secret="custom")
+        view_instance = view.view_class(**view.view_initkwargs)
+        self.assertEqual(view_instance.signing_secret, b"custom")
 
 
 @tag("mailtrap")
@@ -372,3 +446,15 @@ class MailtrapDeliveryTestCase(WebhookTestCase):
         self.assertEqual(event.message_id, "1df37d17-0286-4d8b-8edf-bc4ec5be86e6")
         self.assertEqual(event.recipient, "receiver@example.com")
         self.assertEqual(event.reject_reason, "blocked")
+
+    def test_misconfigured_inbound(self):
+        errmsg = (
+            "You seem to have set Mailtrap's *inbound* webhook"
+            " to Anymail's Mailtrap *tracking* webhook URL."
+        )
+        with self.assertRaisesMessage(AnymailConfigurationError, errmsg):
+            self.client.post(
+                "/anymail/mailtrap/tracking/",
+                content_type="application/json",
+                data={"events": [{"event": "inbound.message_received"}]},
+            )

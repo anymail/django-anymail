@@ -15,7 +15,7 @@ from .webhooks.mailkite import (
     MailKiteInboundWebhookView,
     MailKiteTrackingWebhookView,
 )
-from .webhooks.mailtrap import MailtrapTrackingWebhookView
+from .webhooks.mailtrap import MailtrapInboundWebhookView, MailtrapTrackingWebhookView
 from .webhooks.mandrill import MandrillCombinedWebhookView
 from .webhooks.postal import PostalInboundWebhookView, PostalTrackingWebhookView
 from .webhooks.postmark import PostmarkInboundWebhookView, PostmarkTrackingWebhookView
@@ -66,6 +66,11 @@ urlpatterns = [
         "mailkite/inbound/",
         MailKiteInboundWebhookView.as_view(),
         name="mailkite_inbound_webhook",
+    ),
+    path(
+        "mailtrap/inbound/",
+        MailtrapInboundWebhookView.as_view(),
+        name="mailtrap_inbound_webhook",
     ),
     path(
         "postal/inbound/",

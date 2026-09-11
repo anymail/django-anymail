@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import io
 import json
-import typing
 from base64 import b64decode
+from collections.abc import Iterator
 
 from django.http import HttpResponse
 from django.utils.dateparse import parse_datetime
@@ -24,7 +23,7 @@ from ..signals import (
     inbound,
     tracking,
 )
-from ..utils import get_anymail_setting, getfirst
+from ..utils import DEFAULT_DOWNLOAD_CHUNK_SIZE, get_anymail_setting, getfirst
 from .base import AnymailBaseWebhookView
 
 try:
@@ -42,6 +41,27 @@ except ImportError:
     _get_anymail_boto3_params = _LazyError(
         AnymailImproperlyInstalled(missing_package="boto3", install_extra="amazon-ses")
     )
+
+try:
+    from s3_encryption import (
+        CommitmentPolicy,
+        S3EncryptionClient,
+        S3EncryptionClientConfig,
+    )
+    from s3_encryption.exceptions import S3EncryptionClientSecurityError
+    from s3_encryption.materials.kms_keyring import KmsKeyring
+except ImportError:
+    # The encryption client is required only for inbound S3 encrypted messages.
+    S3EncryptionClient = _LazyError(
+        AnymailImproperlyInstalled(
+            missing_package="amazon-s3-encryption-client-python",
+            install_extra="amazon-ses",
+        )
+    )
+    S3EncryptionClientConfig = S3EncryptionClient
+    CommitmentPolicy = S3EncryptionClient
+    KmsKeyring = S3EncryptionClient
+    S3EncryptionClientSecurityError = object
 
 
 class AmazonSESBaseWebhookView(AnymailBaseWebhookView):
@@ -363,6 +383,21 @@ class AmazonSESInboundWebhookView(AmazonSESBaseWebhookView):
 
     signal = inbound
 
+    def __init__(self, **kwargs):
+        self.kms_key_id = get_anymail_setting(
+            "inbound_kms_key_id",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            default=None,
+        )
+        self.chunk_size = get_anymail_setting(
+            "download_chunk_size",
+            esp_name=self.esp_name,
+            kwargs=kwargs,
+            default=DEFAULT_DOWNLOAD_CHUNK_SIZE,
+        )
+        super().__init__(**kwargs)
+
     def esp_to_anymail_events(self, ses_event, sns_message):
         ses_event_type = ses_event.get("notificationType")
         if ses_event_type != "Received":
@@ -386,16 +421,12 @@ class AmazonSESInboundWebhookView(AmazonSESBaseWebhookView):
             else:
                 message = AnymailInboundMessage.parse_raw_mime(content)
         elif action_type == "S3":
-            # Download message from s3 and parse. (SNS has 15s limit
+            # Stream and parse message from s3. (SNS has 15s limit
             # for an http response; hope download doesn't take that long)
-            fp = self.download_s3_object(
-                bucket_name=action_object["bucketName"],
-                object_key=action_object["objectKey"],
+            chunks = self.fetch_s3_chunks(
+                action_object["bucketName"], action_object["objectKey"]
             )
-            try:
-                message = AnymailInboundMessage.parse_raw_mime_file(fp)
-            finally:
-                fp.close()
+            message = AnymailInboundMessage.parse_raw_mime_chunks(chunks)
         else:
             raise AnymailConfigurationError(
                 "Anymail's Amazon SES inbound webhook works only with 'SNS' or 'S3'"
@@ -435,29 +466,55 @@ class AmazonSESInboundWebhookView(AmazonSESBaseWebhookView):
             )
         ]
 
-    def download_s3_object(self, bucket_name: str, object_key: str) -> typing.IO:
-        """
-        Download bucket_name/object_key from S3. Must return a file-like object
-        (bytes or text) opened for reading. Caller is responsible for closing it.
-        """
-        s3_client = self.get_boto_client("s3")
-        bytesio = io.BytesIO()
+    def fetch_s3_chunks(self, bucket_name: str, object_key: str) -> Iterator[bytes]:
+        s3_client = kms_client = stream = None
         try:
-            s3_client.download_fileobj(bucket_name, object_key, bytesio)
+            s3_client = self.get_boto_client("s3")
+            if self.kms_key_id:
+                # SES uses AES-GCM without key commitment, so we must enable legacy
+                # algorithms and use a policy that doesn't require key commitment.
+                kms_client = self.get_boto_client("kms")
+                keyring = KmsKeyring(
+                    kms_client,
+                    self.kms_key_id,
+                    enable_legacy_wrapping_algorithms=True,
+                )
+                config = S3EncryptionClientConfig(
+                    keyring,
+                    commitment_policy=CommitmentPolicy.REQUIRE_ENCRYPT_ALLOW_DECRYPT,
+                    enable_delayed_authentication=True,
+                )
+                encryption_client = S3EncryptionClient(s3_client, config)
+                response = encryption_client.get_object(
+                    Bucket=bucket_name, Key=object_key
+                )
+            else:
+                response = s3_client.get_object(Bucket=bucket_name, Key=object_key)
+
+            stream = response["Body"]
+            for chunk in stream.iter_chunks(self.chunk_size):
+                yield chunk
+
         except ClientError as err:
-            bytesio.close()
             # improve the botocore error message
             raise AnymailBotoClientAPIError(
                 "Anymail AmazonSESInboundWebhookView couldn't download"
-                " S3 object '{bucket_name}:{object_key}'"
-                "".format(bucket_name=bucket_name, object_key=object_key),
+                f" S3 object '{bucket_name}:{object_key}'",
                 client_error=err,
             ) from err
-        else:
-            bytesio.seek(0)
-            return bytesio
+        except S3EncryptionClientSecurityError as err:
+            raise AnymailBotoClientSecurityError(
+                "Anymail AmazonSESInboundWebhookView failed decrypting"
+                f" S3 object '{bucket_name}:{object_key}'",
+                client_error=err,
+            ) from err
         finally:
-            s3_client.close()
+            if stream:
+                stream.close()
+            if kms_client:
+                kms_client.close()
+            if s3_client:
+                s3_client.close()
 
 
 class AnymailBotoClientAPIError(AnymailAPIError, ClientError):
@@ -471,4 +528,16 @@ class AnymailBotoClientAPIError(AnymailAPIError, ClientError):
             operation_name=client_error.operation_name,
         )
         # emulate AnymailError init:
+        self.args = args
+
+
+class AnymailBotoClientSecurityError(AnymailAPIError, S3EncryptionClientSecurityError):
+    """An AnymailAPIError that is also a Boto S3EncryptionClientSecurityError"""
+
+    def __init__(self, *args, client_error):
+        assert isinstance(client_error, S3EncryptionClientSecurityError)
+        AnymailAPIError.__init__(self, *args)
+        S3EncryptionClientSecurityError.__init__(
+            self, getattr(client_error, "kwargs", {}).get("msg") or str(client_error)
+        )
         self.args = args

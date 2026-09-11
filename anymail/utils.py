@@ -41,6 +41,9 @@ UNSET = type("UNSET", (object,), {})  # Used as non-None default value
 SMTP7BIT = email.policy.SMTP.clone(cte_type="7bit")
 
 
+DEFAULT_DOWNLOAD_CHUNK_SIZE = 64 * 1024  # For streaming downloads (e.g., inbound)
+
+
 def concat_lists(*args):
     """
     Combines all non-UNSET args, by concatenating lists (or sequence-like types).

@@ -5,7 +5,7 @@ from unittest.mock import ANY
 
 import responses
 from django.test import override_settings, tag
-from responses.matchers import header_matcher
+from responses.matchers import header_matcher, request_kwargs_matcher
 
 from anymail.exceptions import (
     AnymailConfigurationError,
@@ -101,12 +101,13 @@ class ResendInboundTestCase(ResendWebhookTestCase):
             },
         )
 
-        # Mock: download raw MIME
+        # Mock: stream raw MIME
         responses.add(
             responses.GET,
             raw_mime_url,
             content_type="message/rfc822",
             body=raw_mime.encode("utf-8"),
+            match=[request_kwargs_matcher({"stream": True})],
         )
 
         response = self.client_post_signed("/anymail/resend/inbound/", raw_event)

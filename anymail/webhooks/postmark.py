@@ -138,12 +138,18 @@ class PostmarkTrackingWebhookView(PostmarkBaseWebhookView):
         except KeyError:
             tags = []
 
+        # Anymail-generated Message ID takes precedence (see bulk API sends).
+        try:
+            message_id = metadata["anymail_id"]
+        except KeyError:
+            message_id = esp_event.get("MessageID", None)
+
         return AnymailTrackingEvent(
             description=esp_event.get("Description", None),
             esp_event=esp_event,
             event_id=event_id,
             event_type=event_type,
-            message_id=esp_event.get("MessageID", None),
+            message_id=message_id,
             metadata=metadata,
             mta_response=esp_event.get("Details", None),
             recipient=recipient,

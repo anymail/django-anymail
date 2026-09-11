@@ -25,16 +25,65 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
-vNext
+v15.2
 -----
 
-*Unreleased changes*
+*2026-09-05*
+
+Features
+~~~~~~~~
+
+* **Amazon SES:** Add support for inbound messages using S3 encryption.
+  This requires the :pypi:`amazon-s3-encryption-client-python` package, which
+  is now included when installing with the ``django-anymail[amazon-ses]`` extra.
+
+* **Amazon SES:** When using the S3 receipt action for inbound email, large
+  messages are now downloaded and parsed incrementally to reduce memory usage.
+
+* **Mailtrap:** Support signature verification for tracking event webhooks.
+
+* **Mailtrap:** Add support for inbound email. See
+  `docs <https://anymail.dev/en/stable/esps/mailtrap/#inbound-webhook>`.
+
+* **Postmark:** Add support for Postmark's bulk API. See
+  `Using Postmark's bulk API
+  <https://anymail.dev/en/stable/esps/postmark/#using-postmark-s-bulk-api>`_.
+
+* **Postmark:** Add ``POSTMARK_MESSAGE_STREAM`` option to specify the id of the
+  Postmark message stream used for sending. With Django 6.1 ``MAILERS`` you can
+  use a different ``message_stream`` for each configured mailer.
+
+* **Resend:** Large inbound messages are now downloaded and parsed
+  incrementally to reduce memory usage.
+
+Fixes
+~~~~~
+
+* **Amazon SES:** Avoid a Python bug that could corrupt images and attachments
+  in inbound messages.
+
+* **Inbound:** ``AnymailInboundMessage``'s ``text`` and ``html`` attributes
+  and ``get_content_text()`` method now normalize line endings to ``\n``.
+  In earlier releases, either ``\n`` or ``\r\n`` could be returned,
+  inconsistently and somewhat unpredictably.
+
+
+v15.1
+-----
+
+*2026-07-30*
 
 Fixes
 ~~~~~
 
 * **Amazon SES, Brevo:** Fix ``InvalidMailer`` error about "Unknown options"
   when used with Django 6.1 ``MAILERS`` setting.
+
+* **Postmark:** Raise an unsupported feature error when ``merge_data`` or
+  ``merge_global_data`` is used without a ``template_id``. Anymail passes that
+  data to Postmark in its ``TemplateModel`` field, which is silently ignored
+  when sending through a non-template API. (Thanks to `@slinkymanbyday`_ for
+  reporting the issue and `@Sanjays2402`_ for the fix.)
 
 Other
 ~~~~~
@@ -2040,6 +2089,7 @@ Features
 .. _@puru02: https://github.com/puru02
 .. _@RignonNoel: https://github.com/RignonNoel
 .. _@rodrigondec: https://github.com/rodrigondec
+.. _@Sanjays2402: https://github.com/Sanjays2402
 .. _@sblondon: https://github.com/sblondon
 .. _@scur-iolus: https://github.com/scur-iolus
 .. _@sdarwin: https://github.com/sdarwin

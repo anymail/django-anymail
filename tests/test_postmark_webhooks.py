@@ -475,3 +475,33 @@ class PostmarkDeliveryTestCase(WebhookTestCase):
         event = kwargs["event"]
         self.assertEqual(event.event_type, "unsubscribed")
         self.assertEqual(event.message_id, "5555555-5555555-5555-5555555")
+
+    def test_bulk_api_delivery_event(self):
+        raw_event = {
+            "MessageID": "b09e614f-d179-491a-8c1d-fc5073da65a2",
+            "Recipient": "recipient@example.com",
+            "DeliveredAt": "2026-08-27T18:06:22Z",
+            "Details": "smtp;250 2.0.0 OK  ...",
+            "Tag": "",
+            "ServerID": 1773622,
+            "Metadata": {"anymail_id": "mocked-uuid-1"},
+            "RecordType": "Delivery",
+            "MessageStream": "broadcast",
+        }
+        response = self.client.post(
+            "/anymail/postmark/tracking/",
+            content_type="application/json",
+            data=json.dumps(raw_event),
+        )
+        self.assertEqual(response.status_code, 200)
+        kwargs = self.assert_handler_called_once_with(
+            self.tracking_handler,
+            sender=PostmarkTrackingWebhookView,
+            event=ANY,
+            esp_name="Postmark",
+        )
+        event = kwargs["event"]
+        self.assertIsInstance(event, AnymailTrackingEvent)
+        self.assertEqual(event.event_type, "delivered")
+        self.assertEqual(event.recipient, "recipient@example.com")
+        self.assertEqual(event.message_id, "mocked-uuid-1")
