@@ -175,9 +175,37 @@ class MailKiteBackendStandardEmailTests(MailKiteBackendMockAPITestCase):
             data["replyTo"], "reply@example.com, Other <reply2@example.com>"
         )
 
+    def test_non_ascii_headers(self):
+        # MailKite correctly encodes non-ASCII display-names (but requires IDNA
+        # encoding for non-ASCII domain names). It correctly rfc2047 encodes
+        # the subject, but sends raw utf-8 for custom headers.
+        email = mail.EmailMessage(
+            from_email='"Odesílatel, z adresy" <from@příklad.example.cz>',
+            to=['"Příjemce, na adresu" <to@příklad.example.cz>'],
+            subject="Předmět e-mailu",
+            reply_to=['"Odpověď, adresa" <reply@příklad.example.cz>'],
+            headers={"X-Extra": "Další"},
+            body="Prostý text",
+        )
+        email.send()
+        data = self.get_api_call_json()
+        self.assertEqual(
+            data["from"], '"Odesílatel, z adresy" <from@xn--pklad-zsa96e.example.cz>'
+        )
+        self.assertEqual(
+            data["to"], ['"Příjemce, na adresu" <to@xn--pklad-zsa96e.example.cz>']
+        )
+        self.assertEqual(data["subject"], "Předmět e-mailu")
+        self.assertEqual(
+            data["replyTo"], '"Odpověď, adresa" <reply@xn--pklad-zsa96e.example.cz>'
+        )
+        self.assertEqual(data["headers"], {"X-Extra": "=?utf-8?b?RGFsxaHDrQ==?="})
+
     def test_attachments(self):
         # MailKite attachments use {filename, content (base64), contentType}
         # (note: camelCase contentType). There is no content_id / inline field.
+        # MailKite accepts non-ASCII filenames but incorrectly sends them
+        # as 8-bit utf-8 (without using RFC 2231 encoding).
         self.message.attach("receipt.pdf", b"%PDF-1.4 fake pdf", "application/pdf")
         self.message.attach("data.csv", b"a,b\n1,2\n", "text/csv")
         self.message.send()
