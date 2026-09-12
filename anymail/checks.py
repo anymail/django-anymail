@@ -19,14 +19,19 @@ def get_configured_email_backends():
         }
 
     try:
-        from django.utils.deprecation import RemovedInDjango70Warning
+        try:
+            from django.utils.deprecation import RemovedInDjango2028Warning
+        except ImportError:
+            from django.utils.deprecation import (
+                RemovedInDjango70Warning as RemovedInDjango2028Warning,
+            )
     except ImportError:
         # Django < 6.1
         return {settings.EMAIL_BACKEND}
     else:
         # Django 6.1 -- 6.2: ignore warning on deprecated setting access
         with warnings.catch_warnings(
-            action="ignore", category=RemovedInDjango70Warning
+            action="ignore", category=RemovedInDjango2028Warning
         ):
             return {settings.EMAIL_BACKEND}
 

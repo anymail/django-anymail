@@ -10,6 +10,7 @@ from requests.structures import CaseInsensitiveDict
 from ..exceptions import (
     AnymailCancelSend,
     AnymailConfigurationError,
+    AnymailDeprecationWarning,
     AnymailError,
     AnymailInvalidAddress,
     AnymailInvalidMailer,
@@ -93,7 +94,7 @@ class AnymailBaseBackend(BaseEmailBackend):
         if fail_silently:
             warnings.warn(
                 "Anymail will drop support for fail_silently after Django 6.2.",
-                DeprecationWarning,
+                AnymailDeprecationWarning,
             )
         self.fail_silently = fail_silently
 

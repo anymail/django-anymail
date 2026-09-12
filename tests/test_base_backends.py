@@ -4,10 +4,11 @@ import django.core.mail
 from django.test import SimpleTestCase, tag
 
 from anymail.backends.base_requests import AnymailRequestsBackend, RequestsPayload
+from anymail.exceptions import AnymailDeprecationWarning
 from anymail.message import AnymailMessage, AnymailRecipientStatus
 
 from .mock_requests_backend import RequestsBackendMockAPITestCase
-from .utils import AnymailTestMixin, ignore_fail_silently_warning, override_settings
+from .utils import AnymailTestMixin, ignore_connection_warnings, override_settings
 
 
 class MinimalRequestsBackend(AnymailRequestsBackend):
@@ -89,17 +90,20 @@ class RequestsBackendBaseTestCase(RequestsBackendMockAPITestCase):
         timeout = self.get_api_call_arg("timeout")
         self.assertEqual(timeout, 5)
 
-    @ignore_fail_silently_warning()
-    @mock.patch(f"{__name__}.MinimalRequestsBackend.create_session")
+    @mock.patch("tests.test_base_backends.MinimalRequestsBackend.create_session")
     def test_create_session_error_fail_silently(self, mock_create_session):
         # If create_session fails and fail_silently is True,
         # make sure _send doesn't raise a misleading error.
         mock_create_session.side_effect = ValueError("couldn't create session")
-        with self.assertWarnsMessage(
-            DeprecationWarning,
-            "Anymail will drop support for fail_silently after Django 6.2.",
+        with (
+            self.assertWarnsMessage(
+                AnymailDeprecationWarning,
+                "Anymail will drop support for fail_silently after Django 6.2.",
+            ),
+            ignore_connection_warnings(),
         ):
-            sent = self.message.send(fail_silently=True)
+            connection = django.core.mail.get_connection(fail_silently=True)
+        sent = connection.send_messages([self.message])
         self.assertEqual(sent, 0)
 
 

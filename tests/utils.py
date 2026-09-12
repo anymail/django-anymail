@@ -20,9 +20,14 @@ from django.utils.module_loading import import_string
 from anymail.exceptions import AnymailImproperlyInstalled
 
 try:
-    from django.utils.deprecation import RemovedInDjango70Warning
+    try:
+        from django.utils.deprecation import RemovedInDjango2028Warning
+    except ImportError:
+        from django.utils.deprecation import (
+            RemovedInDjango70Warning as RemovedInDjango2028Warning,
+        )
 except ImportError:
-    RemovedInDjango70Warning = None
+    RemovedInDjango2028Warning = None
 
 
 def override_settings(**kwargs):
@@ -81,12 +86,12 @@ def get_default_mailer():
 
 def ignore_fail_silently_warning():
     anymail_message = r"Anymail will drop support for fail_silently after Django 6.2."
-    if RemovedInDjango70Warning is not None:
-        # Get lowest common superclass of RemovedInDjango70Warning, DeprecationWarning
+    if RemovedInDjango2028Warning is not None:
+        # Get lowest common superclass of RemovedInDjango2028Warning, DeprecationWarning
         # (which will vary by Django release, and might be Warning).
         category = next(
             cls
-            for cls in RemovedInDjango70Warning.__mro__
+            for cls in RemovedInDjango2028Warning.__mro__
             if cls in DeprecationWarning.__mro__
         )
         return ignore_warnings(
@@ -97,15 +102,26 @@ def ignore_fail_silently_warning():
         return ignore_warnings(category=DeprecationWarning, message=anymail_message)
 
 
+class NullTestContextDecorator:
+    # Works anywhere a django.test.utils.TestContextDecorator would, but does nothing.
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass
+
+    def __call__(self, f):
+        return f
+
+
 def ignore_connection_warnings():
-    if RemovedInDjango70Warning is not None:
+    if RemovedInDjango2028Warning is not None:
         return ignore_warnings(
-            category=RemovedInDjango70Warning,
+            category=RemovedInDjango2028Warning,
             message=r"(get_connection\(\)|The 'connection' argument) is deprecated.",
         )
     else:
-        # Noop decorator
-        return lambda f: f
+        return NullTestContextDecorator()
 
 
 def decode_att(att):

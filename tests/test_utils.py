@@ -28,10 +28,15 @@ except ImportError:
     EmailAttachment = None
 
 try:
-    from django.utils.deprecation import RemovedInDjango70Warning
+    try:
+        from django.utils.deprecation import RemovedInDjango2028Warning
+    except ImportError:
+        from django.utils.deprecation import (
+            RemovedInDjango70Warning as RemovedInDjango2028Warning,
+        )
 except ImportError:
     # A category for @ignore_warnings that won't match anything:
-    RemovedInDjango70Warning = SyntaxWarning
+    RemovedInDjango2028Warning = SyntaxWarning
 
 from anymail._idna import idna2008
 from anymail.exceptions import AnymailInvalidAddress, _LazyError
@@ -594,7 +599,7 @@ class TestQuoting(SimpleTestCase):
                 self.assertEqual(result, expected)
 
 
-@ignore_warnings(category=RemovedInDjango70Warning, message="MIMEBase attachments")
+@ignore_warnings(category=RemovedInDjango2028Warning, message="MIMEBase attachments")
 class NormalizedAttachmentTests(SimpleTestCase):
     """Test utils.Attachment"""
 
