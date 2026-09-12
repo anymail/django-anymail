@@ -15,7 +15,7 @@ from ..signals import (
     inbound,
     tracking,
 )
-from ..utils import get_anymail_setting
+from ..utils import get_anymail_setting, getfirst
 from .base import AnymailBaseWebhookView
 
 
@@ -71,6 +71,9 @@ class MailerSendTrackingWebhookView(MailerSendBaseWebhookView):
     def parse_events(self, request):
         esp_event = json.loads(request.body.decode("utf-8"))
         event_type = esp_event.get("type")
+        if event_type == "webhook.test":
+            # Automatic ping during webhook config
+            return []
         if event_type == "inbound.message":
             raise AnymailConfigurationError(
                 "You seem to have set MailerSend's *inbound* route endpoint"
@@ -79,26 +82,87 @@ class MailerSendTrackingWebhookView(MailerSendBaseWebhookView):
         return [self.esp_to_anymail_event(esp_event)]
 
     event_types = {
-        # Map MailerSend activity.type: Anymail normalized type
+        # Map MailerSend data.type: Anymail normalized type
         "sent": EventType.SENT,
         "delivered": EventType.DELIVERED,
         "soft_bounced": EventType.BOUNCED,
         "hard_bounced": EventType.BOUNCED,
+        "deferred": EventType.DEFERRED,
         "opened": EventType.OPENED,
         "clicked": EventType.CLICKED,
         "unsubscribed": EventType.UNSUBSCRIBED,
-        "spam_complaint": EventType.COMPLAINED,
+        "spam_complaint": EventType.COMPLAINED,  # v1 payload only
+        "spam_complaints": EventType.COMPLAINED,
+        "suppressed": EventType.REJECTED,
     }
 
+    reject_reasons = {
+        # Map MailerSend data.type: Anymail normalized reject reason
+        "soft_bounced": RejectReason.BOUNCED,
+        "hard_bounced": RejectReason.BOUNCED,
+        "unsubscribed": RejectReason.UNSUBSCRIBED,
+        "spam_complaints": RejectReason.SPAM,
+        "suppressed": RejectReason.BLOCKED,
+    }
+
+    def esp_to_anymail_event(self, esp_event):
+        data = esp_event.get("data", {})
+        if "email" in data:
+            return self.mailersend_v1_to_anymail_event(esp_event)
+
+        data_type = data.get("type")
+        event_type = self.event_types.get(data_type, EventType.UNKNOWN)
+        reject_reason = self.reject_reasons.get(data_type)
+        event_id = data.get("id")
+        recipient = data.get("recipient")
+        message_id = data.get("message_id")
+        tags = data.get("tags", [])
+
+        try:
+            timestamp = parse_datetime(esp_event["created_at"])
+        except KeyError:
+            timestamp = None
+
+        meta = data.get("meta") or {}  # convert [] to {}
+        description = getfirst(
+            meta,
+            [
+                "bounce_reason",
+                "reject_reason",
+                "suppression_reason",
+                "unsubscribe_reason",
+            ],
+            None,
+        )
+        mta_response = str(meta["bounce_code"]) if "bounce_code" in meta else None
+        user_agent = meta.get("user_agent")
+        click_url = meta.get("url")
+
+        return AnymailTrackingEvent(
+            event_type=event_type,
+            timestamp=timestamp,
+            message_id=message_id,
+            event_id=event_id,
+            recipient=recipient,
+            reject_reason=reject_reason,
+            description=description,
+            mta_response=mta_response,
+            tags=tags,
+            click_url=click_url,
+            user_agent=user_agent,
+            esp_event=esp_event,
+        )
+
     morph_reject_reasons = {
-        # Map MailerSend morph.object (type): Anymail normalized RejectReason
+        # Map MailerSend v1 morph.object (type): Anymail normalized RejectReason
         "recipient_bounce": RejectReason.BOUNCED,
         "spam_complaint": RejectReason.SPAM,
         "recipient_unsubscribe": RejectReason.UNSUBSCRIBED,
         # any others?
     }
 
-    def esp_to_anymail_event(self, esp_event):
+    def mailersend_v1_to_anymail_event(self, esp_event):
+        # Obsolete v1 webhook format. Can be removed after 12/2026.
         activity_data = esp_event.get("data", {})
         email_data = activity_data.get("email", {})
         message_data = email_data.get("message", {})

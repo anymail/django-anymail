@@ -492,19 +492,22 @@ See "`About webhook attempts`_" in their documentation for more details.
 
 MailerSend will report these Anymail
 :attr:`~anymail.signals.AnymailTrackingEvent.event_type`\s:
-sent, delivered, bounced, complained, unsubscribed, opened, and clicked.
+sent, delivered, bounced, deferred, complained, unsubscribed, opened, and clicked.
 
 The event's :attr:`~anymail.signals.AnymailTrackingEvent.esp_event` field will be
-the *complete* parsed MailerSend webhook payload, including an additional wrapper
-object not shown in their documentation. The activity data in MailerSend's
-`webhook payload example`_ is available as ``event.esp_event["data"]``.
+the parsed MailerSend webhook payload.
+
+.. versionchanged:: vNext
+
+    Added support for MailerSend's "webhook version 2.0" format. Earlier
+    releases supported only the deprecated 1.0 format.
 
 .. _add a webhook to your domain:
    https://www.mailersend.com/help/webhooks#adding-webhooks
 .. _About webhook attempts:
    https://www.mailersend.com/help/webhooks#webhook-attempts
 .. _webhook payload example:
-   https://developers.mailersend.com/api/v1/webhooks.html#payload-example
+   https://developers.mailersend.com/api/v1/account/webhooks#payload-example
 
 
 .. _mailersend-inbound:

@@ -25,6 +25,23 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
+vNext
+-----
+
+*Unreleased changes*
+
+Fixes
+~~~~~
+
+* **MailerSend:** Add support for MailerSend's updated "webhook version 2.0"
+  format for activity tracking. (Their deprecated 1.0 format is also still
+  supported.)
+
+  To migrate an existing webhook to the new format, first update django-anymail
+  and deploy your project, and then edit your webhook in MailerSend's dashboard
+  to change to version 2.0.
+
+
 v15.2
 -----
 
