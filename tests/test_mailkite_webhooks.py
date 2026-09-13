@@ -5,10 +5,17 @@ from unittest.mock import ANY
 from django.test import override_settings, tag
 
 from anymail.exceptions import AnymailConfigurationError
-from anymail.signals import AnymailTrackingEvent
-from anymail.webhooks.mailkite import MailKiteTrackingWebhookView
+from anymail.signals import AnymailInboundEvent, AnymailTrackingEvent
+from anymail.webhooks.mailkite import (
+    MailKiteCombinedWebhookView,
+    MailKiteTrackingWebhookView,
+)
 
-from .test_mailkite_inbound import TEST_WEBHOOK_SECRET, MailKiteWebhookTestCase
+from .test_mailkite_inbound import (
+    TEST_WEBHOOK_SECRET,
+    MailKiteWebhookTestCase,
+    sample_inbound_event,
+)
 from .webhook_cases import WebhookBasicAuthTestCase
 
 
@@ -179,3 +186,64 @@ class MailKiteTrackingTestCase(MailKiteWebhookTestCase):
                 "/anymail/mailkite/tracking/",
                 {"id": "msg_1", "type": "email.received"},
             )
+
+
+@tag("mailkite")
+@override_settings(ANYMAIL_MAILKITE_WEBHOOK_SECRET=TEST_WEBHOOK_SECRET)
+class MailKiteCombinedWebhookTestCase(MailKiteWebhookTestCase):
+    """A single MailKite webhook can deliver both inbound mail and tracking events"""
+
+    def post_combined(self, payload):
+        response = self.client_post_signed("/anymail/mailkite/", payload)
+        self.assertEqual(response.status_code, 200)
+        return response
+
+    def test_routes_tracking_event_to_tracking_signal(self):
+        self.post_combined(
+            sample_tracking_event(
+                "email.clicked",
+                click={
+                    "url": "https://example.com/",
+                    "machine": False,
+                    "userAgent": "Mozilla/5.0",
+                },
+            )
+        )
+        kwargs = self.assert_handler_called_once_with(
+            self.tracking_handler,
+            sender=MailKiteCombinedWebhookView,
+            event=ANY,
+            esp_name="MailKite",
+        )
+        event = kwargs["event"]
+        self.assertIsInstance(event, AnymailTrackingEvent)
+        self.assertEqual(event.event_type, "clicked")
+        self.assertEqual(event.click_url, "https://example.com/")
+        self.assertEqual(self.inbound_handler.call_count, 0)
+
+    def test_routes_inbound_event_to_inbound_signal(self):
+        self.post_combined(sample_inbound_event())
+        kwargs = self.assert_handler_called_once_with(
+            self.inbound_handler,
+            sender=MailKiteCombinedWebhookView,
+            event=ANY,
+            esp_name="MailKite",
+        )
+        event = kwargs["event"]
+        self.assertIsInstance(event, AnymailInboundEvent)
+        self.assertEqual(event.event_type, "inbound")
+        self.assertEqual(self.tracking_handler.call_count, 0)
+
+    def test_ignores_unknown_event_type(self):
+        # MailKite retries a non-2xx delivery, so an event type this version of
+        # Anymail doesn't know about must be accepted and dropped, not raised.
+        self.post_combined({"id": "evt_1", "type": "domain.verified"})
+        self.assertEqual(self.tracking_handler.call_count, 0)
+        self.assertEqual(self.inbound_handler.call_count, 0)
+
+    def test_no_configuration_error_for_either_event_type(self):
+        # The whole point of the combined view: neither event type is "misrouted".
+        self.post_combined(sample_tracking_event("email.bounced"))
+        self.post_combined(sample_inbound_event())
+        self.assertEqual(self.tracking_handler.call_count, 1)
+        self.assertEqual(self.inbound_handler.call_count, 1)

@@ -88,26 +88,10 @@ class MailKiteBaseWebhookView(AnymailBaseWebhookView):
             )
 
 
-class MailKiteInboundWebhookView(MailKiteBaseWebhookView):
-    """Handler for MailKite inbound webhook (``email.received`` events)"""
+class MailKiteInboundEventMixin:
+    """Converts a MailKite ``email.received`` event to an AnymailInboundEvent"""
 
-    signal = inbound
-
-    def parse_events(self, request):
-        esp_event = json.loads(request.body.decode("utf-8"))
-        if esp_event.get("type") != "email.received":
-            if str(esp_event.get("type", "")).startswith("email."):
-                raise AnymailConfigurationError(
-                    "You seem to have set MailKite's *tracking-event* webhook"
-                    " to Anymail's MailKite *inbound* webhook URL."
-                    " (Or MailKite has added an event type this version of"
-                    " Anymail doesn't know about.)"
-                )
-            # Ignore anything else, rather than erroring on every delivery.
-            return []
-        return [self.esp_to_anymail_event(esp_event)]
-
-    def esp_to_anymail_event(self, esp_event):
+    def mailkite_inbound_to_anymail_event(self, esp_event):
         # Payload documented in MailKite's email.received event schema:
         # id, from {address, name?}, to [{address, name?}], subject, text,
         # html, threadId, receivedAt (ms), auth {spf, dkim, dmarc, spam},
@@ -178,10 +162,8 @@ class MailKiteInboundWebhookView(MailKiteBaseWebhookView):
         )
 
 
-class MailKiteTrackingWebhookView(MailKiteBaseWebhookView):
-    """Handler for MailKite tracking-event webhook (``email.*`` events)"""
-
-    signal = tracking
+class MailKiteTrackingEventMixin:
+    """Converts a MailKite ``email.<event>`` event to an AnymailTrackingEvent"""
 
     # Map MailKite event type: Anymail normalized type.
     # (email.delivered is reserved by MailKite for a future release;
@@ -195,16 +177,7 @@ class MailKiteTrackingWebhookView(MailKiteBaseWebhookView):
         "email.clicked": EventType.CLICKED,
     }
 
-    def parse_events(self, request):
-        esp_event = json.loads(request.body.decode("utf-8"))
-        if esp_event.get("type") == "email.received":
-            raise AnymailConfigurationError(
-                "You seem to have set MailKite's *inbound* webhook"
-                " to Anymail's MailKite *tracking* webhook URL."
-            )
-        return [self.esp_to_anymail_event(esp_event)]
-
-    def esp_to_anymail_event(self, esp_event):
+    def mailkite_tracking_to_anymail_event(self, esp_event):
         # Payload documented in MailKite's tracking-event schema:
         # {id: evt_…, type: "email.<event>", createdAt (ms), createdAtIso,
         #  data: {messageId, providerMessageId, from, to, subject,
@@ -253,3 +226,83 @@ class MailKiteTrackingWebhookView(MailKiteBaseWebhookView):
             user_agent=engagement.get("userAgent"),
             esp_event=esp_event,
         )
+
+
+class MailKiteCombinedWebhookView(
+    MailKiteInboundEventMixin, MailKiteTrackingEventMixin, MailKiteBaseWebhookView
+):
+    """Handler for a single MailKite webhook carrying both inbound and tracking events
+
+    This is the view to use with MailKite's default setup, where one webhook URL
+    per domain receives everything and the consumer switches on the event ``type``
+    (engagement events are opted in per domain). If you'd rather keep engagement
+    events off your inbound handler, MailKite can also POST them to a separate
+    tracking URL -- see MailKiteInboundWebhookView and MailKiteTrackingWebhookView.
+    """
+
+    signal = None  # set in esp_to_anymail_event
+
+    def parse_events(self, request):
+        esp_event = json.loads(request.body.decode("utf-8"))
+        event = self.esp_to_anymail_event(esp_event)
+        return [event] if event is not None else []
+
+    def esp_to_anymail_event(self, esp_event):
+        """Route the event to the inbound or the tracking handler"""
+        esp_type = esp_event.get("type")
+        if esp_type == "email.received":
+            self.signal = inbound
+            return self.mailkite_inbound_to_anymail_event(esp_event)
+        elif esp_type in self.event_types:
+            self.signal = tracking
+            return self.mailkite_tracking_to_anymail_event(esp_event)
+        else:
+            # An event type this version of Anymail doesn't know about. Ignoring it
+            # is better than erroring, which would make MailKite retry it forever.
+            return None
+
+
+class MailKiteInboundWebhookView(MailKiteInboundEventMixin, MailKiteBaseWebhookView):
+    """Handler for a MailKite webhook carrying only inbound (``email.received``) events
+
+    Use MailKiteCombinedWebhookView instead if the same MailKite webhook also
+    delivers tracking events.
+    """
+
+    signal = inbound
+
+    def parse_events(self, request):
+        esp_event = json.loads(request.body.decode("utf-8"))
+        esp_type = esp_event.get("type")
+        if esp_type != "email.received":
+            if esp_type in MailKiteTrackingEventMixin.event_types:
+                raise AnymailConfigurationError(
+                    "You seem to have set MailKite's *tracking* events"
+                    " to Anymail's MailKite *inbound* webhook URL."
+                    " Use Anymail's MailKite *combined* webhook URL"
+                    " if a single MailKite webhook delivers both."
+                )
+            # Ignore anything else, rather than erroring on every delivery.
+            return []
+        return [self.mailkite_inbound_to_anymail_event(esp_event)]
+
+
+class MailKiteTrackingWebhookView(MailKiteTrackingEventMixin, MailKiteBaseWebhookView):
+    """Handler for a MailKite webhook carrying only tracking (``email.<event>``) events
+
+    Use MailKiteCombinedWebhookView instead if the same MailKite webhook also
+    delivers inbound mail.
+    """
+
+    signal = tracking
+
+    def parse_events(self, request):
+        esp_event = json.loads(request.body.decode("utf-8"))
+        if esp_event.get("type") == "email.received":
+            raise AnymailConfigurationError(
+                "You seem to have set MailKite's *inbound* webhook"
+                " to Anymail's MailKite *tracking* webhook URL."
+                " Use Anymail's MailKite *combined* webhook URL"
+                " if a single MailKite webhook delivers both."
+            )
+        return [self.mailkite_tracking_to_anymail_event(esp_event)]

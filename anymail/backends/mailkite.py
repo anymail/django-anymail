@@ -111,12 +111,10 @@ class MailKitePayload(RequestsPayload):
     def __init__(self, message, defaults, backend, *args, **kwargs):
         self.recipients = []  # for parse_recipient_status
         self.to_recipients = []  # `to` only, for batch fan-out
-        self.metadata = None  # needed to merge with merge_metadata in batch
         self.merge_data = {}
-        self.merge_metadata = {}
         self.merge_headers = {}
         headers = kwargs.pop("headers", {})
-        headers["Authorization"] = "Bearer %s" % backend.api_key
+        headers["Authorization"] = f"Bearer {backend.api_key}"
         headers["Content-Type"] = "application/json"
         headers["Accept"] = "application/json"
         super().__init__(message, defaults, backend, headers=headers, *args, **kwargs)
@@ -141,6 +139,10 @@ class MailKitePayload(RequestsPayload):
         if "cc" in self.data or "bcc" in self.data:
             # Batch sends one message per `to` recipient; there is no cc/bcc.
             self.unsupported_feature("cc or bcc with batch send")
+        if "metadata" in self.data:
+            # The batch send API has no metadata field.
+            del self.data["metadata"]
+            self.unsupported_feature("metadata with batch send")
         self.data.pop("to", None)
         recipients = []
         for email in self.to_recipients:
@@ -148,17 +150,8 @@ class MailKitePayload(RequestsPayload):
             recipient_data = self.merge_data.get(email.addr_spec)
             if recipient_data:
                 recipient["templateData"] = recipient_data
-            headers = {}
-            if email.addr_spec in self.merge_metadata:
-                # Anymail semantics: this recipient's metadata is `metadata`
-                # updated with their merge_metadata entry.
-                recipient_metadata = dict(self.metadata or {})
-                recipient_metadata.update(self.merge_metadata[email.addr_spec])
-                headers["X-Metadata"] = self.serialize_json(recipient_metadata)
             if email.addr_spec in self.merge_headers:
-                headers.update(self.merge_headers[email.addr_spec])
-            if headers:
-                recipient["headers"] = headers
+                recipient["headers"] = self.merge_headers[email.addr_spec]
             recipients.append(recipient)
         self.data["recipients"] = recipients
 
@@ -236,10 +229,10 @@ class MailKitePayload(RequestsPayload):
             # MailKite requires a filename. Generate a reasonable default.
             ext = mimetypes.guess_extension(attachment.mimetype or "")
             if ext:
-                filename = "attachment%s" % ext
+                filename = f"attachment{ext}"
             else:
                 self.unsupported_feature(
-                    "unnamed attachments of type %s" % attachment.mimetype
+                    f"unnamed attachments of type {attachment.mimetype}"
                 )
         att = {
             "filename": filename,
@@ -256,16 +249,12 @@ class MailKitePayload(RequestsPayload):
             ]
 
     def set_metadata(self, metadata):
-        # MailKite has no dedicated metadata field; carry it as JSON in a custom
-        # header (the ESP accepts arbitrary string-valued raw MIME headers).
-        self.data.setdefault("headers", {})["X-Metadata"] = self.serialize_json(
-            metadata
-        )
-        self.metadata = metadata  # merged with merge_metadata in a batch send
-
-    def set_tags(self, tags):
-        # MailKite has no tags field; carry them as JSON in a custom header.
-        self.data.setdefault("headers", {})["X-Tags"] = self.serialize_json(tags)
+        # MailKite's `metadata` is kept server-side with the message -- stored and
+        # returned by the get message API, never emitted as a MIME header. It is
+        # not included in tracking webhook payloads; see the docs for retrieving
+        # it from a webhook handler. (Not supported by the batch send API; see
+        # restructure_data_for_batch.)
+        self.data["metadata"] = metadata
 
     def set_send_at(self, send_at):
         # A future scheduledAt parks the message for MailKite's scheduler;
@@ -299,17 +288,14 @@ class MailKitePayload(RequestsPayload):
         # MailKite renders templates server-side from templateData.
         self.data["templateData"] = merge_global_data
 
-    # Setting any of merge_data / merge_metadata / merge_headers switches to
-    # MailKite's batch-send endpoint: one personalized message per `to`
-    # recipient, with per-recipient values merged over the shared ones.
+    # Setting merge_data or merge_headers switches to MailKite's batch-send
+    # endpoint: one personalized message per `to` recipient, with per-recipient
+    # values merged over the shared ones.
     # The payload is restructured in serialize_data (see
     # restructure_data_for_batch), once every attribute has been processed.
 
     def set_merge_data(self, merge_data):
         self.merge_data = merge_data
-
-    def set_merge_metadata(self, merge_metadata):
-        self.merge_metadata = merge_metadata
 
     def set_merge_headers(self, merge_headers):
         self.merge_headers = merge_headers

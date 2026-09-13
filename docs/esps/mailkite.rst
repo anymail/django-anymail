@@ -47,6 +47,10 @@ Required. A MailKite API key (an ``mk_live_…`` token), which you can create in
 `MailKite dashboard`_. The sender address (``from``) must be on a domain whose
 ownership you've verified in MailKite.
 
+Prefer a **domain-scoped** key, which can only send for the one domain you issue it
+for. (An account-level key can send for every verified domain on the account, and is
+required only for account-wide APIs like retrieving a message.)
+
   .. code-block:: python
 
       ANYMAIL = {
@@ -56,9 +60,6 @@ ownership you've verified in MailKite.
 
 Anymail will also look for ``MAILKITE_API_KEY`` at the root of the settings file
 if neither ``ANYMAIL["MAILKITE_API_KEY"]`` nor ``ANYMAIL_MAILKITE_API_KEY`` is set.
-
-You can override the API key for an individual message in its
-:ref:`esp_extra <mailkite-esp-extra>`.
 
 .. _MailKite dashboard: https://mailkite.dev/docs
 
@@ -116,31 +117,35 @@ can tell Anymail to suppress these errors and send anyway — see
   Attach them as regular attachments instead.
 
 **Batch sending / per-recipient merge**
-  Setting :attr:`~anymail.message.AnymailMessage.merge_data`,
-  :attr:`~anymail.message.AnymailMessage.merge_metadata` or
+  Setting :attr:`~anymail.message.AnymailMessage.merge_data` or
   :attr:`~anymail.message.AnymailMessage.merge_headers` switches to MailKite's
   batch-send endpoint: each ``to`` recipient gets an **individual message**
   showing only their own address, personalized with their merge values
   (per-recipient values win over
-  :attr:`~anymail.message.AnymailMessage.merge_global_data`, metadata and
-  extra headers, key by key). Each recipient gets their own
+  :attr:`~anymail.message.AnymailMessage.merge_global_data` and extra headers,
+  key by key). Each recipient gets their own
   ``message_id`` in :attr:`~anymail.message.AnymailMessage.anymail_status`,
   and a batch can partially succeed — a suppressed address reports status
   ``rejected`` and other failures ``failed``, without raising an error.
-  Two restrictions: MailKite allows at most **50 recipients per batch
-  message**, and ``cc``/``bcc`` can't be combined with a batch send (each
-  message goes to exactly one recipient).
+  Three restrictions: MailKite allows at most **50 recipients per batch
+  message**, ``cc``/``bcc`` can't be combined with a batch send (each
+  message goes to exactly one recipient), and the batch API accepts no
+  metadata (see below).
 
-**Single reply-to field**
-  MailKite's ``replyTo`` is a single string. If you supply multiple reply-to
-  addresses, Anymail joins them into that one string (a header can hold several
-  addresses).
+**No tags**
+  MailKite has no tags field and no ESP-side analytics to segment with one, so
+  :attr:`~anymail.message.AnymailMessage.tags` is not supported.
 
-**Metadata and tags use headers**
-  MailKite has no dedicated metadata or tags field, so Anymail carries
-  :attr:`~anymail.message.AnymailMessage.metadata` and
-  :attr:`~anymail.message.AnymailMessage.tags` as JSON in custom ``X-Metadata`` and
-  ``X-Tags`` headers, respectively.
+**Metadata is not in webhook payloads, and not available for batch sends**
+  :attr:`~anymail.message.AnymailMessage.metadata` is stored with the message and
+  returned by MailKite's get message API, but is *not* included in tracking webhook
+  payloads. To use it in a tracking webhook handler, call the get message API with
+  the event's ``message_id`` (this needs an account-level API key).
+
+  MailKite's batch send API has no metadata field, so neither
+  :attr:`~anymail.message.AnymailMessage.metadata` nor
+  :attr:`~anymail.message.AnymailMessage.merge_metadata` is supported in a
+  batch send.
 
 
 .. _MailKite tracking events: https://mailkite.dev/docs
@@ -152,15 +157,25 @@ Status tracking webhooks
 
 MailKite can POST signed engagement events for your outbound mail —
 ``email.sent``, ``email.bounced``, ``email.complained``, ``email.opened``
-and ``email.clicked`` — to a per-domain *tracking webhook*. This is a
-**separate URL** from the inbound webhook below (so inbound consumers never
-receive event types they don't expect). Set it with the ``setTrackingWebhook``
-API (or ``mailkite webhook set-tracking`` in the CLI) to:
+and ``email.clicked``.
+
+By default these are delivered to your domain's **single webhook URL**, the same
+one that receives inbound mail (engagement events are opted in per domain). Use
+Anymail's *combined* webhook URL for that setup, which handles both kinds of
+event:
+
+    :samp:`https://{yoursite.example.com}/anymail/mailkite/`
+
+MailKite can alternatively POST engagement events to a **separate** tracking URL,
+keeping them off your inbound handler. Set it with the ``setTrackingWebhook`` API
+(or ``mailkite webhook set-tracking`` in the CLI), and use Anymail's paired URLs:
 
     :samp:`https://{yoursite.example.com}/anymail/mailkite/tracking/`
+    (with :samp:`https://{yoursite.example.com}/anymail/mailkite/inbound/`
+    as the domain's webhook)
 
-Deliveries are signed exactly like inbound ones, verified with the same
-``MAILKITE_WEBHOOK_SECRET`` setting as the inbound webhook (see below).
+Either way, deliveries are signed identically and verified with the same
+``MAILKITE_WEBHOOK_SECRET`` setting (see :ref:`below <mailkite-inbound>`).
 Anymail normalizes the events to
 :class:`~anymail.signals.AnymailTrackingEvent`: bounces carry the DSN
 diagnostic in :attr:`~anymail.signals.AnymailTrackingEvent.mta_response`
@@ -194,6 +209,12 @@ MailKite domain's webhook URL (in the `MailKite dashboard`_, or via the
 ``setWebhook`` API) to:
 
     :samp:`https://{yoursite.example.com}/anymail/mailkite/inbound/`
+
+If that same webhook also delivers tracking events (MailKite's default when you
+opt a domain into them), use the combined URL instead — see
+:ref:`status tracking <mailkite-tracking>`:
+
+    :samp:`https://{yoursite.example.com}/anymail/mailkite/`
 
 MailKite signs every delivery with an ``X-MailKite-Signature`` header
 (HMAC-SHA256). Anymail requires the signing secret to verify it:

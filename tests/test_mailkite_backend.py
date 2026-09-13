@@ -1,4 +1,3 @@
-import json
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -326,13 +325,13 @@ class MailKiteBackendAnymailFeatureTests(MailKiteBackendMockAPITestCase):
             self.message.send()
 
     def test_metadata(self):
+        # MailKite's metadata field is stored with the message and returned by
+        # its get message API. (It is not included in tracking webhook payloads.)
         self.message.metadata = {"user_id": "12345", "items": 6}
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(
-            json.loads(data["headers"]["X-Metadata"]),
-            {"user_id": "12345", "items": 6},
-        )
+        self.assertEqual(data["metadata"], {"user_id": "12345", "items": 6})
+        self.assertNotIn("headers", data)
 
     def test_send_at(self):
         utc_plus_6 = get_fixed_timezone(6 * 60)
@@ -389,29 +388,19 @@ class MailKiteBackendAnymailFeatureTests(MailKiteBackendMockAPITestCase):
         )
 
     def test_tags(self):
+        # MailKite has no tags field, and no ESP-side analytics to segment with one.
         self.message.tags = ["receipt", "reorder test 12"]
-        self.message.send()
-        data = self.get_api_call_json()
-        self.assertEqual(
-            json.loads(data["headers"]["X-Tags"]),
-            ["receipt", "reorder test 12"],
-        )
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "tags"):
+            self.message.send()
 
-    def test_headers_metadata_tags_interaction(self):
-        # Three features that use custom headers must not clobber each other
+    def test_headers_metadata_interaction(self):
+        # metadata is its own API field, so it can't collide with extra_headers
         self.message.extra_headers = {"X-Custom": "custom value"}
         self.message.metadata = {"user_id": "12345"}
-        self.message.tags = ["receipt", "reorder test 12"]
         self.message.send()
         data = self.get_api_call_json()
-        self.assertEqual(
-            data["headers"],
-            {
-                "X-Custom": "custom value",
-                "X-Tags": '["receipt", "reorder test 12"]',
-                "X-Metadata": '{"user_id": "12345"}',
-            },
-        )
+        self.assertEqual(data["headers"], {"X-Custom": "custom value"})
+        self.assertEqual(data["metadata"], {"user_id": "12345"})
 
     def test_template_id(self):
         self.message.template_id = "tpl_welcome"
@@ -526,15 +515,45 @@ class MailKiteBackendAnymailFeatureTests(MailKiteBackendMockAPITestCase):
         )
 
     def test_merge_metadata(self):
-        # Per-recipient metadata: `metadata` merged with the recipient's
-        # merge_metadata entry, carried in a per-recipient X-Metadata header.
+        # MailKite's batch send API has no metadata field (and header values are
+        # not retrievable), so there is no way to carry per-recipient metadata.
+        message = AnymailMessage(
+            subject="Subject",
+            body="Body",
+            from_email="from@example.com",
+            to=["alice@example.com", "bob@example.com"],
+            merge_metadata={
+                "alice@example.com": {"user_id": 123},
+                "bob@example.com": {"user_id": 456},
+            },
+        )
+        with self.assertRaisesMessage(AnymailUnsupportedFeature, "merge_metadata"):
+            message.send()
+
+    def test_metadata_with_batch_send(self):
+        # metadata works for a single send, but the batch API has no such field.
+        message = AnymailMessage(
+            subject="Subject",
+            body="Body",
+            from_email="from@example.com",
+            to=["alice@example.com", "bob@example.com"],
+            metadata={"kind": "welcome"},
+            merge_data={},  # switches to the batch endpoint
+        )
+        with self.assertRaisesMessage(
+            AnymailUnsupportedFeature, "metadata with batch send"
+        ):
+            message.send()
+
+    def test_metadata_ignored_with_batch_send(self):
+        # With ignore_unsupported_features, the batch send still goes out --
+        # just without the metadata MailKite can't accept.
         self.set_mock_response(
             json_data={
                 "results": [
                     {"to": "alice@example.com", "id": "msg_a", "status": "sent"},
-                    {"to": "bob@example.com", "id": "msg_b", "status": "sent"},
                 ],
-                "sent": 2,
+                "sent": 1,
                 "scheduled": 0,
                 "failed": 0,
             }
@@ -543,28 +562,15 @@ class MailKiteBackendAnymailFeatureTests(MailKiteBackendMockAPITestCase):
             subject="Subject",
             body="Body",
             from_email="from@example.com",
-            to=["alice@example.com", "bob@example.com"],
-            metadata={"kind": "welcome", "batch": 11},
-            merge_metadata={
-                "alice@example.com": {"user_id": 123},
-                "bob@example.com": {"user_id": 456, "kind": "vip-welcome"},
-            },
+            to=["alice@example.com"],
+            metadata={"kind": "welcome"},
+            merge_data={},
         )
-        message.send()
+        with self.settings(ANYMAIL_IGNORE_UNSUPPORTED_FEATURES=True):
+            message.send()
         data = self.get_api_call_json()
-        # Shared metadata still travels as the shared X-Metadata header:
-        self.assertEqual(
-            json.loads(data["headers"]["X-Metadata"]), {"kind": "welcome", "batch": 11}
-        )
-        # Each recipient's header is metadata updated with their entry:
-        self.assertEqual(
-            json.loads(data["recipients"][0]["headers"]["X-Metadata"]),
-            {"kind": "welcome", "batch": 11, "user_id": 123},
-        )
-        self.assertEqual(
-            json.loads(data["recipients"][1]["headers"]["X-Metadata"]),
-            {"kind": "vip-welcome", "batch": 11, "user_id": 456},
-        )
+        self.assertNotIn("metadata", data)
+        self.assertEqual(data["recipients"], [{"to": "alice@example.com"}])
 
     def test_merge_headers(self):
         self.set_mock_response(

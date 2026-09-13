@@ -281,7 +281,7 @@ class MailKiteInboundTestCase(MailKiteWebhookTestCase):
 
         with self.assertRaisesMessage(
             AnymailConfigurationError,
-            "You seem to have set MailKite's *tracking-event* webhook"
+            "You seem to have set MailKite's *tracking* events"
             " to Anymail's MailKite *inbound* webhook URL.",
         ):
             self.client_post_signed(
