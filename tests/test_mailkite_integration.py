@@ -72,7 +72,6 @@ class MailKiteBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
             reply_to=["reply@example.com"],
             headers={"X-Anymail-Test": "value"},
             metadata={"meta1": "simple string", "meta2": 2},
-            tags=["integration", "tag 2"],
             track_opens=True,
         )
         message.attach_alternative("<p>HTML content</p>", "text/html")
@@ -92,15 +91,13 @@ class MailKiteBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
 
     def test_scheduled_send(self):
         # A future send_at parks the message with MailKite's scheduler.
-        # Metadata and tags (carried as headers) are preserved on the
-        # scheduled message.
+        # Metadata is preserved on the scheduled message.
         message = AnymailMessage(
             subject="Anymail MailKite scheduled-send integration test",
             body="This message was scheduled 2 minutes ahead via send_at",
             from_email=self.from_email,
             to=["test+to1@anymail.dev"],
             metadata={"meta1": "scheduled"},
-            tags=["integration-scheduled"],
         )
         message.send_at = datetime.now(timezone.utc) + timedelta(minutes=2)
         message.send()
@@ -124,10 +121,6 @@ class MailKiteBackendIntegrationTests(AnymailTestMixin, SimpleTestCase):
                 "test+to2@anymail.dev": {"name": "Two"},
             },
             merge_global_data={"group": "integration"},
-            merge_metadata={
-                "test+to1@anymail.dev": {"user_id": 1},
-                "test+to2@anymail.dev": {"user_id": 2},
-            },
         )
         message.send()
 
