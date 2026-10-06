@@ -110,10 +110,74 @@ emails per batch; Anymail does not split larger batches automatically.
 .. _batch endpoint: https://developers.smtp2go.com/reference/send-email-batch
 
 
-Status tracking and inbound webhooks
-------------------------------------
+.. _smtp2go-webhooks:
 
-SMTP2GO tracking webhooks and inbound email are not supported by this backend.
+Status tracking webhooks
+------------------------
+
+If you use Anymail's :ref:`status tracking <event-tracking>`, add a webhook
+in SMTP2GO's **Settings > Webhooks > Manage Webhooks**:
+
+* Set the URL to ``https://random:random@yoursite.example.com/anymail/smtp2go/tracking/``,
+  where ``random:random`` matches your :setting:`ANYMAIL_WEBHOOK_SECRET` and the
+  domain is your Django site. See :ref:`securing-webhooks`.
+* Alternatively, configure the Authorization header as Basic with the same credentials.
+* Select your application's API key under Users.
+* Choose JSON or Form encoded output; Anymail supports both.
+* Select the email events you want to receive. Enable open and click tracking
+  on your API key for engagement events. Do not select SMS events.
+* Save, then use **Test this webhook** to verify your configuration.
+
+See SMTP2GO's `webhook setup guide`_ for details. Anymail uses standard Basic
+authentication validation; SMTP2GO does not document webhook signatures.
+
+Anymail normalizes the events as follows:
+
+.. list-table::
+   :header-rows: 1
+
+   * - SMTP2GO event
+     - Anymail event type
+   * - processed
+     - queued
+   * - delivered
+     - delivered
+   * - open
+     - opened
+   * - click
+     - clicked
+   * - bounce (hard or soft)
+     - bounced
+   * - spam
+     - complained
+   * - unsubscribe
+     - unsubscribed
+   * - resubscribe
+     - subscribed
+   * - reject
+     - rejected
+
+The tracking event's ``message_id`` is SMTP2GO's ``email_id``, matching the send
+response for unscheduled emails. Its ``event_id`` is the webhook's ``id``, and
+``recipient`` is the event's ``rcpt`` (not the full list of email recipients).
+Event timestamps are interpreted as UTC when no timezone offset is supplied.
+
+SMTP2GO does not document a structured click URL or detailed rejection reason.
+Anymail preserves ``context``, bounce classification, custom email headers, and
+all other provider fields in ``esp_event``. ``click_url`` remains unset, and
+reject events use reject reason ``other`` rather than guessing the cause.
+
+For scheduled messages, the send response's ``schedule_id`` differs from the
+webhook's ``email_id``. Request the ``X-Smtp2go-Schedule-Id`` email header in
+your webhook settings and read it from ``esp_event`` to correlate them.
+
+.. _webhook setup guide: https://developers.smtp2go.com/docs/setup-a-webhook
+
+
+Inbound
+-------
+
+SMTP2GO inbound email is not supported by Anymail.
 
 
 Live integration tests
