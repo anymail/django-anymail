@@ -53,6 +53,7 @@ jobs:
           - { tox: django60-py314-postal, python: "3.14" }
           - { tox: django60-py314-postmark, python: "3.14" }
           - { tox: django60-py314-resend, python: "3.14" }
+          - { tox: django60-py314-smtp2go, python: "3.14" }
           - { tox: django60-py314-scaleway, python: "3.14" }
           # - { tox: django60-py314-sendgrid, python: "3.14" }
           - { tox: django60-py314-sparkpost, python: "3.14" }
@@ -107,6 +108,9 @@ jobs:
           ANYMAIL_TEST_POSTMARK_TEMPLATE_ID: ${{ secrets.ANYMAIL_TEST_POSTMARK_TEMPLATE_ID }}
           ANYMAIL_TEST_RESEND_API_KEY: ${{ secrets.ANYMAIL_TEST_RESEND_API_KEY }}
           ANYMAIL_TEST_RESEND_DOMAIN: ${{ secrets.ANYMAIL_TEST_RESEND_DOMAIN }}
+          ANYMAIL_TEST_SMTP2GO_API_KEY: ${{ secrets.ANYMAIL_TEST_SMTP2GO_API_KEY }}
+          ANYMAIL_TEST_SMTP2GO_DOMAIN: ${{ vars.ANYMAIL_TEST_SMTP2GO_DOMAIN }}
+          ANYMAIL_TEST_SMTP2GO_TEMPLATE_ID: ${{ vars.ANYMAIL_TEST_SMTP2GO_TEMPLATE_ID }}
           ANYMAIL_TEST_SCALEWAY_DOMAIN: ${{ vars.ANYMAIL_TEST_SCALEWAY_DOMAIN }}
           ANYMAIL_TEST_SCALEWAY_PROJECT_ID: ${{ secrets.ANYMAIL_TEST_SCALEWAY_PROJECT_ID }}
           ANYMAIL_TEST_SCALEWAY_SECRET_KEY: ${{ secrets.ANYMAIL_TEST_SCALEWAY_SECRET_KEY }}

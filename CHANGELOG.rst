@@ -30,6 +30,12 @@ vNext
 
 *Unreleased changes*
 
+Features
+~~~~~~~~
+
+* **SMTP2GO:** Add an HTTP API email backend with attachments, inline images,
+  templates, scheduled sending, and personalized batch sending.
+
 Fixes
 ~~~~~
 

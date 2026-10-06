@@ -15,7 +15,7 @@ authors = [
 description = """\
 Django email backends and webhooks for Amazon SES, Brevo,
  MailerSend, Mailgun, Mailjet, Mailtrap, Mandrill, Postal, Postmark, Resend,
- Scaleway TEM, SendGrid, SparkPost, and Unisender Go
+ SMTP2GO, Scaleway TEM, SendGrid, SparkPost, and Unisender Go
  (EmailBackend, transactional email tracking and inbound email signals)\
 """
 # readme: see tool.hatch.metadata.hooks.custom below
@@ -32,6 +32,7 @@ keywords = [
     "Postal",
     "Postmark", "ActiveCampaign",
     "Resend",
+    "SMTP2GO",
     "Scaleway", "Scaleway TEM",
     "SendGrid", "Twilio",
     "SparkPost", "Bird",
@@ -83,6 +84,7 @@ mandrill = []
 postal = ["cryptography"]
 postmark = []
 resend = ["svix"]
+smtp2go = []
 scaleway = []
 sendgrid = ["cryptography"]
 sendinblue = []
