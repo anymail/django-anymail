@@ -3,8 +3,50 @@
 Mixing email backends
 =====================
 
-Since you are replacing Django's global :setting:`EMAIL_BACKEND`, by default
-Anymail will handle **all** outgoing mail, sending everything through your ESP.
+Your default email backend handles outgoing mail unless you explicitly select
+a different connection. You can use multiple Anymail backends, multiple accounts
+with the same ESP, or a mix of Anymail and Django's built-in backends.
+
+Named mailers (Django 6.1 or later)
+-----------------------------------
+
+Configure each backend in :setting:`MAILERS` with its own options:
+
+.. code-block:: python
+
+    MAILERS = {
+        "default": {
+            "BACKEND": "anymail.backends.mailgun.EmailBackend",
+            "OPTIONS": {"api_key": "<your Mailgun key>"},
+        },
+        "marketing": {
+            "BACKEND": "anymail.backends.postmark.EmailBackend",
+            "OPTIONS": {
+                "server_token": "<your Postmark server token>",
+                "message_stream": "<your broadcast stream ID>",
+            },
+        },
+    }
+
+Then select the named mailer when sending:
+
+.. code-block:: python
+
+    from django.core.mail import send_mail
+
+    send_mail(
+        "Thanks", "We sent your order", "sales@example.com", ["customer@example.com"]
+    )
+    send_mail(
+        "News", "Our latest updates", "news@example.com", ["subscriber@example.com"],
+        using="marketing",
+    )
+
+Each mailer's ``OPTIONS`` override the corresponding ``ANYMAIL`` settings.
+See :ref:`backend-configuration` for configuration details.
+
+Explicit connections (Django 6.0 or earlier)
+--------------------------------------------
 
 You can use Django mail's optional :func:`connection <django.core.mail.get_connection>`
 argument to send some mail through your ESP and others through a different system.

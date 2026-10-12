@@ -32,7 +32,8 @@ To use Anymail in your Django project:
             # ...
         ]
 
-3. Also in :file:`settings.py`, add an :setting:`ANYMAIL` settings dict,
+3. If you are using Django 6.0 or earlier, or configuring webhooks,
+   also add an :setting:`ANYMAIL` settings dict in :file:`settings.py`,
    substituting the appropriate settings for your ESP. E.g.:
 
     .. code-block:: python
@@ -57,21 +58,44 @@ To use Anymail for *sending* email from Django, make additional changes
 in your project's :file:`settings.py`. (Skip this section if you are only
 planning to *receive* email.)
 
-1. Change your existing Django :setting:`EMAIL_BACKEND` to the Anymail backend
-   for your ESP. For example, to send using Mailgun by default:
+On Django 6.1 or later, configure your ESP in :setting:`MAILERS`:
 
-    .. code-block:: python
+.. code-block:: python
 
-        EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
+    MAILERS = {
+        "default": {
+            "BACKEND": "anymail.backends.mailgun.EmailBackend",
+            "OPTIONS": {
+                "api_key": "<your Mailgun key>",
+            },
+        },
+    }
 
-   (:setting:`EMAIL_BACKEND` sets Django's default for sending emails; you can also
-   use :ref:`multiple Anymail backends <multiple-backends>` to send particular
-   messages through different ESPs.)
+``BACKEND`` is the Anymail backend for your ESP. ``OPTIONS`` supplies its
+configuration using lowercase names without the ``ANYMAIL_`` or ESP prefix:
+for example, ``MAILGUN_API_KEY`` becomes ``api_key``. Options take precedence
+over the corresponding :setting:`ANYMAIL` settings; omitted options fall back
+to those settings. See :ref:`anymail-settings-reference` for details.
+You do not need an ``ANYMAIL`` dict for sending if all required settings are
+supplied in ``OPTIONS``. Webhook settings still go in ``ANYMAIL``.
 
-2. If you don't already have :setting:`DEFAULT_FROM_EMAIL` and :setting:`SERVER_EMAIL`
-   in your settings, this is a good time to add them. (Django's defaults are
-   "webmaster\@localhost" and "root\@localhost", respectively, and most ESPs won't
-   allow sending from those addresses.)
+On Django 6.0 or earlier:
+
+Change your existing Django :setting:`EMAIL_BACKEND` to the Anymail backend
+for your ESP. For example, to send using Mailgun by default:
+
+.. code-block:: python
+
+    EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
+
+(:setting:`EMAIL_BACKEND` sets Django's default for sending emails; you can also
+use :ref:`multiple Anymail backends <multiple-backends>` to send particular
+messages through different ESPs.)
+
+For all Django versions, if you don't already have :setting:`DEFAULT_FROM_EMAIL`
+and :setting:`SERVER_EMAIL` in your settings, this is a good time to add them.
+(Django's defaults are "webmaster\@localhost" and "root\@localhost", respectively,
+and most ESPs won't allow sending from those addresses.)
 
 With the settings above, you are ready to send outgoing email through your ESP.
 If you also want to enable status tracking or inbound handling, continue with the
@@ -189,6 +213,8 @@ receiving inbound message events.
 .. _mod_wsgi: https://modwsgi.readthedocs.io/en/latest/configuration-directives/WSGIPassAuthorization.html
 
 
+.. _anymail-settings-reference:
+
 .. setting:: ANYMAIL
 
 Anymail settings reference
@@ -224,10 +250,20 @@ if you are using other Django apps that work with the same ESP.)
                                    # nor ANYMAIL_MAILGUN_API_KEY have been set
 
 
+On Django 6.1 or later, you can provide sending settings in the ``OPTIONS``
+dict of a :setting:`MAILERS` configuration. These options override the
+corresponding ``ANYMAIL`` settings for that mailer. To convert a setting name
+to an option, remove the ``ANYMAIL_`` and ESP prefixes and lowercase the rest:
+e.g., ``ANYMAIL_MAILGUN_API_KEY`` becomes ``api_key``. Generic backend settings
+like ``ANYMAIL_IGNORE_UNSUPPORTED_FEATURES`` become ``ignore_unsupported_features``.
+The ``send_defaults`` option replaces ESP-specific send defaults and is merged
+with global :setting:`ANYMAIL_SEND_DEFAULTS`; see :ref:`send-defaults`.
+Webhook settings are configured separately in ``ANYMAIL``.
+
 Finally, for complex use cases, you can override most settings on a per-instance
 basis by providing keyword args where the instance is initialized (e.g., in a
-:func:`~django.core.mail.get_connection` call to create an email backend instance,
-or in a `View.as_view()` call to set up webhooks in a custom urls.py). To get the kwargs
+:func:`~django.core.mail.get_connection` call on Django 6.0 or earlier, or in a
+`View.as_view()` call to set up webhooks in a custom urls.py). To get the kwargs
 parameter for a setting, drop "ANYMAIL" and the ESP name, and lowercase the rest:
 e.g., you can override ANYMAIL_MAILGUN_API_KEY for a particular connection by calling
 ``get_connection("anymail.backends.mailgun.EmailBackend", api_key="abc")``.
