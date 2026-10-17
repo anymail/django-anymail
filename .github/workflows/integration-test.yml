@@ -54,7 +54,7 @@ jobs:
           - { tox: django60-py314-postmark, python: "3.14" }
           - { tox: django60-py314-resend, python: "3.14" }
           - { tox: django60-py314-scaleway, python: "3.14" }
-          # - { tox: django60-py314-sendgrid, python: "3.14" }
+          - { tox: django60-py314-sendgrid, python: "3.14" }
           - { tox: django60-py314-sparkpost, python: "3.14" }
           - { tox: django60-py314-unisender_go, python: "3.14" }
 
