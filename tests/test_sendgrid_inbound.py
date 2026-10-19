@@ -23,13 +23,6 @@ from .webhook_cases import WebhookTestCase
 @tag("sendgrid")
 @ignore_warnings(category=AnymailNotSupportedWarning)
 class SendgridInboundTestCase(WebhookTestCase):
-    def test_not_supported_warning(self):
-        with self.assertWarns(
-            AnymailNotSupportedWarning,
-            msg="django-anymail has dropped official support for SendGrid.",
-        ):
-            self.client.post("/anymail/sendgrid/inbound/", data={"email": ""})
-
     def test_inbound_basics(self):
         raw_event = {
             "headers": dedent("""\

@@ -30,6 +30,15 @@ vNext
 
 *Unreleased changes*
 
+Un-breaking changes
+~~~~~~~~~~~~~~~~~~~
+
+* **SendGrid:** Anymail once again officially supports SendGrid, after discontinuing
+  that support in 13.0.1. SendGrid has re-enabled the test account and integration tests
+  are running again. (Thanks to the many django-anymail users who voiced their concerns
+  directly to SendGrid and in public forums, and to Andrew MacLean at Twilio for
+  raising internal awareness of the issue.)
+
 Fixes
 ~~~~~
 
@@ -54,9 +63,7 @@ Fixes
   and workarounds in the
   `docs <https://anymail.dev/en/latest/esps/sendgrid/#sendgrid-garbled-text-attachments>`_.
 
-  (Thanks to `@Adman`_ for the report and fix. As a reminder, SendGrid is no
-  longer tested. Although Anymail's maintainers have reviewed the fix, it has not
-  been independently verified against the live API.)
+  (Thanks to `@Adman`_ for the report and fix)
 
 
 v15.2

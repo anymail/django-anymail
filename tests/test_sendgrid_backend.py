@@ -28,7 +28,6 @@ from .utils import (
     AnymailTestMixin,
     create_text_attachment,
     decode_att,
-    get_default_mailer,
     ignore_fail_silently_warning,
     override_settings,
     sample_image_content,
@@ -72,13 +71,6 @@ class SendGridBackendMockAPITestCase(RequestsBackendMockAPITestCase):
 @ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridBackendStandardEmailTests(SendGridBackendMockAPITestCase):
     """Test backend support for Django standard email features"""
-
-    def test_not_supported_warning(self):
-        with self.assertWarns(
-            AnymailNotSupportedWarning,
-            msg="django-anymail has dropped official support for SendGrid.",
-        ):
-            get_default_mailer()
 
     def test_send_mail(self):
         """Test basic API for simple send"""
