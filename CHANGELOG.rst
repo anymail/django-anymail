@@ -30,6 +30,15 @@ vNext
 
 *Unreleased changes*
 
+Un-breaking changes
+~~~~~~~~~~~~~~~~~~~
+
+* **SendGrid:** Anymail once again officially supports SendGrid, after discontinuing
+  that support in 13.0.1. SendGrid has re-enabled the test account and integration tests
+  are running again. (Thanks to the many django-anymail users who voiced their concerns
+  directly to SendGrid and in public forums, and to Andrew MacLean at Twilio for
+  raising internal awareness of the issue.)
+
 Fixes
 ~~~~~
 

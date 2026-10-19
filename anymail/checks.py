@@ -63,17 +63,7 @@ def check_deprecated_settings(app_configs, **kwargs):
             )
         )
 
-    if any(
-        backend == "anymail.backends.sendgrid.EmailBackend"
-        for backend in get_configured_email_backends()
-    ):
-        errors.append(
-            checks.Warning(
-                "django-anymail has dropped official support for SendGrid.",
-                hint="See https://github.com/anymail/django-anymail/issues/432.",
-                id="anymail.W003",
-            )
-        )
+    # anymail.W003: retired [SendGrid support warning; see issue #432]
 
     return errors
 

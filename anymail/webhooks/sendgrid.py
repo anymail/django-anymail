@@ -3,14 +3,12 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-import warnings
 from datetime import datetime, timezone
 from email.parser import BytesParser
 from email.policy import default as default_policy
 
 from ..exceptions import (
     AnymailImproperlyInstalled,
-    AnymailNotSupportedWarning,
     AnymailWebhookValidationFailure,
     _LazyError,
 )
@@ -88,11 +86,6 @@ class SendGridBaseWebhookView(AnymailBaseWebhookView):
             self.warn_if_no_basic_auth = True
 
         super().__init__(**kwargs)
-        warnings.warn(
-            "django-anymail has dropped official support for SendGrid."
-            " See https://github.com/anymail/django-anymail/issues/432.",
-            AnymailNotSupportedWarning,
-        )
 
     def validate_request(self, request):
         if self.webhook_verification_key:
@@ -255,7 +248,7 @@ class SendGridInboundWebhookView(AnymailBaseWebhookView):
     signal = inbound
 
     # The inbound webhook does not currently implement signature validation
-    # because we don't have access to a SendGrid account that could test it.
+    # because we didn't have access to a SendGrid account that could test it.
     # It *should* only require changing to SendGridBaseWebhookView and
     # providing the setting name:
     #
@@ -263,14 +256,6 @@ class SendGridInboundWebhookView(AnymailBaseWebhookView):
     #         key_setting_name = "inbound_webhook_verification_key"
     #
     # and then setting SENDGRID_INBOUND_WEBHOOK_VERIFICATION_KEY.
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        warnings.warn(
-            "django-anymail has dropped official support for SendGrid."
-            " See https://github.com/anymail/django-anymail/issues/432.",
-            AnymailNotSupportedWarning,
-        )
 
     def parse_events(self, request):
         return [self.esp_to_anymail_event(request)]
