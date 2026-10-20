@@ -22,6 +22,7 @@ and notes about any quirks or limitations:
    postal
    postmark
    resend
+   smtp2go
    scaleway
    sendgrid
    sparkpost
