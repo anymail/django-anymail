@@ -11,6 +11,11 @@ from .webhooks.mailersend import (
 )
 from .webhooks.mailgun import MailgunInboundWebhookView, MailgunTrackingWebhookView
 from .webhooks.mailjet import MailjetInboundWebhookView, MailjetTrackingWebhookView
+from .webhooks.mailkite import (
+    MailKiteCombinedWebhookView,
+    MailKiteInboundWebhookView,
+    MailKiteTrackingWebhookView,
+)
 from .webhooks.mailtrap import MailtrapInboundWebhookView, MailtrapTrackingWebhookView
 from .webhooks.mandrill import MandrillCombinedWebhookView
 from .webhooks.postal import PostalInboundWebhookView, PostalTrackingWebhookView
@@ -57,6 +62,11 @@ urlpatterns = [
         "mailjet/inbound/",
         MailjetInboundWebhookView.as_view(),
         name="mailjet_inbound_webhook",
+    ),
+    path(
+        "mailkite/inbound/",
+        MailKiteInboundWebhookView.as_view(),
+        name="mailkite_inbound_webhook",
     ),
     path(
         "mailtrap/inbound/",
@@ -115,6 +125,11 @@ urlpatterns = [
         name="mailjet_tracking_webhook",
     ),
     path(
+        "mailkite/tracking/",
+        MailKiteTrackingWebhookView.as_view(),
+        name="mailkite_tracking_webhook",
+    ),
+    path(
         "mailtrap/tracking/",
         MailtrapTrackingWebhookView.as_view(),
         name="mailtrap_tracking_webhook",
@@ -159,6 +174,13 @@ urlpatterns = [
         "unisender_go/tracking/",
         UnisenderGoTrackingWebhookView.as_view(),
         name="unisender_go_tracking_webhook",
+    ),
+    # A single MailKite webhook can deliver both inbound mail and tracking events,
+    # so Anymail offers a combined endpoint alongside the split pair above:
+    path(
+        "mailkite/",
+        MailKiteCombinedWebhookView.as_view(),
+        name="mailkite_combined_webhook",
     ),
     # Anymail uses a combined Mandrill webhook endpoint,
     # to simplify Mandrill's key-validation scheme:

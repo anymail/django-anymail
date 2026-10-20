@@ -32,6 +32,7 @@ Anymail currently supports these ESPs:
 * **MailerSend**
 * **Mailgun** (Sinch transactional email)
 * **Mailjet** (Sinch transactional email)
+* **MailKite**
 * **Mailtrap**
 * **Mandrill** (MailChimp transactional email)
 * **Postal** (self-hosted ESP)
