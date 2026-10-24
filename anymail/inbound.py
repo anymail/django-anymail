@@ -415,8 +415,10 @@ class AnymailInboundMessage(EmailMessage):
             # email.Message parses message/rfc822 parts as a "multipart" (list) payload
             # whose single item is the recursively-parsed message attachment
             if isinstance(content, bytes):
-                content = content.decode()
-            payload = [cls.parse_raw_mime(content)]
+                message = cls.parse_raw_mime_bytes(content)
+            else:
+                message = cls.parse_raw_mime(content)
+            payload = [message]
             charset = None
 
         part.set_payload(payload, charset)
