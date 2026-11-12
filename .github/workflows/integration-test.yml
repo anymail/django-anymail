@@ -45,6 +45,7 @@ jobs:
         config:
           - { tox: django60-py314-amazon_ses, python: "3.14" }
           - { tox: django60-py314-brevo, python: "3.14" }
+          - { tox: django60-py314-mailchannels, python: "3.14" }
           - { tox: django60-py314-mailersend, python: "3.14" }
           - { tox: django60-py314-mailgun, python: "3.14" }
           - { tox: django60-py314-mailjet, python: "3.14" }
@@ -105,6 +106,9 @@ jobs:
           ANYMAIL_TEST_POSTMARK_DOMAIN: ${{ secrets.ANYMAIL_TEST_POSTMARK_DOMAIN }}
           ANYMAIL_TEST_POSTMARK_SERVER_TOKEN: ${{ secrets.ANYMAIL_TEST_POSTMARK_SERVER_TOKEN }}
           ANYMAIL_TEST_POSTMARK_TEMPLATE_ID: ${{ secrets.ANYMAIL_TEST_POSTMARK_TEMPLATE_ID }}
+          ANYMAIL_TEST_MAILCHANNELS_API_KEY: ${{ secrets.ANYMAIL_TEST_MAILCHANNELS_API_KEY }}
+          ANYMAIL_TEST_MAILCHANNELS_FROM_EMAIL: ${{ vars.ANYMAIL_TEST_MAILCHANNELS_FROM_EMAIL }}
+          ANYMAIL_TEST_MAILCHANNELS_TO_EMAIL: ${{ vars.ANYMAIL_TEST_MAILCHANNELS_TO_EMAIL }}
           ANYMAIL_TEST_RESEND_API_KEY: ${{ secrets.ANYMAIL_TEST_RESEND_API_KEY }}
           ANYMAIL_TEST_RESEND_DOMAIN: ${{ secrets.ANYMAIL_TEST_RESEND_DOMAIN }}
           ANYMAIL_TEST_SCALEWAY_DOMAIN: ${{ vars.ANYMAIL_TEST_SCALEWAY_DOMAIN }}

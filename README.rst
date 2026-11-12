@@ -29,6 +29,7 @@ Anymail currently supports these ESPs:
 
 * **Amazon SES**
 * **Brevo** (formerly SendinBlue)
+* **MailChannels** (sending only)
 * **MailerSend**
 * **Mailgun** (Sinch transactional email)
 * **Mailjet** (Sinch transactional email)
