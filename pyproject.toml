@@ -148,3 +148,6 @@ combine_as_imports = true
 known_first_party = "anymail"
 profile = "black"
 py_version = "310"
+
+[tool.uv.dependency-groups]
+docs = { requires-python = ">=3.12" }
