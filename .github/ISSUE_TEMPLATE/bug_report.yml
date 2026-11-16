@@ -1,0 +1,94 @@
+# yaml-language-server: $schema=https://schemastore.org/github-issue-forms.json
+name: 🐞 Bug report
+description: Report a specific problem in django-anymail's behavior
+type: "Bug"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this to report a specific problem in django-anymail's behavior.
+
+        For questions about using Anymail or help diagnosing error messages, post in the [Q&A] discussion instead.
+
+        Please **do not report security issues** here. Use *Report a vulnerability* on the [security page].
+
+        [Q&A]: https://github.com/anymail/django-anymail/discussions/categories/q-a
+        [security page]: https://github.com/anymail/django-anymail/security
+
+  - type: textarea
+    attributes:
+      label: Description
+      placeholder: |
+        Enter description
+
+        (Tip: drag the resize corner grip below to make this field taller)
+      description: |
+        A concise but complete explanation of the problem you're seeing. We need to understand:
+        * What you're trying to do
+        * The incorrect behavior you saw (what actually happened)
+        * The expected behavior (what should have happened)
+        * How to reproduce the problem (a [minimal reproducible example] is best,
+          but any context is helpful)
+        * Has this ever worked before? If so, what changed?
+        * The results of any [troubleshooting] steps you've already tried
+
+        Please include:
+        * The exact error message and stack trace if you're getting an error
+        * Any relevant code (for example, if you're having problems sending,
+          show your code that sends the message)
+        * Relevant settings (`ANYMAIL`, `EMAIL_BACKEND` or `MAILERS`, etc.)
+
+        Please **do not post screenshots of code** or error messages.
+        Paste in the actual text as a [fenced block].
+
+        To mask sensitive information, change domains to `example.com` and emails
+        to `from@example.com`, `to@example.com`, etc. (Use `my.example.com` and
+        `other.example.com` or similar if you need multiple domains.)
+        Replace other secrets with `[REDACTED]`.
+
+        [fenced block]: https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-and-highlighting-code-blocks
+        [minimal reproducible example]: https://stackoverflow.com/help/minimal-reproducible-example
+        [troubleshooting]: https://anymail.dev/en/stable/help/#troubleshooting
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Environment
+      placeholder: Environment
+      description: |
+        Environment where you experienced the problem. For example:
+          * django-anymail version: 14.0
+          * ESP name: Amazon SES
+          * Django version: 6.1
+          * Python version: 3.15.2
+
+        You can also add any other versions or conditions needed to reproduce
+        the issue (e.g., "OS: Ubuntu 24.04" or "using Mailgun's European endpoint").
+      value: |
+        * django-anymail version:
+        * ESP name:
+        * Django version:
+        * Python version:
+
+  - type: dropdown
+    attributes:
+      label: Where discovered
+      description: How did you first find this problem?
+      options:
+        - "-- Select an option --"
+        - Experienced in production or while developing/testing a Django project
+        - Found while reading the Anymail documentation
+        - I (or my AI) found it by reviewing django-anymail source
+        - Other (please explain below)
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional information
+      placeholder: Enter additional information (optional)
+      description: |
+        Anything else that would be useful to know: links or references,
+        a suggested fix if you have one, workarounds, or any other relevant
+        information that didn't have a place above.

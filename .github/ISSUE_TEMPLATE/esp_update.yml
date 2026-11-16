@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://schemastore.org/github-issue-forms.json
+name: 📩 ESP update request
+description: |
+  Update an existing ESP integration for a newly-supported capability or API
+title: "<esp_name>: <summary>"
+type: "Feature"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this to request an update to an existing ESP integration. (For example, when the ESP has updated their APIs or added new capabilities.)
+
+        To request integrating an ESP not currently supported by django-anymail, use the [new ESP request] instead.
+
+        To request any other Anymail change or improvement, please post in the [Ideas] discussion.
+
+        [Ideas]: https://github.com/anymail/django-anymail/discussions/categories/ideas
+        [new ESP request]: https://github.com/anymail/django-anymail/issues/new?template=esp_request.md
+
+  - type: input
+    id: esp_name
+    attributes:
+      label: ESP name
+      description: This must be one of the ESPs currently supported by django-anymail
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Announcement/docs
+      description: |
+        Link to the ESP's announcement or documentation for the updated capability
+        (if available)
+      placeholder: "https://..."
+
+  - type: input
+    attributes:
+      label: django-anymail version
+      description: |
+        The version of django-anymail you're currently using
+        (where the ESP capability is missing)
+
+  - type: textarea
+    attributes:
+      label: Description
+      placeholder: Enter description (optional)
+      description: |
+        A concise but complete description of the update needed. (You can leave
+        this blank if it's obvious from the info above.)
+
+        You can also include:
+        * Other links or references
+        * Workarounds (can Anymail's `esp_extra` be used to access the feature?)
+        * Whether you'd be willing to help with development or testing
+        * If you've already got an implementation, a link to your fork
+          (and mention whether you're running it in a production environment)
+        * Anything else that would be useful to know

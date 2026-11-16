@@ -12,14 +12,16 @@ decisions that aren't necessarily obvious from the code.
 
 ## Getting started
 
-- Don't want to do _all_ of this? **That's OK!** A partial PR
-  is better than no PR. And opening a work-in-progress PR
-  early is a really good idea.
-- Don't want to do _any_ of this? Use GitHub issues to request
-  support for other ESPs in Anymail.
-- It's often easiest to copy and modify the existing code
-  for an ESP with a similar API. There are some hints in each
-  section below what might be "similar".
+Before spending time (or AI tokens) on code, please open a
+[new ESP request] in GitHub issues. Anymail's maintainers generally
+won't review a new ESP PR until the request has gathered a certain
+level of authentic community interest.
+
+It's often easiest to copy and modify the existing code
+for an ESP with a similar API. There are some hints in each
+section below what might be "similar".
+
+[new ESP request]: https://github.com/anymail/django-anymail/issues/new?template=esp_request.md
 
 ### Which ESPs?
 

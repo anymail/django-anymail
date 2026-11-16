@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://schemastore.org/github-issue-forms.json
+name: 📘 Docs correction
+description: Report a problem in Anymail's documentation
+type: "Bug"
+labels: ["docs"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this to report incorrect, outdated, or confusing information in the django-anymail documentation.
+
+        To suggest new documentation topics or substantial changes, please post in the [Ideas] discussion instead.
+
+        **Note**: For broken links, typos, and similar minor fixes to the docs, you can also open a pull request directly. (No need to create an issue.)
+
+        [Ideas]: https://github.com/anymail/django-anymail/discussions/categories/ideas
+
+  - type: input
+    attributes:
+      label: Affected page
+      description: |
+        Link to the Anymail documentation page that needs updating
+      placeholder: "https://anymail.dev/..."
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Description
+      placeholder: |
+        Enter description
+
+        (Tip: drag the resize corner grip below to make this field taller)
+      description: |
+        A concise but complete description of what's incorrect, outdated, confusing,
+        missing, or otherwise needs updating.
+
+        It can be helpful to include:
+        * Links to the ESP's or Django's documentation, if relevant
+        * When things changed (version or date) for outdated content
+        * Suggested rewording, if you have one
+        * Anything else that would be useful to know

@@ -1,0 +1,114 @@
+# yaml-language-server: $schema=https://schemastore.org/github-issue-forms.json
+name: ✉️ New ESP request
+description: Request adding support for an email service provider
+title: "Add support for <esp_name>"
+type: "New ESP"
+labels: ["community input needed"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this to request adding a django-anymail integration for an email service provider.
+
+        The ESP must support **transactional sending**—sending an individual email to a specific recipient—to work with Django's email features. (Some ESPs call this their "SMTP service.")
+
+        If the ESP only offers bulk sending to mailing lists, like marketing campaigns, it cannot be integrated with Anymail.
+
+  - type: markdown
+    attributes:
+      value: "### About the ESP"
+
+  - type: input
+    id: esp_name
+    attributes:
+      label: ESP name
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Transactional sending API docs
+      placeholder: "https://docs.example.com/..."
+      description: |
+        Link to the documentation for the ESP's **transactional sending** API
+    validations:
+      required: true
+
+  - type: checkboxes
+    attributes:
+      label: Supported features
+      description: |
+        Check any features the ESP supports *in its transactional sending APIs.*
+
+        (None of these are required; knowing helps scope the integration work.)
+      options:
+        - label: Metadata, tags or categories (custom data associated with a message)
+        - label: Templates and substitution variables (merge fields)
+        - label: Batch sending (single API call to send multiple messages)
+        - label: Webhooks for status tracking (e.g., delivered, opened, bounced)
+        - label: Inbound email (email receiving)
+        - label: Other (provide details in *API info* below)
+        - label: Not sure / haven't checked
+
+  - type: dropdown
+    attributes:
+      label: Testing plan availability
+      description: |
+        Does the ESP have a pricing plan that would allow django-anymail testing?
+
+        Full ESP support requires ongoing access to a low volume, free or minimal cost
+        plan for development, triaging and fixing bugs, and weekly integration testing.
+      options:
+        - "-- Select an option --"
+        - Not sure / haven't checked
+        - Yes, free tier supporting 300+ messages/month with no time limit
+        - Yes, usage-based fee per message with no other monthly charges
+        - No, sending requires a monthly fee (possibly after a free trial period)
+        - I am a representative of the ESP and can provide special arrangements
+        - Other (explain below)
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: API info
+      placeholder: Enter API info (optional)
+      description: |
+        Links to the ESP's developer documentation and any other
+        notes that would assist understanding how to integrate the ESP.
+
+        If you can find them, API references for specific features are really helpful:
+        transactional sending variations, templates, webhook payloads and signing,
+        inbound handling, etc.
+
+  - type: markdown
+    attributes:
+      value: "### About you"
+
+  - type: dropdown
+    attributes:
+      label: Who's making this request?
+      description: |
+        It helps to know if this is coming from a developer working
+        on a Django project, a representative of the ESP, or someone else.
+      options:
+        - "-- Select an option --"
+        - I use this ESP as a paying customer
+        - I use this ESP on a free or trial basis
+        - I'm thinking about using this ESP
+        - I work for or represent the ESP
+        - I'm an AI (briefly summarize your assignment/task below)
+        - Other (provide details below)
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional information
+      placeholder: Enter additional information (optional)
+      description: |
+        You can include things like:
+        * Whether you'd be willing to help with development or testing
+        * If you've already got an implementation, a link to your fork
+          (and mention whether you're running it in a production environment)
+        * Anything else that would be useful to know (and didn't have a place above)

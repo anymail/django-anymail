@@ -35,19 +35,39 @@ folks from Brack3t who developed the original version of Djrill.
 Bugs
 ----
 
-You can report problems or request features in `Anymail's GitHub issue tracker`_.
-(For a security-related issue that should not be disclosed publicly, instead email
-Anymail's maintainers at *security\<at>anymail\<dot>dev*.)
+You can report problems or request features in `Anymail's GitHub issues <issues>`_.
+(For a security-related issue that should not be disclosed publicly, instead use
+the *Report a vulnerability* button on the repo's `security page <security>`_,
+or email Anymail's maintainers at *security\<at>anymail\<dot>dev*.)
 
 We also have some :ref:`troubleshooting` information that may be helpful.
 
-.. _Anymail's GitHub issue tracker: https://github.com/anymail/django-anymail/issues
+.. _issues: https://github.com/anymail/django-anymail/issues
+.. _security: https://github.com/anymail/django-anymail/security
+
+
+Enhancement requests
+--------------------
+
+To suggest integrating a new ESP, first check if there's already an
+`existing ESP request`_ for it. If so, express your interest by upvoting as described
+in the issue comments. If not, open an issue using the `new ESP request`_ option.
+
+Other enhancements should be proposed in Anymail's discussion forum under `Ideas`_.
+
+.. _existing ESP request: https://github.com/anymail/django-anymail/issues?q=is%3Aissue+type%3A%22New+ESP%22
+.. _new ESP request: https://github.com/anymail/django-anymail/issues/new?template=esp_request.md
+.. _Ideas: https://github.com/anymail/django-anymail/discussions/categories/ideas
 
 
 Pull requests
 -------------
 
 Pull requests are always welcome to fix bugs and improve support for ESP and Django features.
+For all but minor corrections, please report an issue or propose a feature
+in the discussion forum before opening a PR.
+
+When submitting a pull request:
 
 * Please include test cases.
 * We try to follow the `Django coding style`_.

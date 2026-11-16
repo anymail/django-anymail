@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://schemastore.org/github-issue-config.json
+blank_issues_enabled: true
+contact_links:
+  - name: 🙏 Help (Q&A)
+    about: Ask about error messages, how to use Anymail, or any other questions
+    url: https://github.com/anymail/django-anymail/discussions/categories/q-a
+  - name: 💡 Feature request or idea
+    about: Suggest new features and discuss ideas for improvements
+    url: https://github.com/anymail/django-anymail/discussions/categories/ideas
+  - name: 💬 General discussion
+    about: Everything else
+    url: https://github.com/anymail/django-anymail/discussions/categories/general
