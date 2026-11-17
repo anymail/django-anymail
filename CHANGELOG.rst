@@ -30,6 +30,14 @@ vNext
 
 *Unreleased changes*
 
+Features
+~~~~~~~~
+
+* **MailChannels:** Add a sending backend for the MailChannels Email API,
+  including asynchronous queue status, inline attachments, envelope senders,
+  open/click tracking controls, Mustache merge data and batch personalizations.
+  Tracking and inbound webhook handlers are not included.
+
 Fixes
 ~~~~~
 
