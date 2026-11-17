@@ -21,6 +21,7 @@ from .webhooks.sendinblue import (
     SendinBlueInboundWebhookView,
     SendinBlueTrackingWebhookView,
 )
+from .webhooks.smtp2go import SMTP2GOTrackingWebhookView
 from .webhooks.sparkpost import (
     SparkPostInboundWebhookView,
     SparkPostTrackingWebhookView,
@@ -149,6 +150,11 @@ urlpatterns = [
         "sendinblue/tracking/",
         SendinBlueTrackingWebhookView.as_view(),
         name="sendinblue_tracking_webhook",
+    ),
+    path(
+        "smtp2go/tracking/",
+        SMTP2GOTrackingWebhookView.as_view(),
+        name="smtp2go_tracking_webhook",
     ),
     path(
         "sparkpost/tracking/",
