@@ -30,6 +30,6 @@ see the [_Contributing_][contributing] section in the docs.
 
 [contributing]: https://anymail.dev/en/stable/contributing/
 [Ideas]: https://github.com/anymail/django-anymail/discussions/categories/ideas
-[new ESP request]: https://github.com/anymail/django-anymail/issues/new?template=esp_request.md
+[new ESP request]: https://github.com/anymail/django-anymail/issues/new?template=esp_request.yml
 [support]: https://anymail.dev/en/stable/help/#support
 [troubleshooting]: https://anymail.dev/en/stable/help/#troubleshooting

@@ -56,7 +56,7 @@ in the issue comments. If not, open an issue using the `new ESP request`_ option
 Other enhancements should be proposed in Anymail's discussion forum under `Ideas`_.
 
 .. _existing ESP request: https://github.com/anymail/django-anymail/issues?q=is%3Aissue+type%3A%22New+ESP%22
-.. _new ESP request: https://github.com/anymail/django-anymail/issues/new?template=esp_request.md
+.. _new ESP request: https://github.com/anymail/django-anymail/issues/new?template=esp_request.yml
 .. _Ideas: https://github.com/anymail/django-anymail/discussions/categories/ideas
 
 

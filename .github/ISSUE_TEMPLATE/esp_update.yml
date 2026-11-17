@@ -15,7 +15,7 @@ body:
         To request any other Anymail change or improvement, please post in the [Ideas] discussion.
 
         [Ideas]: https://github.com/anymail/django-anymail/discussions/categories/ideas
-        [new ESP request]: https://github.com/anymail/django-anymail/issues/new?template=esp_request.md
+        [new ESP request]: https://github.com/anymail/django-anymail/issues/new?template=esp_request.yml
 
   - type: input
     id: esp_name
