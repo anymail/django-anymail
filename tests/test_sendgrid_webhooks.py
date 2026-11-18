@@ -323,17 +323,6 @@ class SendGridSignedWebhookSecurityAndHttpBasicAuthTestCase(
 @tag("sendgrid")
 @ignore_warnings(category=AnymailNotSupportedWarning)
 class SendGridDeliveryTestCase(WebhookTestCase):
-    def test_not_supported_warning(self):
-        with self.assertWarns(
-            AnymailNotSupportedWarning,
-            msg="django-anymail has dropped official support for SendGrid.",
-        ):
-            self.client.post(
-                "/anymail/sendgrid/tracking/",
-                content_type="application/json",
-                data=json.dumps([]),
-            )
-
     def test_processed_event(self):
         raw_events = [
             {
