@@ -25,6 +25,7 @@ from .webhooks.sparkpost import (
     SparkPostInboundWebhookView,
     SparkPostTrackingWebhookView,
 )
+from .webhooks.sweego import SweegoInboundWebhookView, SweegoTrackingWebhookView
 from .webhooks.unisender_go import UnisenderGoTrackingWebhookView
 
 app_name = "anymail"
@@ -88,6 +89,11 @@ urlpatterns = [
         "sparkpost/inbound/",
         SparkPostInboundWebhookView.as_view(),
         name="sparkpost_inbound_webhook",
+    ),
+    path(
+        "sweego/inbound/",
+        SweegoInboundWebhookView.as_view(),
+        name="sweego_inbound_webhook",
     ),
     path(
         "amazon_ses/tracking/",
@@ -154,6 +160,11 @@ urlpatterns = [
         "sparkpost/tracking/",
         SparkPostTrackingWebhookView.as_view(),
         name="sparkpost_tracking_webhook",
+    ),
+    path(
+        "sweego/tracking/",
+        SweegoTrackingWebhookView.as_view(),
+        name="sweego_tracking_webhook",
     ),
     path(
         "unisender_go/tracking/",
