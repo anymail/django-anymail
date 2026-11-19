@@ -17,6 +17,7 @@ and notes about any quirks or limitations:
    mailersend
    mailgun
    mailjet
+   mailkite
    mailtrap
    mandrill
    postal
