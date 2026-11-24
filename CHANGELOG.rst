@@ -25,10 +25,10 @@ Release history
 ^^^^^^^^^^^^^^^
     ..  This extra heading level keeps the ToC from becoming unmanageably long
 
-vNext
+v15.3
 -----
 
-*Unreleased changes*
+*2026-11-24*
 
 Un-breaking changes
 ~~~~~~~~~~~~~~~~~~~
@@ -61,7 +61,7 @@ Fixes
   recipients may see garbled text or errors in their email client. Trying to send
   non-ASCII text attachment content with SendGrid is not recommended. More info
   and workarounds in the
-  `docs <https://anymail.dev/en/latest/esps/sendgrid/#sendgrid-garbled-text-attachments>`_.
+  `docs <https://anymail.dev/en/stable/esps/sendgrid/#sendgrid-garbled-text-attachments>`_.
 
   (Thanks to `@Adman`_ for the report and fix)
 

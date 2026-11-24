@@ -5,7 +5,7 @@ SendGrid
 
 Anymail integrates with the Twilio `SendGrid`_ email service, using their `Web API`_.
 
-.. versionchanged:: vNext
+.. versionchanged:: 15.3
 
     Anymail's SendGrid integration is once again fully supported.
 
@@ -288,7 +288,7 @@ Limitations and quirks
   use only ASCII characters. Another option is switching to Django's built-in
   SMTP EmailBackend with SendGrid's SMTP relay endpoint.
 
-  .. versionchanged:: vNext
+  .. versionchanged:: 15.3
 
       Anymail no longer includes the ``charset`` parameter in the SendGrid API's
       attachment type, as some customers reported it caused API errors. (Anymail

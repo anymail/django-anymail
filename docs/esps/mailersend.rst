@@ -497,7 +497,7 @@ sent, delivered, bounced, deferred, complained, unsubscribed, opened, and clicke
 The event's :attr:`~anymail.signals.AnymailTrackingEvent.esp_event` field will be
 the parsed MailerSend webhook payload.
 
-.. versionchanged:: vNext
+.. versionchanged:: 15.3
 
     Added support for MailerSend's "webhook version 2.0" format. Earlier
     releases supported only the deprecated 1.0 format.
