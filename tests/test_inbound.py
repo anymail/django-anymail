@@ -671,6 +671,26 @@ class AnymailInboundMessageAttachedMessageTests(SimpleTestCase):
         ):
             self.assertTrue(orig_inline_att.is_inline_attachment())
 
+    def test_construct_rfc822_attachment_from_8bit_bytes(self):
+        # An attached email has its own charset and need not be UTF-8.
+        raw = (
+            b"From: sender@example.com\n"
+            b"To: recipient@example.com\n"
+            b"Content-Type: text/plain; charset=iso-8859-1\n"
+            b"Content-Transfer-Encoding: 8bit\n"
+            b"\n"
+            b"caf\xe9\n"
+        )
+        for content, encoded in [(raw, False), (b64encode(raw), True)]:
+            with self.subTest(base64=encoded):
+                att = AnymailInboundMessage.construct_attachment(
+                    "message/rfc822", content, base64=encoded, filename="message.eml"
+                )
+                message = att.get_payload(0)
+                self.assertIsInstance(message, AnymailInboundMessage)
+                self.assertEqual(message.text, "café\n")
+                self.assertEqual(message.get_content_bytes(), b"caf\xe9\n")
+
     def test_construct_rfc822_attachment_from_data(self):
         # constructed message/rfc822 attachment should end up as parsed message
         # (same as if attachment was parsed from raw mime, as in previous test)
